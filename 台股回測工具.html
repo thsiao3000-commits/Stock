@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>📈 台股策略回測 + AI 技術分析</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #18202b;
+    --panel2: #1f2937;
+    --border: #2d3a4b;
+    --text: #e6edf3;
+    --muted: #8b9bb0;
+    --accent: #4aa3ff;
+    --up: #ff6b6b;     /* 台股慣例：紅漲 */
+    --down: #2ecc8f;   /* 綠跌 */
+    --gold: #f6b93b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+    line-height: 1.6;
+  }
+  header {
+    padding: 24px 20px 12px; text-align: center;
+    background: linear-gradient(180deg, #131b26, var(--bg));
+  }
+  header h1 { margin: 0 0 4px; font-size: 1.6rem; }
+  header p { margin: 0; color: var(--muted); font-size: .9rem; }
+  main { max-width: 1080px; margin: 0 auto; padding: 12px 20px 60px; }
+  section {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px; margin-top: 20px;
+  }
+  section h2 { margin: 0 0 14px; font-size: 1.1rem; color: var(--accent); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  label.field { display: flex; flex-direction: column; gap: 5px; font-size: .85rem; color: var(--muted); }
+  input, select, button {
+    font: inherit; color: var(--text); background: var(--panel2);
+    border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+  }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  input[type="checkbox"] { width: auto; accent-color: var(--accent); }
+  .row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-top: 14px; }
+  .hint { font-size: .8rem; color: var(--muted); }
+  #strategyDesc { color: var(--gold); font-size: .9rem; margin-top: 12px; }
+  button.primary {
+    background: var(--accent); color: #04101f; font-weight: 700;
+    padding: 10px 26px; cursor: pointer; border: none;
+  }
+  button.primary:hover { filter: brightness(1.1); }
+  button.primary:disabled { opacity: .45; cursor: not-allowed; }
+  #status { margin-top: 12px; font-size: .9rem; color: var(--muted); min-height: 1.4em; }
+  #status.error { color: var(--up); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+  .card {
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 14px;
+  }
+  .card .k { font-size: .78rem; color: var(--muted); }
+  .card .v { font-size: 1.15rem; font-weight: 700; margin-top: 2px; }
+  .pos { color: var(--up); }
+  .neg { color: var(--down); }
+  #chartWrap { position: relative; margin-top: 18px; }
+  #chart { width: 100%; height: 320px; display: block; }
+  #tooltip {
+    position: absolute; pointer-events: none; display: none;
+    background: rgba(15,20,25,.95); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 10px; font-size: .78rem; white-space: nowrap; z-index: 5;
+  }
+  .legend { display: flex; gap: 18px; font-size: .8rem; color: var(--muted); margin-top: 6px; }
+  .legend i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+  details { margin-top: 16px; }
+  summary { cursor: pointer; color: var(--muted); font-size: .9rem; }
+  .tableWrap { max-height: 360px; overflow: auto; margin-top: 10px; border: 1px solid var(--border); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: .82rem; }
+  th, td { padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: right; white-space: nowrap; }
+  th { position: sticky; top: 0; background: var(--panel2); color: var(--muted); font-weight: 600; }
+  td:first-child, th:first-child, td:nth-child(2), th:nth-child(2),
+  td:nth-child(3), th:nth-child(3), td:nth-child(4), th:nth-child(4) { text-align: left; }
+  #aiOutput {
+    margin-top: 16px; background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 20px; display: none; overflow-x: auto;
+  }
+  #aiOutput h1, #aiOutput h2, #aiOutput h3, #aiOutput h4 { color: var(--accent); margin: 14px 0 6px; }
+  #aiOutput h1 { font-size: 1.2rem; } #aiOutput h2 { font-size: 1.1rem; } #aiOutput h3 { font-size: 1rem; }
+  #aiOutput table { margin: 8px 0; } #aiOutput th, #aiOutput td { text-align: left; }
+  #aiOutput code { background: #0d1117; padding: 1px 6px; border-radius: 5px; font-size: .85em; }
+  #aiOutput pre { background: #0d1117; padding: 12px; border-radius: 8px; overflow-x: auto; }
+  #aiOutput ul, #aiOutput ol { padding-left: 22px; }
+  footer { text-align: center; color: var(--muted); font-size: .78rem; padding: 0 20px 40px; }
+  @media (max-width: 600px) { main { padding: 8px 12px 40px; } section { padding: 14px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>📈 台股策略回測 + AI 技術分析</h1>
+  <p>資料來源：台灣證券交易所（TWSE）每日收盤行情 — 僅支援上市股票</p>
+</header>
+<main>
+
+  <!-- ── 參數設定 ── -->
+  <section>
+    <h2>① 策略參數</h2>
+    <div class="grid">
+      <label class="field">台股代號（上市）
+        <input id="stockNo" value="2330" placeholder="例：2330" inputmode="numeric">
+      </label>
+      <label class="field">計算區間（起）
+        <input id="dateStart" type="date">
+      </label>
+      <label class="field">計算區間（迄）
+        <input id="dateEnd" type="date">
+      </label>
+      <label class="field">起始投入資金（NT$）
+        <input id="capital" type="number" value="1000000" min="1000" step="1000">
+      </label>
+      <label class="field">策略模式
+        <select id="mode">
+          <option value="periodic" selected>機械式定期執行</option>
+          <option value="kd">KD 黃金交叉觸發</option>
+        </select>
+      </label>
+      <label class="field pOnly">開盤動作
+        <select id="openAction">
+          <option value="buy" selected>買進</option>
+          <option value="sell">賣出</option>
+          <option value="none">不動作</option>
+        </select>
+      </label>
+      <label class="field pOnly">收盤動作
+        <select id="closeAction">
+          <option value="sell" selected>賣出</option>
+          <option value="buy">買進</option>
+          <option value="none">不動作</option>
+        </select>
+      </label>
+      <label class="field pOnly">執行頻率（每 N 個交易日執行一次）
+        <input id="interval" type="number" value="1" min="1" step="1">
+      </label>
+      <label class="field kdOnly" style="display:none">KD 週期（N 日 RSV）
+        <input id="kdN" type="number" value="9" min="2" max="60" step="1">
+      </label>
+      <label class="field kdOnly" style="display:none">訊號執行時點
+        <select id="kdExec">
+          <option value="nextOpen" selected>次一交易日開盤</option>
+          <option value="close">訊號當日收盤</option>
+        </select>
+      </label>
+      <label class="field kdOnly" style="display:none">買進門檻（金叉當日 K 低於才買，留空＝不限）
+        <input id="kdBuyBelow" type="number" placeholder="例：20" min="0" max="100" step="1">
+      </label>
+      <label class="field kdOnly" style="display:none">賣出門檻（死叉當日 K 高於才賣，留空＝不限）
+        <input id="kdSellAbove" type="number" placeholder="例：80" min="0" max="100" step="1">
+      </label>
+    </div>
+    <div class="row">
+      <label><input id="useFees" type="checkbox" checked> 計入交易成本</label>
+      <label class="hint">手續費率 % <input id="feeRate" type="number" value="0.1425" step="0.0001" min="0" style="width:90px"></label>
+      <label class="hint">證交稅率 % <input id="taxRate" type="number" value="0.3" step="0.01" min="0" style="width:80px"></label>
+      <span class="hint">（一般 0.3%；現股當沖可改 0.15%）</span>
+    </div>
+    <div id="strategyDesc"></div>
+    <div class="row">
+      <button id="runBtn" class="primary">🚀 開始回測</button>
+      <span class="hint">每月一次 API 請求、間隔 0.5 秒，區間越長等越久。賣出僅在有持股時執行（不模擬放空）；以零股（1 股）為單位、All-in 全額進出。</span>
+      <span class="hint kdOnly" style="display:none">KD 以區間內資料起算（K、D 初始值 50），需暖身期：區間最前面約 N 日不會出現訊號，建議區間至少 3 個月。</span>
+    </div>
+    <div id="status"></div>
+  </section>
+
+  <!-- ── 回測結果 ── -->
+  <section id="resultSec" style="display:none">
+    <h2 id="resultTitle">② 回測結果</h2>
+    <div class="cards" id="cards"></div>
+    <div id="chartWrap">
+      <canvas id="chart"></canvas>
+      <div id="tooltip"></div>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--gold)"></i>策略資產（起點=100）</span>
+      <span><i style="background:var(--accent)"></i>買進持有（起點=100）</span>
+      <span><span style="color:var(--up)">▲</span> 買進　<span style="color:var(--down)">▼</span> 賣出（≤80 筆時顯示）</span>
+    </div>
+    <details>
+      <summary>📜 交易明細（點擊展開）</summary>
+      <div class="tableWrap">
+        <table id="tradeTable">
+          <thead><tr><th>#</th><th>日期</th><th>時點</th><th>動作</th><th>價格</th><th>股數</th><th>金額</th><th>成本</th><th>現金餘額</th><th>持股</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+
+  <!-- ── AI 技術分析 ── -->
+  <section id="aiSec">
+    <h2>③ OpenAI 技術分析</h2>
+    <div class="grid">
+      <label class="field">OpenAI API Key
+        <input id="apiKey" type="password" placeholder="sk-...">
+      </label>
+      <label class="field">模型
+        <select id="modelSel">
+          <option value="gpt-5.4" selected>gpt-5.4（預設）</option>
+          <option value="gpt-5.4-mini">gpt-5.4-mini</option>
+          <option value="__custom__">自訂…</option>
+        </select>
+      </label>
+      <label class="field" id="customModelWrap" style="display:none">自訂模型名稱
+        <input id="customModel" placeholder="例：gpt-5.2">
+      </label>
+    </div>
+    <div class="row">
+      <label><input id="rememberKey" type="checkbox"> 記住 API Key（存於本機瀏覽器 localStorage）</label>
+      <button id="aiBtn" class="primary">🤖 產生 AI 技術分析</button>
+    </div>
+    <div id="aiStatus" class="hint" style="margin-top:10px"></div>
+    <div id="aiOutput"></div>
+  </section>
+
+</main>
+<footer>
+  資料來源：台灣證券交易所。股價為原始價格（未還原除權息）。本工具僅供研究參考，不構成任何投資建議。
+</footer>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+
+/* ════════════════ CORE：資料解析與回測（純函式） ════════════════ */
+// === CORE ===
+function rocToISO(s) {                      // "115/05/04" → "2026-05-04"
+  const [y, m, d] = s.trim().split('/');
+  return (Number(y) + 1911) + '-' + m + '-' + d;
+}
+function numOrNull(s) {                     // "2,275.00" → 2275 ；"--" → null
+  if (s == null) return null;
+  const t = String(s).replace(/,/g, '').trim();
+  if (t === '' || t === '--' || t === 'X') return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+function parseMonth(json) {                 // TWSE STOCK_DAY → [{date,open,high,low,close,volume}]
+  if (!json || json.stat !== 'OK' || !Array.isArray(json.data)) return [];
+  return json.data.map(r => ({
+    date:   rocToISO(r[0]),
+    volume: numOrNull(r[1]),
+    open:   numOrNull(r[3]),
+    high:   numOrNull(r[4]),
+    low:    numOrNull(r[5]),
+    close:  numOrNull(r[6]),
+  })).filter(d => d.open != null && d.close != null);
+}
+function runEngine(days, p, planFor) {
+  // planFor(i, day) → [{action:'buy'|'sell'|'none', price, when, note?}, …]
+  let cash = p.capital, shares = 0, totalCost = 0;
+  const trades = [], equity = [];
+  function act(action, price, when, date, note) {
+    if (action === 'buy' && cash > 0) {
+      const qty = Math.floor(cash / (price * (1 + p.feeRate)));
+      if (qty <= 0) return;
+      const amount = qty * price, fee = amount * p.feeRate;
+      cash -= amount + fee; shares += qty; totalCost += fee;
+      trades.push({ date, when, action: '買進', note, price, qty, amount, cost: fee, cash, shares });
+    } else if (action === 'sell' && shares > 0) {
+      const qty = shares, amount = qty * price;
+      const fee = amount * p.feeRate, tax = amount * p.taxRate;
+      cash += amount - fee - tax; shares = 0; totalCost += fee + tax;
+      trades.push({ date, when, action: '賣出', note, price, qty, amount, cost: fee + tax, cash, shares });
+    }
+  }
+  days.forEach((d, i) => {
+    for (const s of planFor(i, d)) act(s.action, s.price, s.when, d.date, s.note);
+    equity.push(cash + shares * d.close);
+  });
+  const final = equity[equity.length - 1];
+  let peak = -Infinity, maxDD = 0;
+  for (const v of equity) { peak = Math.max(peak, v); maxDD = Math.max(maxDD, (peak - v) / peak); }
+  return { trades, equity, cash, shares, final, totalCost,
+           profit: final - p.capital, returnPct: (final / p.capital - 1) * 100, maxDD: maxDD * 100 };
+}
+function simulate(days, p) {
+  // p: {capital, openAction, closeAction, interval, feeRate, taxRate}
+  return runEngine(days, p, (i, d) => i % p.interval !== 0 ? [] : [
+    { action: p.openAction,  price: d.open,  when: '開盤' },
+    { action: p.closeAction, price: d.close, when: '收盤' },
+  ]);
+}
+function kdSeries(days, n = 9) {        // 與 calcKD 同算法，回傳逐日 {K,D}（前 n-1 日為 null）
+  let K = 50, D = 50;
+  return days.map((d, i) => {
+    if (i < n - 1) return null;
+    const w = days.slice(i - n + 1, i + 1);
+    const hi = Math.max(...w.map(x => x.high ?? x.close));
+    const lo = Math.min(...w.map(x => x.low ?? x.close));
+    const rsv = hi === lo ? 50 : (d.close - lo) / (hi - lo) * 100;
+    K = K * 2 / 3 + rsv / 3; D = D * 2 / 3 + K / 3;
+    return { K, D };
+  });
+}
+function kdSignals(days, p) {           // sig[i]: 'buy'（黃金交叉）| 'sell'（死亡交叉）| null
+  const kd = kdSeries(days, p.kdN);
+  const sig = days.map(() => null);
+  for (let i = 1; i < days.length; i++) {
+    const prev = kd[i - 1], cur = kd[i];
+    if (!prev || !cur) continue;
+    if (prev.K <= prev.D && cur.K > cur.D) {
+      if (p.kdBuyBelow == null || cur.K < p.kdBuyBelow) sig[i] = 'buy';
+    } else if (prev.K >= prev.D && cur.K < cur.D) {
+      if (p.kdSellAbove == null || cur.K > p.kdSellAbove) sig[i] = 'sell';
+    }
+  }
+  return { kd, sig };
+}
+function simulateKD(days, p) {
+  // p: {capital, kdN, kdExec:'nextOpen'|'close', kdBuyBelow, kdSellAbove, feeRate, taxRate}
+  const { sig } = kdSignals(days, p);
+  return runEngine(days, p, (i, d) => {
+    const s = p.kdExec === 'close' ? sig[i] : (i > 0 ? sig[i - 1] : null);
+    if (!s) return [];
+    return [{
+      action: s,
+      price: p.kdExec === 'close' ? d.close : d.open,
+      when:  p.kdExec === 'close' ? '收盤' : '開盤',
+      note:  s === 'buy' ? 'KD金叉' : 'KD死叉',
+    }];
+  });
+}
+/* ── 技術指標 ── */
+function sma(arr, n) { if (arr.length < n) return null; let s = 0; for (let i = arr.length - n; i < arr.length; i++) s += arr[i]; return s / n; }
+function emaSeries(arr, n) { const k = 2 / (n + 1); let e = arr[0]; return arr.map((v, i) => e = i === 0 ? v : v * k + e * (1 - k)); }
+function calcRSI(closes, n = 14) {
+  if (closes.length < n + 1) return null;
+  let g = 0, l = 0;
+  for (let i = 1; i <= n; i++) { const c = closes[i] - closes[i - 1]; c > 0 ? g += c : l -= c; }
+  let ag = g / n, al = l / n;
+  for (let i = n + 1; i < closes.length; i++) {
+    const c = closes[i] - closes[i - 1];
+    ag = (ag * (n - 1) + Math.max(c, 0)) / n;
+    al = (al * (n - 1) + Math.max(-c, 0)) / n;
+  }
+  return al === 0 ? 100 : 100 - 100 / (1 + ag / al);
+}
+function calcMACD(closes) {
+  if (closes.length < 35) return null;
+  const e12 = emaSeries(closes, 12), e26 = emaSeries(closes, 26);
+  const dif = closes.map((_, i) => e12[i] - e26[i]);
+  const dea = emaSeries(dif, 9), i = closes.length - 1;
+  return { dif: dif[i], macd: dea[i], hist: dif[i] - dea[i] };
+}
+function calcKD(days, n = 9) {
+  if (days.length < n) return null;
+  let K = 50, D = 50;
+  for (let i = n - 1; i < days.length; i++) {
+    const w = days.slice(i - n + 1, i + 1);
+    const hi = Math.max(...w.map(d => d.high ?? d.close));
+    const lo = Math.min(...w.map(d => d.low ?? d.close));
+    const rsv = hi === lo ? 50 : (days[i].close - lo) / (hi - lo) * 100;
+    K = K * 2 / 3 + rsv / 3; D = D * 2 / 3 + K / 3;
+  }
+  return { K, D };
+}
+// === END CORE ===
+
+/* ════════════════ TWSE 抓取 ════════════════ */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function monthList(startISO, endISO) {
+  const out = [];
+  let [y, m] = startISO.split('-').map(Number);
+  const [ey, em] = endISO.split('-').map(Number);
+  while (y < ey || (y === ey && m <= em)) {
+    out.push(`${y}${String(m).padStart(2, '0')}`);
+    m++; if (m > 12) { m = 1; y++; }
+  }
+  return out;
+}
+async function fetchAll(stockNo, startISO, endISO, onProgress) {
+  const months = monthList(startISO, endISO);
+  let all = [], name = '';
+  for (let i = 0; i < months.length; i++) {
+    onProgress(`抓取 ${months[i].slice(0, 4)}/${months[i].slice(4)} 資料中…（${i + 1}/${months.length}）`);
+    const url = `https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?date=${months[i]}01&stockNo=${encodeURIComponent(stockNo)}&response=json`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`TWSE 回應 HTTP ${res.status}（可能被限流，請稍候 5 分鐘再試）`);
+    const json = await res.json();
+    if (json.stat === 'OK') {
+      if (!name && json.title) {
+        const m = json.title.match(/^\s*\d+年\d+月\s+(\S+)\s+(\S+)/);
+        if (m) name = m[2];
+      }
+      all = all.concat(parseMonth(json));
+    }
+    if (i < months.length - 1) await sleep(500);
+  }
+  all = all.filter(d => d.date >= startISO && d.date <= endISO)
+           .sort((a, b) => a.date.localeCompare(b.date));
+  return { days: all, name };
+}
+
+/* ════════════════ UI：回測 ════════════════ */
+const nf = new Intl.NumberFormat('zh-TW');
+const money = x => 'NT$' + nf.format(Math.round(x));
+const pct = x => (x >= 0 ? '+' : '') + x.toFixed(2) + '%';
+let lastResult = null;   // {days, name, stockNo, params, sim, bhReturn}
+
+function readParams() {
+  const optNum = id => { const v = $(id).value.trim(); return v === '' ? null : Number(v); };
+  return {
+    stockNo: $('stockNo').value.trim(),
+    start: $('dateStart').value,
+    end: $('dateEnd').value,
+    capital: Number($('capital').value),
+    mode: $('mode').value,
+    openAction: $('openAction').value,
+    closeAction: $('closeAction').value,
+    interval: Math.max(1, Math.floor(Number($('interval').value) || 1)),
+    kdN: Math.max(2, Math.floor(Number($('kdN').value) || 9)),
+    kdExec: $('kdExec').value,
+    kdBuyBelow: optNum('kdBuyBelow'),
+    kdSellAbove: optNum('kdSellAbove'),
+    feeRate: $('useFees').checked ? Number($('feeRate').value) / 100 : 0,
+    taxRate: $('useFees').checked ? Number($('taxRate').value) / 100 : 0,
+  };
+}
+function strategyText(p) {
+  if (p.mode === 'kd') {
+    const buy = `黃金交叉買進${p.kdBuyBelow != null ? `（限當日 K<${p.kdBuyBelow}）` : ''}`;
+    const sell = `死亡交叉賣出${p.kdSellAbove != null ? `（限當日 K>${p.kdSellAbove}）` : ''}`;
+    const exec = p.kdExec === 'close' ? '訊號當日收盤' : '次一交易日開盤';
+    return `KD(${p.kdN}) ${buy}、${sell}，於${exec}執行`;
+  }
+  const t = { buy: '買進', sell: '賣出', none: '不動作' };
+  let note = '';
+  if (p.openAction === 'buy' && p.closeAction === 'sell') note = '（當沖做多：可將證交稅改為 0.15%）';
+  else if (p.openAction === 'sell' && p.closeAction === 'buy') note = '（收盤買、次一執行日開盤賣：隔日沖風格）';
+  else if (p.openAction === 'none' && p.closeAction === 'buy') note = '（定期收盤買進並持有）';
+  else if (p.openAction === 'buy' && p.closeAction === 'none') note = '（定期開盤買進並持有）';
+  return `每 ${p.interval} 個交易日 → 開盤${t[p.openAction]}、收盤${t[p.closeAction]} ${note}`;
+}
+function describeStrategy() { $('strategyDesc').textContent = '目前策略：' + strategyText(readParams()); }
+function applyMode() {
+  const kd = $('mode').value === 'kd';
+  document.querySelectorAll('.pOnly').forEach(el => el.style.display = kd ? 'none' : '');
+  document.querySelectorAll('.kdOnly').forEach(el => el.style.display = kd ? '' : 'none');
+  describeStrategy();
+}
+['openAction', 'closeAction', 'interval', 'kdN', 'kdExec', 'kdBuyBelow', 'kdSellAbove']
+  .forEach(id => $(id).addEventListener('input', describeStrategy));
+$('mode').addEventListener('input', applyMode);
+
+async function runBacktest() {
+  const p = readParams();
+  const st = $('status');
+  st.className = '';
+  if (!/^[0-9A-Za-z]{4,6}$/.test(p.stockNo)) { st.className = 'error'; st.textContent = '請輸入正確的股票代號（例：2330）'; return; }
+  if (!p.start || !p.end || p.start > p.end) { st.className = 'error'; st.textContent = '請確認計算區間（起日不可晚於迄日）'; return; }
+  if (!(p.capital > 0)) { st.className = 'error'; st.textContent = '請輸入正確的起始資金'; return; }
+  if (p.mode === 'periodic' && p.openAction === 'none' && p.closeAction === 'none') { st.className = 'error'; st.textContent = '開盤與收盤至少要有一個動作'; return; }
+  if (p.mode === 'kd' && !(p.kdN >= 2 && p.kdN <= 60)) { st.className = 'error'; st.textContent = '請輸入 2～60 的 KD 週期'; return; }
+
+  $('runBtn').disabled = true;
+  try {
+    const { days, name } = await fetchAll(p.stockNo, p.start, p.end, msg => st.textContent = msg);
+    if (days.length < 2) throw new Error('此區間查無交易資料：請確認代號是否為「上市」股票、區間內是否有交易日');
+    if (p.mode === 'kd' && days.length < p.kdN + 1) throw new Error(`區間僅 ${days.length} 個交易日，不足以計算 KD(${p.kdN})，請拉長區間`);
+    const sim = p.mode === 'kd' ? simulateKD(days, p) : simulate(days, p);
+    const first = days[0], last = days[days.length - 1];
+    const bhReturn = (last.close / first.open - 1) * 100;   // 買進持有（未計成本）
+    lastResult = { days, name, stockNo: p.stockNo, params: p, sim, bhReturn };
+    renderResult();
+    st.textContent = `完成：${name || p.stockNo} 共 ${days.length} 個交易日（${first.date} ～ ${last.date}）`;
+  } catch (e) {
+    st.className = 'error';
+    st.textContent = '❌ ' + e.message;
+  } finally {
+    $('runBtn').disabled = false;
+  }
+}
+$('runBtn').addEventListener('click', runBacktest);
+
+function renderResult() {
+  const { days, name, stockNo, params: p, sim, bhReturn } = lastResult;
+  $('resultSec').style.display = '';
+  $('resultTitle').textContent = `② 回測結果 — ${stockNo} ${name || ''}`;
+  const last = days[days.length - 1];
+  const spanDays = (new Date(last.date) - new Date(days[0].date)) / 86400000;
+  const annual = spanDays >= 60 ? (Math.pow(sim.final / p.capital, 365 / spanDays) - 1) * 100 : null;
+  const cls = x => x >= 0 ? 'pos' : 'neg';
+  const cards = [
+    ['最終資產', money(sim.final), ''],
+    ['總盈虧', (sim.profit >= 0 ? '+' : '') + money(sim.profit).replace('NT$-', '-NT$'), cls(sim.profit)],
+    ['報酬率', pct(sim.returnPct), cls(sim.returnPct)],
+    annual != null ? ['年化報酬率', pct(annual), cls(annual)] : null,
+    ['最大回撤', '-' + sim.maxDD.toFixed(2) + '%', 'neg'],
+    ['交易次數', nf.format(sim.trades.length) + ' 筆', ''],
+    ['總交易成本', money(sim.totalCost), ''],
+    ['買進持有報酬率', pct(bhReturn), cls(bhReturn)],
+    ['期末持倉', nf.format(sim.shares) + ' 股 / ' + money(sim.cash), ''],
+  ].filter(Boolean);
+  $('cards').innerHTML = cards.map(([k, v, c]) =>
+    `<div class="card"><div class="k">${k}</div><div class="v ${c}">${v}</div></div>`).join('');
+
+  const tb = $('tradeTable').querySelector('tbody');
+  tb.innerHTML = sim.trades.map((t, i) =>
+    `<tr><td>${i + 1}</td><td>${t.date}</td><td>${t.when}</td><td>${t.action}${t.note ? `〔${t.note}〕` : ''}</td>` +
+    `<td>${t.price.toFixed(2)}</td><td>${nf.format(t.qty)}</td><td>${nf.format(Math.round(t.amount))}</td>` +
+    `<td>${nf.format(Math.round(t.cost))}</td><td>${nf.format(Math.round(t.cash))}</td><td>${nf.format(t.shares)}</td></tr>`
+  ).join('');
+
+  drawChart();
+}
+
+/* ════════════════ 圖表（Canvas） ════════════════ */
+function drawChart(hoverIdx = -1) {
+  if (!lastResult) return;
+  const { days, sim, params: p } = lastResult;
+  const c = $('chart'), dpr = window.devicePixelRatio || 1;
+  const W = c.clientWidth, H = 320;
+  c.width = W * dpr; c.height = H * dpr;
+  const ctx = c.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+
+  const padL = 48, padR = 14, padT = 14, padB = 28;
+  const eq = sim.equity.map(v => v / p.capital * 100);
+  const bh = days.map(d => d.close / days[0].open * 100);
+  const all = eq.concat(bh);
+  let lo = Math.min(...all), hi = Math.max(...all);
+  if (hi - lo < 1) { hi += 1; lo -= 1; }
+  const xAt = i => padL + (W - padL - padR) * (days.length === 1 ? .5 : i / (days.length - 1));
+  const yAt = v => padT + (H - padT - padB) * (1 - (v - lo) / (hi - lo));
+
+  ctx.strokeStyle = '#2d3a4b'; ctx.fillStyle = '#8b9bb0';
+  ctx.font = '11px -apple-system, "PingFang TC", sans-serif'; ctx.lineWidth = 1;
+  const steps = 5;
+  for (let s = 0; s <= steps; s++) {
+    const v = lo + (hi - lo) * s / steps, y = yAt(v);
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+    ctx.textAlign = 'right'; ctx.fillText(v.toFixed(0), padL - 6, y + 4);
+  }
+  const ticks = Math.min(6, days.length);
+  ctx.textAlign = 'center';
+  for (let s = 0; s < ticks; s++) {
+    const i = Math.round(s * (days.length - 1) / Math.max(1, ticks - 1));
+    ctx.fillText(days[i].date.slice(5), xAt(i), H - 8);
+  }
+  function line(arr, color) {
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath();
+    arr.forEach((v, i) => i === 0 ? ctx.moveTo(xAt(i), yAt(v)) : ctx.lineTo(xAt(i), yAt(v)));
+    ctx.stroke();
+  }
+  line(bh, '#4aa3ff');
+  line(eq, '#f6b93b');
+
+  // 交易點標記（超過 80 筆不畫，避免高頻策略糊成一團）
+  if (sim.trades.length && sim.trades.length <= 80) {
+    const idxOf = new Map(days.map((d, i) => [d.date, i]));
+    for (const t of sim.trades) {
+      const i = idxOf.get(t.date);
+      if (i == null) continue;
+      const x = xAt(i), y = yAt(eq[i]);
+      ctx.fillStyle = t.action === '買進' ? '#ff6b6b' : '#2ecc8f';
+      ctx.beginPath();
+      if (t.action === '買進') { ctx.moveTo(x, y + 10); ctx.lineTo(x - 4.5, y + 18); ctx.lineTo(x + 4.5, y + 18); }
+      else { ctx.moveTo(x, y - 10); ctx.lineTo(x - 4.5, y - 18); ctx.lineTo(x + 4.5, y - 18); }
+      ctx.closePath(); ctx.fill();
+    }
+  }
+
+  if (hoverIdx >= 0) {
+    const x = xAt(hoverIdx);
+    ctx.strokeStyle = 'rgba(230,237,243,.35)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, H - padB); ctx.stroke();
+    for (const [arr, col] of [[eq, '#f6b93b'], [bh, '#4aa3ff']]) {
+      ctx.fillStyle = col; ctx.beginPath();
+      ctx.arc(x, yAt(arr[hoverIdx]), 3.5, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+}
+$('chart').addEventListener('mousemove', e => {
+  if (!lastResult) return;
+  const { days, sim } = lastResult;
+  const rect = $('chart').getBoundingClientRect();
+  const padL = 48, padR = 14;
+  const frac = (e.clientX - rect.left - padL) / (rect.width - padL - padR);
+  const i = Math.max(0, Math.min(days.length - 1, Math.round(frac * (days.length - 1))));
+  drawChart(i);
+  const tip = $('tooltip');
+  tip.style.display = 'block';
+  tip.innerHTML = `<b>${days[i].date}</b><br>收盤：${days[i].close.toFixed(2)}<br>策略資產：${money(sim.equity[i])}`;
+  const tx = Math.min(e.clientX - rect.left + 14, rect.width - tip.offsetWidth - 4);
+  tip.style.left = tx + 'px';
+  tip.style.top = (e.clientY - rect.top - 10) + 'px';
+});
+$('chart').addEventListener('mouseleave', () => { $('tooltip').style.display = 'none'; drawChart(); });
+window.addEventListener('resize', () => drawChart());
+
+/* ════════════════ OpenAI 技術分析 ════════════════ */
+$('modelSel').addEventListener('change', () => {
+  $('customModelWrap').style.display = $('modelSel').value === '__custom__' ? '' : 'none';
+  localStorage.setItem('twbt_model', $('modelSel').value);
+});
+function selectedModel() {
+  const v = $('modelSel').value;
+  return v === '__custom__' ? ($('customModel').value.trim() || 'gpt-5.4') : v;
+}
+function buildPrompt() {
+  const { days, name, stockNo, params: p, sim, bhReturn } = lastResult;
+  const closes = days.map(d => d.close);
+  const last = days[days.length - 1];
+  const rsi = calcRSI(closes), macd = calcMACD(closes), kd = calcKD(days);
+  const vol5 = sma(days.map(d => d.volume || 0), 5), vol20 = sma(days.map(d => d.volume || 0), 20);
+  const recent = days.slice(-60);
+  const hi20 = Math.max(...days.slice(-20).map(d => d.high ?? d.close));
+  const lo20 = Math.min(...days.slice(-20).map(d => d.low ?? d.close));
+  const f = (x, n = 2) => x == null ? 'N/A' : x.toFixed(n);
+  const csv = recent.map(d =>
+    `${d.date},${d.open},${d.high ?? ''},${d.low ?? ''},${d.close},${Math.round((d.volume || 0) / 1000)}`).join('\n');
+  return `你是一位專業的台股技術分析師。請根據以下資料，以繁體中文撰寫一份技術分析報告（Markdown 格式）。
+
+【標的】${stockNo} ${name || ''}
+【資料區間】${days[0].date} ～ ${last.date}（共 ${days.length} 個交易日）
+【最新收盤】${last.close}（${last.date}）
+
+【技術指標（最新值）】
+- MA5=${f(sma(closes, 5))}、MA10=${f(sma(closes, 10))}、MA20=${f(sma(closes, 20))}、MA60=${f(sma(closes, 60))}
+- RSI(14)=${f(rsi)}
+- MACD(12,26,9)：DIF=${f(macd?.dif)}、MACD=${f(macd?.macd)}、柱狀=${f(macd?.hist)}
+- KD(9)：K=${f(kd?.K)}、D=${f(kd?.D)}
+- 近20日最高=${hi20}、最低=${lo20}
+- 5日均量=${f(vol5 / 1000 / 1000, 0)} 千張、20日均量=${f(vol20 / 1000 / 1000, 0)} 千張
+
+【近 ${recent.length} 個交易日 OHLCV（日期,開,高,低,收,成交張數）】
+${csv}
+
+【使用者回測策略與結果】
+- 策略：${strategyText(p)}
+- 交易成本：手續費 ${(p.feeRate * 100).toFixed(4)}%、證交稅 ${(p.taxRate * 100).toFixed(2)}%
+- 起始資金 ${money(p.capital)} → 最終資產 ${money(sim.final)}（報酬率 ${pct(sim.returnPct)}、最大回撤 -${sim.maxDD.toFixed(2)}%、交易 ${sim.trades.length} 筆、總成本 ${money(sim.totalCost)}）
+- 同期買進持有報酬率（未計成本）：${pct(bhReturn)}
+
+請依下列章節撰寫：
+1. 趨勢研判（短、中期）
+2. 支撐與壓力位（給出具體價位與理由）
+3. 技術指標解讀（均線、RSI、MACD、KD、量能）
+4. 回測策略評論（與買進持有比較，分析該策略的優劣、交易成本影響與適用情境）
+5. 風險提醒
+
+最後請註明：本分析僅供參考，不構成投資建議。`;
+}
+async function callOpenAI(apiKey, model, prompt) {
+  const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey };
+  // 先用 Responses API；遇到不支援的模型/端點再退回 chat/completions
+  let res = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST', headers,
+    body: JSON.stringify({ model, input: prompt }),
+  });
+  if (res.ok) {
+    const j = await res.json();
+    let text = j.output_text || '';
+    if (!text && Array.isArray(j.output)) {
+      for (const o of j.output) if (o.type === 'message')
+        for (const part of o.content || []) if (part.type === 'output_text') text += part.text;
+    }
+    if (text) return text;
+    throw new Error('Responses API 回傳內容為空');
+  }
+  if (![400, 404, 422].includes(res.status)) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `OpenAI HTTP ${res.status}`);
+  }
+  res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST', headers,
+    body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }] }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `OpenAI HTTP ${res.status}`);
+  }
+  const j = await res.json();
+  return j.choices?.[0]?.message?.content || '';
+}
+$('aiBtn').addEventListener('click', async () => {
+  const st = $('aiStatus');
+  if (!lastResult) { st.textContent = '⚠️ 請先完成一次回測，AI 需要股價資料才能分析。'; return; }
+  const apiKey = $('apiKey').value.trim();
+  if (!apiKey) { st.textContent = '⚠️ 請輸入 OpenAI API Key。'; return; }
+  if ($('rememberKey').checked) localStorage.setItem('twbt_apikey', apiKey);
+  else localStorage.removeItem('twbt_apikey');
+  const model = selectedModel();
+  $('aiBtn').disabled = true;
+  st.textContent = `🤖 ${model} 分析中（依模型推理深度可能需要數十秒）…`;
+  $('aiOutput').style.display = 'none';
+  try {
+    const text = await callOpenAI(apiKey, model, buildPrompt());
+    $('aiOutput').innerHTML = mdToHtml(text);
+    $('aiOutput').style.display = 'block';
+    st.textContent = `✅ 分析完成（模型：${model}）`;
+  } catch (e) {
+    st.textContent = '❌ ' + e.message;
+  } finally {
+    $('aiBtn').disabled = false;
+  }
+});
+
+/* ── 極簡 Markdown 轉 HTML ── */
+function mdToHtml(md) {
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const inline = s => s
+    .replace(/`([^`]+)`/g, (_, c) => '<code>' + c + '</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<i>$2</i>');
+  const lines = esc(md).split('\n');
+  let html = '', list = null, inCode = false, tableRows = [];
+  const closeList = () => { if (list) { html += `</${list}>`; list = null; } };
+  const flushTable = () => {
+    if (!tableRows.length) return;
+    html += '<table>';
+    tableRows.forEach((cells, i) => {
+      const tag = i === 0 ? 'th' : 'td';
+      html += '<tr>' + cells.map(c => `<${tag}>${inline(c)}</${tag}>`).join('') + '</tr>';
+    });
+    html += '</table>'; tableRows = [];
+  };
+  for (const raw of lines) {
+    if (raw.trim().startsWith('```')) {
+      closeList(); flushTable();
+      html += inCode ? '</pre>' : '<pre>'; inCode = !inCode; continue;
+    }
+    if (inCode) { html += raw + '\n'; continue; }
+    const line = raw.trimEnd();
+    if (/^\|.*\|\s*$/.test(line)) {
+      closeList();
+      const cells = line.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+      if (!cells.every(c => /^:?-{3,}:?$/.test(c))) tableRows.push(cells);
+      continue;
+    }
+    flushTable();
+    const h = line.match(/^(#{1,4})\s+(.*)/);
+    if (h) { closeList(); html += `<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`; continue; }
+    if (/^(-{3,}|\*{3,})$/.test(line)) { closeList(); html += '<hr>'; continue; }
+    const ul = line.match(/^\s*[-*]\s+(.*)/), ol = line.match(/^\s*\d+[.)]\s+(.*)/);
+    if (ul || ol) {
+      const want = ul ? 'ul' : 'ol';
+      if (list !== want) { closeList(); html += `<${want}>`; list = want; }
+      html += `<li>${inline((ul || ol)[1])}</li>`; continue;
+    }
+    closeList();
+    if (line.trim()) html += `<p>${inline(line)}</p>`;
+  }
+  closeList(); flushTable();
+  if (inCode) html += '</pre>';
+  return html;
+}
+
+/* ════════════════ 初始化 ════════════════ */
+(function init() {
+  const today = new Date();
+  const start = new Date(today); start.setMonth(start.getMonth() - 6);
+  const iso = d => d.toISOString().slice(0, 10);
+  $('dateEnd').value = iso(today);
+  $('dateStart').value = iso(start);
+  describeStrategy();
+  const savedKey = localStorage.getItem('twbt_apikey');
+  if (savedKey) { $('apiKey').value = savedKey; $('rememberKey').checked = true; }
+  const savedModel = localStorage.getItem('twbt_model');
+  if (savedModel && [...$('modelSel').options].some(o => o.value === savedModel)) {
+    $('modelSel').value = savedModel;
+    $('customModelWrap').style.display = savedModel === '__custom__' ? '' : 'none';
+  }
+})();
+</script>
+</body>
+</html>
