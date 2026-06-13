@@ -57,6 +57,10 @@
   button.danger { color: var(--up); border-color: var(--up); background: none; cursor: pointer; }
   .status { margin-top: 10px; font-size: .9rem; color: var(--muted); min-height: 1.4em; }
   .status.error { color: var(--up); }
+  .spinner { display: inline-block; width: 13px; height: 13px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; vertical-align: -2px; margin-right: 7px; animation: twspin .8s linear infinite; }
+  @keyframes twspin { to { transform: rotate(360deg); } }
+  .working-dots::after { content: ''; animation: twdots 1.2s steps(4, end) infinite; }
+  @keyframes twdots { 0% { content: ''; } 25% { content: '·'; } 50% { content: '··'; } 75% { content: '···'; } 100% { content: ''; } }
   .seg { display: inline-flex; background: var(--panel2); border: 1px solid var(--border); border-radius: 9px; padding: 3px; gap: 3px; }
   .seg button { flex: none; border: none; background: none; color: var(--muted); cursor: pointer; padding: 6px 14px; border-radius: 6px; font-size: .88rem; }
   .seg button.on { background: var(--border); color: var(--text); }
@@ -1121,25 +1125,42 @@ async function runAI(prompt, statusEl) {
   const out = $('aiOutput');
   out.style.display = 'block'; out.innerHTML = '';
   $('aiMeta').style.display = 'none';   // 新報告開始：先收起上一份的時間戳與按鈕
+
+  // ── 作業中動畫：轉圈 + 經過秒數 + 階段（思考中→撰寫中），讓使用者確知 AI 仍在運作 ──
+  const t0 = performance.now();
+  let chars = 0, phase = `${model} 思考中`;
+  const tick = () => {
+    const s = Math.round((performance.now() - t0) / 1000);
+    statusEl.className = 'status';
+    statusEl.innerHTML = `<span class="spinner"></span>🤖 ${esc(phase)}<span class="working-dots"></span>　已 ${s}s` +
+      (chars ? `　·　已產生 ${chars} 字` : '');
+  };
+  tick();
+  const timer = setInterval(tick, 250);
+
   let lastPaint = 0;
   const paint = (txt, force) => {
+    chars = txt.length; phase = `${model} 撰寫中`;   // 收到第一個字 → 切到「撰寫中」
     const now = performance.now();
     if (!force && now - lastPaint < 120) return;
     lastPaint = now;
     out.innerHTML = mdToHtml(txt);
-    statusEl.textContent = `🤖 ${model} 串流中… 已收到 ${txt.length} 字`;
   };
-  let text;
   try {
-    text = await streamResponses(key, model, prompt, effort, paint);
-  } catch (e) {
-    if ([400, 404, 422].includes(e.status)) {
-      statusEl.textContent = 'Responses API 不支援此模型，改用 chat/completions…';
-      text = await streamChat(key, model, prompt, paint);
-    } else throw e;
+    let text;
+    try {
+      text = await streamResponses(key, model, prompt, effort, paint);
+    } catch (e) {
+      if ([400, 404, 422].includes(e.status)) {
+        phase = `${model} 改用相容介面`;   // 退回 chat/completions（動畫照常）
+        text = await streamChat(key, model, prompt, paint);
+      } else throw e;
+    }
+    paint(text, true);
+    return { text, model };
+  } finally {
+    clearInterval(timer);   // 停動畫；最終的 ✅／❌ 訊息由呼叫端覆蓋
   }
-  paint(text, true);
-  return { text, model };
 }
 
 /* ════════════════ AI Prompt 組裝 ════════════════ */
