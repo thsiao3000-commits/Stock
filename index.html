@@ -265,6 +265,12 @@
       <span class="hint">回應以串流即時顯示。個股分析需先抓取資料。</span>
     </div>
     <div id="aiStatus" class="status"></div>
+    <div id="aiMeta" style="display:none; align-items:center; gap:10px; margin-top:12px; padding:8px 12px; background:var(--panel2); border:1px solid var(--border); border-radius:8px; font-size:.82rem; color:var(--muted);">
+      <span id="aiMetaText"></span>
+      <span style="flex:1"></span>
+      <button id="aiCopyBtn" class="ghost">📋 複製報告</button>
+      <button id="aiDownloadBtn" class="ghost">⬇️ 下載報告（.md）</button>
+    </div>
     <div id="aiOutput"></div>
   </section>
 
@@ -1112,6 +1118,7 @@ async function runAI(prompt, statusEl) {
   const model = selectedModel(), effort = $('effortSel').value;
   const out = $('aiOutput');
   out.style.display = 'block'; out.innerHTML = '';
+  $('aiMeta').style.display = 'none';   // 新報告開始：先收起上一份的時間戳與按鈕
   let lastPaint = 0;
   const paint = (txt, force) => {
     const now = performance.now();
@@ -1257,7 +1264,9 @@ $('aiBtn').addEventListener('click', async () => {
   if (!aiData) { st.className = 'status error'; st.textContent = '請先抓取資料'; return; }
   $('aiBtn').disabled = true; $('pfBtn').disabled = true;
   try {
-    const { model } = await runAI(buildStockPrompt(), st);
+    const { text, model } = await runAI(buildStockPrompt(), st);
+    const title = `${aiData.market === 'tw' ? '台股' : '美股'}技術分析 — ${aiData.symbol}${aiData.name ? ' ' + aiData.name : ''}`;
+    setReport(title, model, text, `${aiData.symbol}_技術分析`);
     st.textContent = `✅ 個股分析完成（模型：${model}）`;
   } catch (e) {
     st.className = 'status error'; st.textContent = '❌ ' + e.message;
@@ -1274,13 +1283,58 @@ $('pfBtn').addEventListener('click', async () => {
   $('aiBtn').disabled = true; $('pfBtn').disabled = true;
   try {
     await ensureFX(false);
-    const { model } = await runAI(buildPortfolioPrompt(), st);
+    const { text, model } = await runAI(buildPortfolioPrompt(), st);
+    setReport('投資組合總評', model, text, '投資組合總評');
     st.textContent = `✅ 投資組合總評完成（模型：${model}）`;
   } catch (e) {
     st.className = 'status error'; st.textContent = '❌ ' + e.message;
   } finally {
     $('aiBtn').disabled = false; $('pfBtn').disabled = false;
   }
+});
+
+/* ── 報告：時間戳記 / 複製 / 下載 ── */
+let lastReport = null;   // { fullText, filename }
+function nowStamp() {
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  return { date: isoD(d), full: `${isoD(d)} ${p(d.getHours())}:${p(d.getMinutes())}` };
+}
+function setReport(title, model, markdown, filenameBase) {
+  const ts = nowStamp();
+  // 時間戳與模型寫進報告開頭，讓畫面顯示、複製、下載三者內容一致
+  const header = `# ${title}\n\n**產生時間：** ${ts.full}　｜　**AI 模型：** ${model}\n\n---\n\n`;
+  const fullText = header + (markdown || '').trim() + '\n';
+  lastReport = { fullText, filename: `${filenameBase}_${ts.date}.md` };
+  $('aiOutput').innerHTML = mdToHtml(fullText);
+  $('aiOutput').style.display = 'block';
+  $('aiMetaText').textContent = `📄 報告產生於 ${ts.full}`;
+  $('aiMeta').style.display = 'flex';
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; }
+  catch (_) {
+    try {   // file:// 或非安全環境的退路
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      const ok = document.execCommand('copy'); ta.remove(); return ok;
+    } catch (_) { return false; }
+  }
+}
+$('aiCopyBtn').addEventListener('click', async () => {
+  if (!lastReport) return;
+  const ok = await copyText(lastReport.fullText), b = $('aiCopyBtn');
+  b.textContent = ok ? '✓ 已複製' : '✗ 複製失敗';
+  setTimeout(() => b.textContent = '📋 複製報告', 1500);
+});
+$('aiDownloadBtn').addEventListener('click', () => {
+  if (!lastReport) return;
+  const blob = new Blob([lastReport.fullText], { type: 'text/markdown;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = lastReport.filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 });
 
 /* ── 極簡 Markdown 轉 HTML ── */
