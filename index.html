@@ -110,7 +110,7 @@
 </head>
 <body>
 <header>
-  <h1>💼 我的投資組合 + AI 分析</h1>
+  <h1>💼 我的投資組合 + AI 分析 <span id="appVer" style="font-size:.78rem; color:var(--muted); font-weight:400; vertical-align:middle;"></span></h1>
   <p>台股（TWSE 收盤）・美股（Twelve Data）・海外債券（手動 Mark）— 加權平均成本法</p>
 </header>
 <main>
@@ -278,10 +278,12 @@
 <footer>
   資料來源：台灣證券交易所（收盤）、Twelve Data（美股）、<a href="https://www.exchangerate-api.com" style="color:var(--muted)">Rates by Exchange Rate API</a>。
   台股價格未還原除權息；債券市價為手動輸入。本工具僅供個人記錄與研究參考，不構成任何投資建議。
+  <br><span id="appVerFoot"></span>
 </footer>
 
 <script>
 'use strict';
+const APP_VERSION = 'v1.0.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1302,7 +1304,7 @@ function nowStamp() {
 function setReport(title, model, markdown, filenameBase) {
   const ts = nowStamp();
   // 時間戳與模型寫進報告開頭，讓畫面顯示、複製、下載三者內容一致
-  const header = `# ${title}\n\n**產生時間：** ${ts.full}　｜　**AI 模型：** ${model}\n\n---\n\n`;
+  const header = `# ${title}\n\n**產生時間：** ${ts.full}　｜　**AI 模型：** ${model}　｜　**工具：** 我的投資組合 ${APP_VERSION}\n\n---\n\n`;
   const fullText = header + (markdown || '').trim() + '\n';
   lastReport = { fullText, filename: `${filenameBase}_${ts.date}.md` };
   $('aiOutput').innerHTML = mdToHtml(fullText);
@@ -1405,6 +1407,8 @@ function bindSettings() {
 (function init() {
   loadDB();
   bindSettings();
+  $('appVer').textContent = APP_VERSION;
+  $('appVerFoot').textContent = '我的投資組合 + AI 分析 ' + APP_VERSION;
   // 還原設定
   $('tdKey').value = db.settings.twelveKey || '';
   $('twFee').value = db.settings.twFee;
