@@ -290,7 +290,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.2.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.3.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -523,6 +523,16 @@ function calcKD(days, n = 9) {
     K = K * 2 / 3 + rsv / 3; D = D * 2 / 3 + K / 3;
   }
   return { K, D };
+}
+function calcOBV(days) {   // 能量潮 On-Balance Volume：漲日加量、跌日減量，回傳累計序列
+  let obv = 0; const out = [0];
+  for (let i = 1; i < days.length; i++) {
+    const v = days[i].volume || 0;
+    if (days[i].close > days[i - 1].close) obv += v;
+    else if (days[i].close < days[i - 1].close) obv -= v;
+    out.push(obv);
+  }
+  return out;
 }
 function weeklyAgg(days) {   // 日線 → 週線（週一為一週起點）
   const map = new Map();
@@ -1215,6 +1225,13 @@ function buildStockPrompt() {
   const rsi = calcRSI(closes), macd = calcMACD(closes), kd = calcKD(days);
   const vols = days.map(d => d.volume || 0);
   const vol5 = sma(vols, 5), vol20 = sma(vols, 20);
+  const obvSeries = calcOBV(days);
+  const obvChg = i => { const L = obvSeries.length; return Math.round((obvSeries[L - 1] - obvSeries[Math.max(0, L - 1 - i)]) / 1000); };
+  const sgn = n => (n >= 0 ? '+' : '') + nf.format(n);
+  const lastVol = vols[vols.length - 1];
+  const prev5 = vols.slice(-6, -1);   // 前 5 日（不含當日）作量比基準
+  const avg5prev = prev5.length ? prev5.reduce((a, b) => a + b, 0) / prev5.length : 0;
+  const volRatio = avg5prev > 0 ? lastVol / avg5prev : null;
   const hi52 = Math.max(...days.map(d => d.high ?? d.close));
   const lo52 = Math.min(...days.map(d => d.low ?? d.close));
   const hi20 = Math.max(...days.slice(-20).map(d => d.high ?? d.close));
@@ -1252,6 +1269,8 @@ function buildStockPrompt() {
 - KD(9)：K=${fnum(kd?.K)}、D=${fnum(kd?.D)}
 - 52週最高=${hi52}、52週最低=${lo52}；近20日最高=${hi20}、最低=${lo20}
 - 5日均量=${Math.round((vol5 || 0) / 1000)} 千股、20日均量=${Math.round((vol20 || 0) / 1000)} 千股
+- OBV 能量潮（千股，累計變化）：近5日 ${sgn(obvChg(5))}、近20日 ${sgn(obvChg(20))}、近60日 ${sgn(obvChg(60))}（與股價走勢比對：同向＝量價配合，背離＝警訊）
+- 量比（最新量÷前5日均量）=${fnum(volRatio)}（>1.5 明顯放量、約 1 持平、<0.7 量縮）
 
 【同期大盤對照】
 ${idxBlock}
@@ -1268,7 +1287,7 @@ ${posBlock}
 請依下列章節撰寫：
 1. 趨勢研判（短期看日線、中長期看週線，分別說明）
 2. 支撐與壓力位（給出具體價位與理由）
-3. 技術指標解讀（均線排列、RSI、MACD、KD、量價關係）
+3. 技術指標解讀（均線排列、RSI、MACD、KD、量價關係，並結合 OBV 能量潮與量比研判量價配合或背離）
 4. 相對大盤強弱（領先或落後大盤？意義為何）
 5. 我的持倉評估（從風險管理角度，就「續抱／加碼／減碼／停損」給出情境式分析與觸發條件，須對應我的成本與損益）
 6. 風險提醒
