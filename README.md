@@ -28,16 +28,20 @@
 
 ```
 .
-├── 我的投資組合.html      # 主工具（單一 HTML 檔，瀏覽器直接開）
+├── 我的投資組合.html      # 主工具（單一 HTML 檔，本機雙擊直接開）
+├── index.html             # 與上者完全相同的副本，供 GitHub Pages 當入口
 ├── twse_realtime.py       # 台股盤中即時報價 CLI（TWSE MIS 快照介面）
 └── README.md
 ```
+
+> `index.html` 是 `我的投資組合.html` 的副本（兩者內容必須一致）。**改主工具後要同步覆蓋**：
+> `cp "我的投資組合.html" index.html`
 
 ---
 
 ## 🚀 快速開始
 
-直接用瀏覽器開啟 `我的投資組合.html`（Mac 可在終端機 `open "我的投資組合.html"`）。
+直接用瀏覽器開啟 `我的投資組合.html`（Mac 可在終端機 `open "我的投資組合.html"`），或開已部署的線上版（見下方「部署到 GitHub Pages」）。
 
 1. 展開頂部「**🔑 API 與參數設定**」：
    - **Twelve Data API Key** — 美股報價用。到 [twelvedata.com](https://twelvedata.com) 免費註冊取得（800 credits／天、8／分鐘，個人使用綽綽有餘）。只用台股＋債券可不填。
@@ -68,7 +72,33 @@
 | open.er-api.com | USD/TWD 匯率 | 每日更新；工具快取 12 小時，可手動覆寫 |
 | 債券市價 | — | 無免費零售債券報價源，**手動輸入**（抄銀行對帳單） |
 
-四個 API 都允許 CORS，HTML 檔**本機直接開啟即可使用**，不需架伺服器。
+四個 API 都允許 CORS，HTML 檔**本機直接開啟即可使用**，不需架伺服器；放上 GitHub Pages（HTTPS）後也照常運作。
+
+---
+
+## 🌐 部署到 GitHub Pages
+
+> **先理解兩件事**
+> 1. **資料永遠在你自己的瀏覽器**：Pages 只負責把 HTML 送到瀏覽器，之後 API Key、資產明細、交易紀錄全部存在你裝置的 localStorage，API 請求由瀏覽器**直連** OpenAI／TWSE／Twelve Data，**不經過 GitHub**。GitHub 看不到你的任何資料。
+> 2. **發佈出來的「網站」是公開的**：知道網址的人都能打開（這支工具是 BYOK，訪客得自己填自己的 key，碰不到你的）。把 repo 設 private 只隱藏原始碼、不會讓網站變私密。
+
+**步驟**
+
+1. **把 repo 改為 Public**（免費方案的 Pages 只能從 public repo 發佈）。
+   repo 頁面 → **Settings → General → 最下方 Danger Zone → Change visibility → Public**。
+   *（本專案程式碼裡沒有任何祕密：`.env` 已 gitignore、API Key 不寫在程式碼中，故公開原始碼是安全的。若想維持 private，需 GitHub Pro 以上。）*
+2. **Settings → Pages → Build and deployment**
+   - Source：**Deploy from a branch**
+   - Branch：**`main`** ／ 資料夾 **`/(root)`** → **Save**
+3. 等約 1 分鐘，網站上線於：
+   **`https://thsiao3000-commits.github.io/Stock/`**
+   （因為有 `index.html`，網址不必帶中文檔名，乾淨好記。）
+
+**上線後的安全注意**
+
+- **金鑰**：只存在你自己的瀏覽器。建議給這工具用的 OpenAI／Twelve Data key 設**用量上限**；在公用電腦上**別勾「記住 API Key」**。
+- **共用 origin** ⚠️：同帳號底下所有 Pages 專案共用 `https://thsiao3000-commits.github.io` 這個 origin，彼此的 localStorage 互通。若日後在同帳號掛其他頁面，那些頁面的 JS 讀得到本工具存的 key。化解：改用**自訂網域**取得獨立 origin，或別在同帳號放來路不明的頁面。
+- **想連「網站本身」都不公開**：改用 Cloudflare Pages／Netlify（可從 private repo 部署、原始碼不公開，並能加存取密碼）。
 
 ---
 
@@ -99,5 +129,6 @@ python3 twse_realtime.py --loop 2330   # 每 5 秒輪詢，Ctrl+C 停止
 ## 📝 備註
 
 - `.env` 僅供本機終端機測試 API 用，已列入 `.gitignore`，不會進版控。
+- `index.html` 為主工具副本，改完主工具記得 `cp "我的投資組合.html" index.html` 同步，否則線上版會是舊的。
 - 台股慣例配色：**紅漲綠跌**。
 - 本工具僅供個人記錄與研究參考，**不構成任何投資建議**。
