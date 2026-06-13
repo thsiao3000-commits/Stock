@@ -287,7 +287,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.1.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.1.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -942,7 +942,11 @@ $('fetchBtn').addEventListener('click', async () => {
       catch (_) { idx = []; }
       idxLabel = 'S&P 500（SPY）';
     }
-    if (!days || days.length < 30) throw new Error('資料不足（不到 30 個交易日），請確認代號');
+    if (!days || days.length < 30) {
+      if (market === 'tw' && (!days || days.length === 0))
+        throw new Error(`查無 ${symbol} 的上市資料 — ${symbol} 可能是上櫃（OTC）股票；本工具台股僅支援上市（TSE）。上櫃即時價可用 twse_realtime.py（otc_${symbol}）查詢。`);
+      throw new Error(`資料不足（僅 ${days ? days.length : 0} 個交易日，需 ≥30）：可能為新上市／興櫃，或代號有誤，請確認。`);
+    }
     const posStats = pos ? computeStock(pos) : null;
     aiData = { market, symbol, name, days, idx: idx || [], idxLabel, pos, posStats };
     st.textContent = `✅ ${symbol} ${name || ''}：${days.length} 個交易日（${days[0].date} ～ ${days[days.length - 1].date}）`;
@@ -958,6 +962,12 @@ $('fetchBtn').addEventListener('click', async () => {
     $('aiBtn').disabled = false;
   } catch (e) {
     st.className = 'status error'; st.textContent = '❌ ' + e.message;
+    // 清掉上一檔留下的殘影，避免「失敗了卻還顯示舊價格／持倉」的誤導
+    aiData = null;
+    $('chartInfo').textContent = '';
+    $('chartWrap').style.display = 'none';
+    $('chartLegend').style.display = 'none';
+    $('aiBtn').disabled = true;   // 無有效資料 → 不能產生個股分析
   } finally {
     $('fetchBtn').disabled = false;
   }
