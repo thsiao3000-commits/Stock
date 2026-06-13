@@ -3,6 +3,35 @@
 本專案版本格式採 [語意化版本](https://semver.org/lang/zh-TW/)（MAJOR.MINOR.PATCH）。
 版本號定義於 `index.html` 的 `APP_VERSION` 常數，並對應 git tag。
 
+---
+
+## 🔖 如何升版（維護備查）
+
+**版號規則**（從目前版本往上加）：
+- **MAJOR**（x.0.0）：重大改版、資料格式不相容（例如 localStorage 結構變更需遷移）。
+- **MINOR**（1.x.0）：新增功能，且向下相容（例如多一種資產類型、新分析模式）。
+- **PATCH**（1.0.x）：修 bug、文案/樣式微調，無新功能。
+
+**升版步驟**（三處務必對齊，否則畫面、tag、紀錄會不一致）：
+
+1. 改 `index.html` 的版本常數（唯一來源）：
+   ```js
+   const APP_VERSION = 'v1.2.3';
+   ```
+2. 更新本檔（CHANGELOG.md）新增版本區塊，並改 `README.md` 開頭的「版本：」那行。
+3. commit、打 tag、推送（含 tag）：
+   ```bash
+   git add -A && git commit -m "Release v1.2.3"
+   git tag -a v1.2.3 -m "v1.2.3 — 一句話描述"
+   git push origin main
+   git push origin v1.2.3
+   ```
+
+> 提醒：tag 要指向「已含新版號的 commit」，所以**先 commit 再 tag**。
+> 查現有 tag：`git tag -l`；GitHub Pages 會在 push main 後自動重新部署最新版。
+
+---
+
 ## [v1.0.0] — 2026-06-13
 
 首個正式版本。個人投資組合追蹤 + AI 分析工具（單檔純前端）。
