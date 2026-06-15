@@ -128,13 +128,13 @@
     <summary>🔑 API 與參數設定</summary>
     <div class="grid">
       <label class="field">Twelve Data API Key（美股報價用）
-        <span class="pw"><input id="tdKey" type="password" placeholder="免費註冊 twelvedata.com 取得"><button type="button" class="eye" data-eye="tdKey" title="顯示／隱藏">👁</button></span>
+        <span class="pw"><input id="tdKey" type="password" name="td-key-x" placeholder="免費註冊 twelvedata.com 取得" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true"><button type="button" class="eye" data-eye="tdKey" title="顯示／隱藏">👁</button></span>
       </label>
       <label class="field">FinMind Token（台股上櫃用，選填）
-        <span class="pw"><input id="fmToken" type="password" placeholder="免填即可用；如被限流再到 finmindtrade.com 免費取得"><button type="button" class="eye" data-eye="fmToken" title="顯示／隱藏">👁</button></span>
+        <span class="pw"><input id="fmToken" type="password" name="fm-token-x" placeholder="免填即可用；如被限流再到 finmindtrade.com 免費取得" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true"><button type="button" class="eye" data-eye="fmToken" title="顯示／隱藏">👁</button></span>
       </label>
       <label class="field">OpenAI API Key
-        <span class="pw"><input id="apiKey" type="password" placeholder="sk-..."><button type="button" class="eye" data-eye="apiKey" title="顯示／隱藏">👁</button></span>
+        <span class="pw"><input id="apiKey" type="password" name="oai-key-x" placeholder="sk-..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true"><button type="button" class="eye" data-eye="apiKey" title="顯示／隱藏">👁</button></span>
       </label>
       <label class="field">AI 模型
         <select id="modelSel">
@@ -321,7 +321,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.9.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.9.2';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1396,24 +1396,25 @@ function selectedModel() {
 async function readSSE(res, onJson) {
   const rd = res.body.getReader(), dec = new TextDecoder();
   let buf = '';
+  const handle = frame => {
+    for (const line of frame.split('\n')) {
+      if (!line.startsWith('data:')) continue;
+      const s = line.slice(5).trim();
+      if (!s || s === '[DONE]') continue;
+      try { onJson(JSON.parse(s)); } catch (_) {}
+    }
+  };
   for (;;) {
     const { done, value } = await rd.read();
     if (done) break;
     buf += dec.decode(value, { stream: true });
     let i;
-    while ((i = buf.indexOf('\n\n')) >= 0) {
-      const frame = buf.slice(0, i); buf = buf.slice(i + 2);
-      for (const line of frame.split('\n')) {
-        if (!line.startsWith('data:')) continue;
-        const s = line.slice(5).trim();
-        if (!s || s === '[DONE]') continue;
-        try { onJson(JSON.parse(s)); } catch (_) {}
-      }
-    }
+    while ((i = buf.indexOf('\n\n')) >= 0) { handle(buf.slice(0, i)); buf = buf.slice(i + 2); }
   }
+  if (buf.trim()) handle(buf);   // 收尾：處理最後沒有 \n\n 結尾的殘留 frame
 }
 async function streamResponses(key, model, prompt, effort, onDelta) {
-  const body = { model, input: prompt, stream: true, max_output_tokens: 16000 };
+  const body = { model, input: prompt, stream: true, max_output_tokens: 32000 };
   if (effort) body.reasoning = { effort };
   const res = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
@@ -1425,15 +1426,16 @@ async function streamResponses(key, model, prompt, effort, onDelta) {
     const err = new Error(e.error?.message || ('OpenAI HTTP ' + res.status));
     err.status = res.status; throw err;
   }
-  let full = '', failMsg = null;
+  let full = '', failMsg = null, truncated = null;
   await readSSE(res, j => {
     const t = j.type || '';
     if (t.endsWith('output_text.delta') && typeof j.delta === 'string') { full += j.delta; onDelta(full); }
+    else if (t === 'response.incomplete') truncated = j.response?.incomplete_details?.reason || 'incomplete';
     else if (t === 'response.failed' || t === 'error') failMsg = j.response?.error?.message || j.error?.message || j.message || '串流中斷';
   });
   if (failMsg) throw new Error(failMsg);
   if (!full) { const err = new Error('Responses API 未回傳內容'); err.status = 400; throw err; }
-  return full;
+  return { text: full, truncated };
 }
 async function streamChat(key, model, prompt, onDelta) {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -1445,12 +1447,13 @@ async function streamChat(key, model, prompt, onDelta) {
     const e = await res.json().catch(() => ({}));
     throw new Error(e.error?.message || ('OpenAI HTTP ' + res.status));
   }
-  let full = '';
+  let full = '', truncated = null;
   await readSSE(res, j => {
-    const d = j.choices?.[0]?.delta?.content;
-    if (d) { full += d; onDelta(full); }
+    const ch = j.choices?.[0];
+    if (ch?.delta?.content) { full += ch.delta.content; onDelta(full); }
+    if (ch?.finish_reason === 'length') truncated = 'max_tokens';
   });
-  return full;
+  return { text: full, truncated };
 }
 async function runAI(prompt, statusEl) {
   const key = $('apiKey').value.trim();
@@ -1483,17 +1486,17 @@ async function runAI(prompt, statusEl) {
     out.innerHTML = mdToHtml(txt);
   };
   try {
-    let text;
+    let r;
     try {
-      text = await streamResponses(key, model, prompt, effort, paint);
+      r = await streamResponses(key, model, prompt, effort, paint);
     } catch (e) {
       if ([400, 404, 422].includes(e.status)) {
         phase = `${model} 改用相容介面`;   // 退回 chat/completions（動畫照常）
-        text = await streamChat(key, model, prompt, paint);
+        r = await streamChat(key, model, prompt, paint);
       } else throw e;
     }
-    paint(text, true);
-    return { text, model };
+    paint(r.text, true);
+    return { text: r.text, model, truncated: r.truncated };
   } finally {
     clearInterval(timer);   // 停動畫；最終的 ✅／❌ 訊息由呼叫端覆蓋
   }
@@ -1655,10 +1658,12 @@ $('aiBtn').addEventListener('click', async () => {
   if (!aiData) { st.className = 'status error'; st.textContent = '請先抓取資料'; return; }
   $('aiBtn').disabled = true; $('pfBtn').disabled = true;
   try {
-    const { text, model } = await runAI(buildStockPrompt(), st);
+    const { text, model, truncated } = await runAI(buildStockPrompt(), st);
     const title = `${aiData.market === 'tw' ? '台股' : '美股'}技術分析 — ${aiData.symbol}${aiData.name ? ' ' + aiData.name : ''}`;
     setReport(title, model, text, `${aiData.symbol}_技術分析`);
-    st.textContent = `✅ 個股分析完成（模型：${model}）`;
+    st.textContent = truncated
+      ? `⚠️ 報告達長度上限被截斷（${truncated}），僅顯示部分內容；建議把「AI 推理深度」調低後再產生一次。`
+      : `✅ 個股分析完成（模型：${model}）`;
   } catch (e) {
     st.className = 'status error'; st.textContent = '❌ ' + e.message;
   } finally {
@@ -1674,9 +1679,11 @@ $('pfBtn').addEventListener('click', async () => {
   $('aiBtn').disabled = true; $('pfBtn').disabled = true;
   try {
     await ensureFX(false);
-    const { text, model } = await runAI(buildPortfolioPrompt(), st);
+    const { text, model, truncated } = await runAI(buildPortfolioPrompt(), st);
     setReport('投資組合總評', model, text, '投資組合總評');
-    st.textContent = `✅ 投資組合總評完成（模型：${model}）`;
+    st.textContent = truncated
+      ? `⚠️ 報告達長度上限被截斷（${truncated}），僅顯示部分內容；建議把「AI 推理深度」調低後再產生一次。`
+      : `✅ 投資組合總評完成（模型：${model}）`;
   } catch (e) {
     st.className = 'status error'; st.textContent = '❌ ' + e.message;
   } finally {
@@ -1849,6 +1856,15 @@ function bindSettings() {
     btn.textContent = show ? '🙈' : '👁';
     btn.title = show ? '隱藏' : '顯示';
   }));
+  // 防瀏覽器／密碼管理員把同一組已存密碼自動填到所有金鑰欄位（例如把 OpenAI key 填進 Twelve Data 欄）：
+  // 載入時設 readonly（自動填入會跳過 readonly 欄），使用者點擊／聚焦時才解鎖可編輯。
+  ['tdKey', 'fmToken', 'apiKey'].forEach(id => {
+    const el = $(id);
+    el.setAttribute('readonly', '');
+    const unlock = () => el.removeAttribute('readonly');
+    el.addEventListener('focus', unlock);
+    el.addEventListener('pointerdown', unlock);
+  });
 }
 (function init() {
   loadDB();
