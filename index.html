@@ -111,6 +111,7 @@
   #aiOutput code { background: #0d1117; padding: 1px 6px; border-radius: 5px; font-size: .85em; }
   #aiOutput pre { background: #0d1117; padding: 12px; border-radius: 8px; overflow-x: auto; }
   #aiOutput ul, #aiOutput ol { padding-left: 22px; }
+  #aiOutput a { color: var(--accent); word-break: break-all; }
   footer { text-align: center; color: var(--muted); font-size: .78rem; padding: 0 20px 40px; }
   .empty { text-align: center; color: var(--muted); padding: 24px; }
   @media (max-width: 600px) { main { padding: 8px 12px 40px; } section, details.box { padding: 14px; } }
@@ -166,8 +167,9 @@
     </div>
     <div class="row">
       <label><input id="rememberKey" type="checkbox"> 記住 OpenAI API Key（存於本機 localStorage）</label>
-      <span class="hint">Twelve Data Key 與其他設定會自動儲存於本機瀏覽器。</span>
+      <label><input id="webSearchChk" type="checkbox" checked> 🌐 個股分析時用 web search 即時搜尋新聞</label>
     </div>
+    <div class="hint" style="margin-top:2px">web search 由 OpenAI 即時搜尋並附來源；會多一筆搜尋費用、也稍慢。不需要時可取消勾選。</div>
     <div class="row" style="margin-top:6px">
       <span class="hint">資料備份：</span>
       <button id="exportBtn" class="ghost">⬇️ 匯出 JSON</button>
@@ -321,7 +323,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.10.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.11.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1140,7 +1142,7 @@ $('fetchBtn').addEventListener('click', async () => {
   $('fetchBtn').disabled = true; $('aiBtn').disabled = true;
   try {
     const end = todayISO(), start = isoD(addMonths(new Date(), -12));
-    let days, name = pos?.name || '', idx, idxLabel, srcNote = '', divStats = null, chip = null, rev = null, per = null, news = null;
+    let days, name = pos?.name || '', idx, idxLabel, srcNote = '', divStats = null, chip = null, rev = null, per = null;
     if (market === 'tw') {
       const r = await fetchTWStock(symbol, start, end, m => st.textContent = m);
       days = r.days; name = name || r.name;
@@ -1158,17 +1160,15 @@ $('fetchBtn').addEventListener('click', async () => {
         const divs = await fmDividends(symbol, isoD(addMonths(new Date(), -72)));   // 近 6 年
         divStats = dividendStats(divs, days[days.length - 1].close);
       } catch (_) {}
-      st.textContent = '抓取籌碼／基本面／新聞…';
+      st.textContent = '抓取籌碼／基本面…';
       try {
-        const [inst, revR, perR, newsR] = await Promise.all([
+        const [inst, revR, perR] = await Promise.all([
           fmDataset('TaiwanStockInstitutionalInvestorsBuySell', symbol, isoD(addMonths(new Date(), -3))),
           fmDataset('TaiwanStockMonthRevenue', symbol, isoD(addMonths(new Date(), -30))),   // 多抓以利近6月年增比較
           fmDataset('TaiwanStockPER', symbol, isoD(addMonths(new Date(), -12))),
-          fmDataset('TaiwanStockNews', symbol, isoD(addMonths(new Date(), -3))),
         ]);
         chip = chipStats(inst); rev = revenueStats(revR); per = perStats(perR);
-        news = (newsR || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 8);   // 取最新 8 則
-      } catch (_) {}
+      } catch (_) {}   // 新聞改由 AI 以 web_search 即時搜尋（見 buildStockPrompt）
     } else {
       st.textContent = `美股 ${symbol}：抓取日線…`;
       const r = await tdDaily(symbol);
@@ -1181,7 +1181,7 @@ $('fetchBtn').addEventListener('click', async () => {
     if (!days || days.length < 30)
       throw new Error(`資料不足（僅 ${days ? days.length : 0} 個交易日，需 ≥30）：可能為新上市／新上櫃／興櫃，或代號有誤，請確認。`);
     const posStats = pos ? computeStock(pos) : null;
-    aiData = { market, symbol, name, days, idx: idx || [], idxLabel, pos, posStats, divStats, chip, rev, per, news };
+    aiData = { market, symbol, name, days, idx: idx || [], idxLabel, pos, posStats, divStats, chip, rev, per };
     st.textContent = `✅ ${symbol} ${name || ''}：${days.length} 個交易日（${days[0].date} ～ ${days[days.length - 1].date}）${srcNote}`;
     const info = [];
     info.push(`最新收盤 ${days[days.length - 1].close}`);
@@ -1469,9 +1469,10 @@ async function readSSE(res, onJson) {
   }
   if (buf.trim()) handle(buf);   // 收尾：處理最後沒有 \n\n 結尾的殘留 frame
 }
-async function streamResponses(key, model, prompt, effort, onDelta) {
+async function streamResponses(key, model, prompt, effort, onDelta, webSearch, onSearch) {
   const body = { model, input: prompt, stream: true, max_output_tokens: 32000 };
   if (effort) body.reasoning = { effort };
+  if (webSearch) { body.tools = [{ type: 'web_search' }]; body.tool_choice = 'auto'; }
   const res = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
@@ -1486,6 +1487,7 @@ async function streamResponses(key, model, prompt, effort, onDelta) {
   await readSSE(res, j => {
     const t = j.type || '';
     if (t.endsWith('output_text.delta') && typeof j.delta === 'string') { full += j.delta; onDelta(full); }
+    else if (t.includes('web_search')) { onSearch && onSearch(); }   // 正在搜尋新聞
     else if (t === 'response.incomplete') truncated = j.response?.incomplete_details?.reason || 'incomplete';
     else if (t === 'response.failed' || t === 'error') failMsg = j.response?.error?.message || j.error?.message || j.message || '串流中斷';
   });
@@ -1511,12 +1513,12 @@ async function streamChat(key, model, prompt, onDelta) {
   });
   return { text: full, truncated };
 }
-async function runAI(prompt, statusEl) {
+async function runAI(prompt, statusEl, opts) {
   const key = $('apiKey').value.trim();
   if (!key) throw new Error('請輸入 OpenAI API Key（於「API 與參數設定」）');
   if ($('rememberKey').checked) localStorage.setItem('twbt_apikey', key);
   else localStorage.removeItem('twbt_apikey');
-  const model = selectedModel(), effort = $('effortSel').value;
+  const model = selectedModel(), effort = $('effortSel').value, webSearch = !!(opts && opts.webSearch);
   const out = $('aiOutput');
   out.style.display = 'block'; out.innerHTML = '';
   $('aiMeta').style.display = 'none';   // 新報告開始：先收起上一份的時間戳與按鈕
@@ -1541,13 +1543,14 @@ async function runAI(prompt, statusEl) {
     lastPaint = now;
     out.innerHTML = mdToHtml(txt);
   };
+  const onSearch = () => { if (chars === 0) phase = `${model} 搜尋新聞中`; };   // 撰寫前若在搜尋，顯示之
   try {
     let r;
     try {
-      r = await streamResponses(key, model, prompt, effort, paint);
+      r = await streamResponses(key, model, prompt, effort, paint, webSearch, onSearch);
     } catch (e) {
       if ([400, 404, 422].includes(e.status)) {
-        phase = `${model} 改用相容介面`;   // 退回 chat/completions（動畫照常）
+        phase = `${model} 改用相容介面`;   // 退回 chat/completions（不支援 web_search）
         r = await streamChat(key, model, prompt, paint);
       } else throw e;
     }
@@ -1631,8 +1634,6 @@ function buildStockPrompt() {
       }
       parts.push(f);
     }
-    if (aiData.news && aiData.news.length)
-      parts.push(`【近期新聞標題（僅標題，請審慎、勿過度延伸）】\n${aiData.news.map(n => `- ${(n.date || '').slice(0, 10)}（${n.source || ''}）${n.title || ''}`).join('\n')}`);
     if (parts.length) fundBlock = '\n' + parts.join('\n\n') + '\n';
   }
 
@@ -1682,7 +1683,7 @@ ${posBlock}
 2. 支撐與壓力位（給出具體價位與理由）
 3. 技術指標解讀（均線排列、RSI、MACD、KD、布林通道、ATR、量價關係，並結合 OBV 能量潮與量比研判量價配合或背離）
 4. 相對大盤強弱（領先或落後大盤？意義為何）
-5. 籌碼、基本面與消息面（三大法人近期買賣超的方向與力道；月營收年增趨勢與 PER／PBR 估值是否合理；近期新聞題材對股價的可能影響與風險。請務實解讀、勿過度延伸新聞標題。美股或查無資料則註明不適用並略過）
+5. 籌碼、基本面與消息面（三大法人近期買賣超的方向與力道；月營收年增趨勢與 PER／PBR 估值是否合理。**消息面：請用網路搜尋（web search）查詢「${symbol} ${name || ''}」的最新相關新聞**——重大消息、法說會、財報、訂單、產業政策等，擇要點評對股價的可能影響與風險，並**標註新聞來源與日期**；務實解讀、勿過度臆測，查無則說明。籌碼／基本面為台股資料，美股或查無則註明不適用）
 6. 配息與殖利率評估（現金殖利率是否具吸引力、配息穩定度與成長性；若臨近除息，說明參與除息／棄息的考量與填息、貼息風險；台股單次現金股利達 2 萬元以上需注意二代健保補充保費與股利所得稅。美股或查無配息資料則註明不適用）
 7. 我的持倉評估（從風險管理角度，就「續抱／加碼／減碼／停損」給出情境式分析與觸發條件，須對應我的成本與損益，並結合除息時點）
 8. 風險提醒
@@ -1743,7 +1744,7 @@ $('aiBtn').addEventListener('click', async () => {
   if (!aiData) { st.className = 'status error'; st.textContent = '請先抓取資料'; return; }
   $('aiBtn').disabled = true; $('pfBtn').disabled = true;
   try {
-    const { text, model, truncated } = await runAI(buildStockPrompt(), st);
+    const { text, model, truncated } = await runAI(buildStockPrompt(), st, { webSearch: $('webSearchChk').checked });
     const title = `${aiData.market === 'tw' ? '台股' : '美股'}技術分析 — ${aiData.symbol}${aiData.name ? ' ' + aiData.name : ''}`;
     setReport(title, model, text, `${aiData.symbol}_技術分析`);
     st.textContent = truncated
@@ -1825,6 +1826,7 @@ function mdToHtml(md) {
   const escFn = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const inline = s => s
     .replace(/`([^`]+)`/g, (_, c) => '<code>' + c + '</code>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')   // [文字](連結)，給新聞來源用
     .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
     .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<i>$2</i>');
   const lines = escFn(md).split('\n');
@@ -1931,6 +1933,7 @@ function bindSettings() {
     localStorage.setItem('twbt_model', $('modelSel').value);
   });
   $('effortSel').addEventListener('change', () => localStorage.setItem('twbt_effort', $('effortSel').value));
+  $('webSearchChk').addEventListener('change', () => localStorage.setItem('twbt_websearch', $('webSearchChk').checked ? '1' : '0'));
   $('exportBtn').addEventListener('click', exportData);
   $('importBtn').addEventListener('click', () => $('importFile').click());
   $('importFile').addEventListener('change', e => { const f = e.target.files[0]; if (f) importData(f); e.target.value = ''; });
@@ -1966,6 +1969,7 @@ function bindSettings() {
   }
   const savedEffort = localStorage.getItem('twbt_effort');
   if (savedEffort != null && [...$('effortSel').options].some(o => o.value === savedEffort)) $('effortSel').value = savedEffort;
+  if (localStorage.getItem('twbt_websearch') === '0') $('webSearchChk').checked = false;   // 預設開啟
   $('ap_date').value = todayISO();
   $('ab_date').value = todayISO();
   if (!db.positions.length) $('addBox').open = true;
