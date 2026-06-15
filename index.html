@@ -164,6 +164,15 @@
       <label><input id="rememberKey" type="checkbox"> 記住 OpenAI API Key（存於本機 localStorage）</label>
       <span class="hint">Twelve Data Key 與其他設定會自動儲存於本機瀏覽器。</span>
     </div>
+    <div class="row" style="margin-top:6px">
+      <span class="hint">資料備份：</span>
+      <button id="exportBtn" class="ghost">⬇️ 匯出 JSON</button>
+      <button id="importBtn" class="ghost">⬆️ 匯入 JSON</button>
+      <input id="importFile" type="file" accept="application/json,.json" style="display:none">
+      <label class="hint" style="display:flex; align-items:center; gap:5px"><input id="exportKeys" type="checkbox"> 匯出時包含 API 金鑰</label>
+      <span id="ioStatus" class="hint"></span>
+    </div>
+    <div class="hint" style="margin-top:4px">持倉與設定只存在本機瀏覽器；匯出 JSON 可備份或搬到其他裝置／瀏覽器，匯入會「覆蓋」目前資料。</div>
   </details>
 
   <!-- ── 損益總覽 ── -->
@@ -290,7 +299,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.4.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.5.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1531,6 +1540,52 @@ function mdToHtml(md) {
 }
 
 /* ════════════════ 設定綁定 / 初始化 ════════════════ */
+/* ════════════════ 資料匯出 / 匯入（備份・跨裝置） ════════════════ */
+function ioStatus(msg, err) { const e = $('ioStatus'); e.textContent = msg; e.style.color = err ? 'var(--up)' : ''; }
+function fillSettingsUI() {
+  $('tdKey').value = db.settings.twelveKey || '';
+  $('fmToken').value = db.settings.finmindToken || '';
+  $('twFee').value = db.settings.twFee;
+  $('twTax').value = db.settings.twTax;
+  $('fxOverride').value = db.settings.fxOverride || '';
+  const k = localStorage.getItem('twbt_apikey');
+  $('apiKey').value = k || '';
+  $('rememberKey').checked = !!k;
+}
+function exportData() {
+  const inclKeys = $('exportKeys').checked;
+  const settings = { ...db.settings };
+  if (!inclKeys) { settings.twelveKey = ''; settings.finmindToken = ''; }
+  const data = { app: 'twpf', version: APP_VERSION, exportedAt: new Date().toISOString(), positions: db.positions, settings };
+  if (inclKeys) { const k = localStorage.getItem('twbt_apikey'); if (k) data.openaiKey = k; }
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `portfolio_backup_${todayISO()}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  ioStatus(`✅ 已匯出 ${db.positions.length} 筆持倉${inclKeys ? '（含金鑰，請妥善保管）' : '（不含金鑰）'}`);
+}
+function importData(file) {
+  const r = new FileReader();
+  r.onload = () => {
+    let data;
+    try { data = JSON.parse(r.result); } catch (_) { ioStatus('❌ 檔案不是有效的 JSON', true); return; }
+    if (!data || data.app !== 'twpf' || !Array.isArray(data.positions)) { ioStatus('❌ 不是本工具的備份檔', true); return; }
+    if (!confirm(`匯入將「覆蓋」目前的 ${db.positions.length} 筆持倉與設定，改為備份檔的 ${data.positions.length} 筆。確定要繼續？`)) return;
+    db.positions = data.positions.filter(p => p && p.id && p.market);
+    db.settings = Object.assign({ twelveKey: '', finmindToken: '', twFee: 0.1425, twTax: 0.3, fxOverride: '' }, data.settings || {});
+    if (data.openaiKey) localStorage.setItem('twbt_apikey', data.openaiKey);
+    saveDB();
+    fillSettingsUI();
+    expandedId = null;
+    renderAll();
+    ensureFX(false).then(renderSummary);
+    ioStatus(`✅ 已匯入 ${db.positions.length} 筆持倉${data.exportedAt ? `（備份於 ${data.exportedAt.slice(0, 10)}）` : ''}`);
+  };
+  r.readAsText(file);
+}
+
 function bindSettings() {
   $('tdKey').addEventListener('input', e => { db.settings.twelveKey = e.target.value.trim(); saveDB(); });
   $('fmToken').addEventListener('input', e => { db.settings.finmindToken = e.target.value.trim(); saveDB(); });
@@ -1545,20 +1600,17 @@ function bindSettings() {
     localStorage.setItem('twbt_model', $('modelSel').value);
   });
   $('effortSel').addEventListener('change', () => localStorage.setItem('twbt_effort', $('effortSel').value));
+  $('exportBtn').addEventListener('click', exportData);
+  $('importBtn').addEventListener('click', () => $('importFile').click());
+  $('importFile').addEventListener('change', e => { const f = e.target.files[0]; if (f) importData(f); e.target.value = ''; });
 }
 (function init() {
   loadDB();
   bindSettings();
   $('appVer').textContent = APP_VERSION;
   $('appVerFoot').textContent = '我的投資組合 + AI 分析 ' + APP_VERSION;
-  // 還原設定
-  $('tdKey').value = db.settings.twelveKey || '';
-  $('fmToken').value = db.settings.finmindToken || '';
-  $('twFee').value = db.settings.twFee;
-  $('twTax').value = db.settings.twTax;
-  $('fxOverride').value = db.settings.fxOverride || '';
-  const savedKey = localStorage.getItem('twbt_apikey');   // 沿用舊回測工具儲存的 OpenAI Key
-  if (savedKey) { $('apiKey').value = savedKey; $('rememberKey').checked = true; }
+  // 還原設定（含 API 金鑰，沿用舊回測工具的 localStorage key）
+  fillSettingsUI();
   const savedModel = localStorage.getItem('twbt_model');
   if (savedModel && [...$('modelSel').options].some(o => o.value === savedModel)) {
     $('modelSel').value = savedModel;
