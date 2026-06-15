@@ -290,6 +290,24 @@
     <div id="aiOutput"></div>
   </section>
 
+  <!-- ── 投資組合績效 ── -->
+  <section>
+    <h2>④ 投資組合績效</h2>
+    <div class="cards" id="perfCards"></div>
+    <div class="row">
+      <button id="curveBtn" class="primary">📈 建立近一年淨值曲線</button>
+      <span class="hint">抓取各股票部位歷史股價、依交易紀錄重建每日淨值並與加權指數對照（債券不納入；外幣以目前匯率換算）。</span>
+    </div>
+    <div id="curveStatus" class="status"></div>
+    <div id="perfChartWrap" style="position:relative; margin-top:12px; display:none">
+      <canvas id="perfChart" style="width:100%; height:300px; display:block"></canvas>
+    </div>
+    <div class="legend" id="perfLegend" style="display:none">
+      <span><i style="background:var(--gold)"></i>我的投組（起點=100）</span>
+      <span><i style="background:var(--accent)"></i>加權指數（起點=100）</span>
+    </div>
+  </section>
+
 </main>
 <footer>
   資料來源：台灣證券交易所（上市收盤）、<a href="https://finmindtrade.com" style="color:var(--muted)">FinMind</a>（上櫃）、Twelve Data（美股）、<a href="https://www.exchangerate-api.com" style="color:var(--muted)">Rates by Exchange Rate API</a>。
@@ -299,7 +317,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.6.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.7.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -695,7 +713,7 @@ function toTWD(v, ccy) {
 /* ════════════════ 畫面渲染 ════════════════ */
 let expandedId = null;
 let editTxId = null;   // 正在編輯的交易 id（null＝新增模式）
-function renderAll() { renderSummary(); renderTable(); renderAISelect(); }
+function renderAll() { renderSummary(); renderTable(); renderAISelect(); renderPerf(); }
 
 function renderSummary() {
   const rows = db.positions.map(p => ({ p, c: computeRow(p) }));
@@ -1195,6 +1213,153 @@ $('chart').addEventListener('mousemove', e => {
 });
 $('chart').addEventListener('mouseleave', () => { $('tooltip').style.display = 'none'; drawChart(); });
 window.addEventListener('resize', () => drawChart());
+
+/* ════════════════ 投資組合績效（XIRR／淨值曲線／大盤對照） ════════════════ */
+// XIRR（年化內部報酬率，money-weighted）：用二分法解 NPV=0。flows:[{date,amount}] 投入負、回收正。
+function xirr(flows) {
+  if (!flows || flows.length < 2) return null;
+  const t0 = parseD(flows[0].date);
+  const yrs = f => (parseD(f.date) - t0) / (365 * 86400000);
+  const npv = r => flows.reduce((s, f) => s + f.amount / Math.pow(1 + r, yrs(f)), 0);
+  if (!flows.some(f => f.amount > 0) || !flows.some(f => f.amount < 0)) return null;
+  let lo = -0.9999, hi = 10, flo = npv(lo), fhi = npv(hi);
+  if (!isFinite(flo) || !isFinite(fhi) || flo * fhi > 0) return null;
+  for (let i = 0; i < 200; i++) {
+    const mid = (lo + hi) / 2, fm = npv(mid);
+    if (Math.abs(fm) < 1e-6) return mid;
+    if (flo * fm < 0) { hi = mid; } else { lo = mid; flo = fm; }
+  }
+  return (lo + hi) / 2;
+}
+function positionFlows(p) {   // 單一部位現金流（部位幣別）：投入負、回收正
+  const flows = [];
+  if (p.market === 'bond') {
+    const b = p.bond, c = computeBond(p);
+    flows.push({ date: b.buyDate, amount: -(b.face * b.buyPricePct / 100 + (b.fee || 0) + (b.accruedPaid || 0)) });
+    couponDates(b).filter(d => d <= todayISO()).forEach(d => flows.push({ date: d, amount: c.couponAmt }));
+  } else {
+    for (const t of (p.txs || [])) {
+      if (t.type === 'buy') flows.push({ date: t.date, amount: -(t.price * t.qty + (t.fee || 0)) });
+      else if (t.type === 'sell') flows.push({ date: t.date, amount: t.price * t.qty - (t.fee || 0) });
+      else if (t.type === 'dividend') flows.push({ date: t.date, amount: t.amount || 0 });
+    }
+  }
+  return flows;
+}
+function portfolioXIRR() {   // 全組合 XIRR（換算 TWD，外幣用目前匯率近似）
+  const flows = [];
+  let termMV = 0, firstDate = null;
+  for (const p of db.positions) {
+    const ccy = posCcy(p), rate = ccy === 'TWD' ? 1 : fx.rate;
+    if (rate == null) return null;
+    for (const f of positionFlows(p)) {
+      flows.push({ date: f.date, amount: f.amount * rate });
+      if (!firstDate || f.date < firstDate) firstDate = f.date;
+    }
+    const c = computeRow(p);
+    termMV += ((c.mv ?? c.cost) || 0) * rate;
+  }
+  if (!flows.length) return null;
+  flows.sort((a, b) => a.date.localeCompare(b.date));
+  flows.push({ date: todayISO(), amount: termMV });
+  return { rate: xirr(flows), firstDate };
+}
+function renderPerf() {
+  const box = $('perfCards');
+  if (!db.positions.length) { box.innerHTML = '<div class="empty">尚無持倉。</div>'; return; }
+  const x = portfolioXIRR();
+  const xPct = x && x.rate != null ? x.rate * 100 : null;
+  const holdDays = x && x.firstDate ? daysBetween(x.firstDate, todayISO()) : null;
+  const cards = [
+    ['XIRR（年化內部報酬率）', xPct == null ? '—' : fmtPct(xPct), clsOf(xPct), xPct == null ? '需先更新報價／匯率' : 'money-weighted'],
+    ['最早買進日', x?.firstDate || '—', '', holdDays != null ? `已持有約 ${holdDays} 天` : ''],
+  ];
+  box.innerHTML = cards.map(([k, v, c, s]) =>
+    `<div class="card"><div class="k">${k}</div><div class="v ${c}">${v}</div>${s ? `<div class="s">${esc(s)}</div>` : ''}</div>`).join('');
+}
+
+let perfData = null;   // {dates, port:[..100基準], bench:[..100基準]}
+$('curveBtn').addEventListener('click', buildEquityCurve);
+async function buildEquityCurve() {
+  const st = $('curveStatus'); st.className = 'status';
+  const stocks = db.positions.filter(p => p.market !== 'bond' && (p.txs || []).some(t => t.type === 'buy'));
+  if (!stocks.length) { st.className = 'status error'; st.textContent = '沒有股票部位可繪製（債券不納入）'; return; }
+  if (db.positions.some(p => p.market === 'us') && !fx.rate) await ensureFX(false);
+  $('curveBtn').disabled = true;
+  try {
+    const start = isoD(addMonths(new Date(), -12)), end = todayISO();
+    const hist = {};
+    for (let i = 0; i < stocks.length; i++) {
+      const p = stocks[i];
+      st.innerHTML = `<span class="spinner"></span>抓取 ${esc(p.symbol)} 歷史股價（${i + 1}/${stocks.length}）…`;
+      let days;
+      if (p.market === 'tw') days = (await fmDaily(p.symbol, start, end)).days;   // 上市櫃通吃，1 請求
+      else days = (await tdDaily(p.symbol)).days.filter(d => d.date >= start && d.date <= end);
+      const m = {}; days.forEach(d => m[d.date] = d.close);
+      hist[p.id] = { map: m, dates: days.map(d => d.date) };
+    }
+    st.innerHTML = `<span class="spinner"></span>抓取加權指數…`;
+    const idx = await fetchTWIndex(start, end, () => {});
+    const idxMap = {}; idx.forEach(d => idxMap[d.date] = d.close);
+    // 交易日聯集
+    const dset = new Set(); for (const id in hist) hist[id].dates.forEach(d => dset.add(d)); idx.forEach(d => dset.add(d.date));
+    const dates = [...dset].sort();
+    const fxR = fx.rate || 1;
+    const priceAsOf = (h, d) => { if (h.map[d] != null) return h.map[d]; let last = null; for (const dd of h.dates) { if (dd <= d) last = dd; else break; } return last != null ? h.map[last] : null; };
+    const vals = [], bench = [];
+    for (const d of dates) {
+      let v = 0;
+      for (const p of stocks) {
+        let sh = 0;
+        for (const t of (p.txs || [])) { if (t.date <= d) { if (t.type === 'buy') sh += t.qty; else if (t.type === 'sell') sh -= t.qty; } }
+        if (sh <= 1e-9) continue;
+        const px = priceAsOf(hist[p.id], d);
+        if (px != null) v += sh * px * (p.market === 'us' ? fxR : 1);
+      }
+      let b = idxMap[d]; if (b == null) { let last = null; for (const dd of idx) { if (dd.date <= d) last = dd.close; else break; } b = last; }
+      vals.push(v); bench.push(b);
+    }
+    // 以第一個「投組有值」的日期為基準 100
+    const i0 = vals.findIndex(v => v > 0);
+    if (i0 < 0) throw new Error('區間內無持股，無法繪製');
+    const base = vals[i0], bbase = bench[i0];
+    const port = vals.map(v => v > 0 ? v / base * 100 : null);
+    const bm = bench.map(b => b != null && bbase ? b / bbase * 100 : null);
+    perfData = { dates: dates.slice(i0), port: port.slice(i0), bench: bm.slice(i0) };
+    $('perfChartWrap').style.display = ''; $('perfLegend').style.display = '';
+    drawPerfChart();
+    const pe = perfData.port[perfData.port.length - 1], be = perfData.bench[perfData.bench.length - 1];
+    st.className = 'status';
+    st.textContent = `✅ 近一年：我的投組 ${fmtPct(pe - 100)}、加權指數 ${be != null ? fmtPct(be - 100) : '—'}（${perfData.dates[0]} ～ ${perfData.dates[perfData.dates.length - 1]}）`;
+  } catch (e) {
+    st.className = 'status error'; st.textContent = '❌ ' + e.message;
+  } finally {
+    $('curveBtn').disabled = false;
+  }
+}
+function drawPerfChart() {
+  if (!perfData) return;
+  const { dates, port, bench } = perfData;
+  const c = $('perfChart'), dpr = window.devicePixelRatio || 1;
+  const W = c.clientWidth, H = 300;
+  c.width = W * dpr; c.height = H * dpr;
+  const ctx = c.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+  const padL = 46, padR = 14, padT = 14, padB = 26;
+  const all = port.concat(bench).filter(v => v != null);
+  let lo = Math.min(...all), hi = Math.max(...all);
+  if (hi - lo < 1) { hi += 1; lo -= 1; }
+  const pad = (hi - lo) * 0.06; lo -= pad; hi += pad;
+  const xAt = i => padL + (W - padL - padR) * (dates.length === 1 ? .5 : i / (dates.length - 1));
+  const yAt = v => padT + (H - padT - padB) * (1 - (v - lo) / (hi - lo));
+  ctx.strokeStyle = '#2d3a4b'; ctx.fillStyle = '#8b9bb0'; ctx.font = '11px -apple-system, sans-serif'; ctx.lineWidth = 1;
+  for (let s = 0; s <= 5; s++) { const v = lo + (hi - lo) * s / 5, y = yAt(v); ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke(); ctx.textAlign = 'right'; ctx.fillText(v.toFixed(0), padL - 6, y + 4); }
+  const ticks = Math.min(6, dates.length); ctx.textAlign = 'center';
+  for (let s = 0; s < ticks; s++) { const i = Math.round(s * (dates.length - 1) / Math.max(1, ticks - 1)); ctx.fillText(dates[i].slice(2), xAt(i), H - 8); }
+  ctx.strokeStyle = '#666'; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(padL, yAt(100)); ctx.lineTo(W - padR, yAt(100)); ctx.stroke(); ctx.setLineDash([]);
+  const line = (arr, col) => { ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); let started = false; arr.forEach((v, i) => { if (v == null) return; const x = xAt(i), y = yAt(v); if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y); }); ctx.stroke(); };
+  line(bench, '#4aa3ff'); line(port, '#f6b93b');
+}
+window.addEventListener('resize', () => { if (perfData) drawPerfChart(); });
 
 /* ════════════════ OpenAI（串流） ════════════════ */
 function selectedModel() {
