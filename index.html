@@ -321,7 +321,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.9.2';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.9.3';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1870,7 +1870,8 @@ function bindSettings() {
   loadDB();
   bindSettings();
   $('appVer').textContent = APP_VERSION;
-  $('appVerFoot').textContent = '我的投資組合 + AI 分析 ' + APP_VERSION;
+  const _yr = new Date().getFullYear();
+  $('appVerFoot').textContent = `© 2026${_yr > 2026 ? '–' + _yr : ''} Tony Hsiao　·　我的投資組合 + AI 分析 ${APP_VERSION}`;
   // 還原設定（含 API 金鑰，沿用舊回測工具的 localStorage key）
   fillSettingsUI();
   const savedModel = localStorage.getItem('twbt_model');
