@@ -257,6 +257,16 @@
   <!-- ── 走勢圖與 AI 分析 ── -->
   <section>
     <h2>③ 走勢圖與 AI 分析</h2>
+    <details style="margin-bottom:14px; font-size:.84rem; color:var(--muted)">
+      <summary style="cursor:pointer; color:var(--accent)">ℹ️ 這份 AI 分析根據哪些資料？</summary>
+      <div style="margin-top:8px; line-height:1.75">
+        <b style="color:var(--text)">程式精算的指標（AI 只解讀、不計算）：</b>技術面 MA／RSI／MACD／KD／布林通道／ATR／OBV／量比／量能；台股另含配息（殖利率、除息／發放日）、三大法人買賣超、月營收年增、本益比(trailing)／PBR。<br>
+        <b style="color:var(--text)">原始價量：</b>近 52 週週線＋近 60 日日線 OHLCV、同期大盤對照（上市配加權指數／上櫃配櫃買指數／美股配 SPY）。<br>
+        <b style="color:var(--text)">AI 即時 web search：</b>最新新聞（附來源連結）；美股的估值（trailing／forward 本益比）、營收成長、分析師評等與機構持股。<br>
+        <b style="color:var(--text)">你的持倉：</b>加權平均成本與損益（存於本機瀏覽器）。<br>
+        <span style="color:var(--gold)">資料來源：股價 TWSE／FinMind／Twelve Data；配息‧籌碼‧月營收‧本益比 FinMind（台股）；新聞與美股基本面 OpenAI web search；匯率 open.er-api。<b>所有數字皆由程式精算後才交給 AI，AI 僅負責解讀。</b></span>
+      </div>
+    </details>
     <div class="row">
       <label class="field" style="min-width:240px">分析標的
         <select id="aiTarget"></select>
@@ -323,7 +333,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.12.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.12.2';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
