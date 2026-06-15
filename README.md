@@ -1,6 +1,6 @@
 # 💼 我的投資組合 + AI 分析
 
-**版本：v1.9.0**（版本號見 `index.html` 的 `APP_VERSION`，並對應 git tag；變更紀錄見 [CHANGELOG.md](CHANGELOG.md)）
+**版本：v1.9.1**（版本號見 `index.html` 的 `APP_VERSION`，並對應 git tag；變更紀錄見 [CHANGELOG.md](CHANGELOG.md)）
 
 追蹤**台股、美股、海外公司債**的個人投資組合工具：逐筆記錄交易、以**加權平均成本法**計算已實現／未實現損益（含台股費稅、股息、債券配息與匯率換算），並可一鍵產生 **AI 技術分析**（針對你的持倉個人化）與**投資組合總評**。
 

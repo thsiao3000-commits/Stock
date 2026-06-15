@@ -44,6 +44,10 @@
   }
   input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   input[type="checkbox"] { width: auto; accent-color: var(--accent); }
+  .pw { position: relative; display: block; }
+  .pw input { width: 100%; padding-right: 40px; }
+  .pw .eye { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem; padding: 4px 7px; line-height: 1; }
+  .pw .eye:hover { color: var(--text); }
   .row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-top: 14px; }
   .hint { font-size: .8rem; color: var(--muted); }
   button.primary {
@@ -124,13 +128,13 @@
     <summary>🔑 API 與參數設定</summary>
     <div class="grid">
       <label class="field">Twelve Data API Key（美股報價用）
-        <input id="tdKey" type="password" placeholder="免費註冊 twelvedata.com 取得">
+        <span class="pw"><input id="tdKey" type="password" placeholder="免費註冊 twelvedata.com 取得"><button type="button" class="eye" data-eye="tdKey" title="顯示／隱藏">👁</button></span>
       </label>
       <label class="field">FinMind Token（台股上櫃用，選填）
-        <input id="fmToken" type="password" placeholder="免填即可用；如被限流再到 finmindtrade.com 免費取得">
+        <span class="pw"><input id="fmToken" type="password" placeholder="免填即可用；如被限流再到 finmindtrade.com 免費取得"><button type="button" class="eye" data-eye="fmToken" title="顯示／隱藏">👁</button></span>
       </label>
       <label class="field">OpenAI API Key
-        <input id="apiKey" type="password" placeholder="sk-...">
+        <span class="pw"><input id="apiKey" type="password" placeholder="sk-..."><button type="button" class="eye" data-eye="apiKey" title="顯示／隱藏">👁</button></span>
       </label>
       <label class="field">AI 模型
         <select id="modelSel">
@@ -317,7 +321,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.9.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.9.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1838,6 +1842,13 @@ function bindSettings() {
   $('exportBtn').addEventListener('click', exportData);
   $('importBtn').addEventListener('click', () => $('importFile').click());
   $('importFile').addEventListener('change', e => { const f = e.target.files[0]; if (f) importData(f); e.target.value = ''; });
+  // 金鑰欄位「眼睛」切換顯示／隱藏，方便核對 key
+  $$('.eye').forEach(btn => btn.addEventListener('click', () => {
+    const inp = $(btn.dataset.eye), show = inp.type === 'password';
+    inp.type = show ? 'text' : 'password';
+    btn.textContent = show ? '🙈' : '👁';
+    btn.title = show ? '隱藏' : '顯示';
+  }));
 }
 (function init() {
   loadDB();
