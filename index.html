@@ -321,7 +321,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.9.3';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.10.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -527,6 +527,51 @@ function dividendStats(divs, lastClose) {
   let streak = 0;
   for (let i = ys.length - 1; i >= 0; i--) { if (byYear[ys[i]] > 0) streak++; else break; }
   return { ttm, yieldPct, freq, last, next, daysToNext, last5, streak };
+}
+// 通用 FinMind 抓取（任一 dataset；抓不到回空陣列，不致命）
+async function fmDataset(dataset, stockNo, startISO) {
+  const tok = (db.settings.finmindToken || '').trim();
+  let url = `https://api.finmindtrade.com/api/v4/data?dataset=${dataset}&data_id=${encodeURIComponent(stockNo)}&start_date=${startISO}`;
+  if (tok) url += `&token=${encodeURIComponent(tok)}`;
+  try { const j = await (await fetch(url)).json(); return (j.status === 200 && Array.isArray(j.data)) ? j.data : []; }
+  catch (_) { return []; }
+}
+// 籌碼：三大法人買賣超（外資/投信/自營），回最近一日與近5/20日淨額（股；正＝買超）
+function chipStats(rows) {
+  if (!rows || !rows.length) return null;
+  const foreign = ['Foreign_Investor', 'Foreign_Dealer_Self'], trust = ['Investment_Trust'];
+  const byDate = {};
+  for (const r of rows) {
+    const net = (r.buy || 0) - (r.sell || 0), d = r.date;
+    const cat = foreign.includes(r.name) ? 'foreign' : trust.includes(r.name) ? 'trust' : 'dealer';
+    (byDate[d] = byDate[d] || { foreign: 0, trust: 0, dealer: 0, total: 0 });
+    byDate[d][cat] += net; byDate[d].total += net;
+  }
+  const dates = Object.keys(byDate).sort();
+  const sumN = (n, k) => dates.slice(-n).reduce((s, d) => s + byDate[d][k], 0);
+  const last = dates[dates.length - 1];
+  return {
+    lastDate: last, lastDay: byDate[last],
+    net5: { total: sumN(5, 'total'), foreign: sumN(5, 'foreign'), trust: sumN(5, 'trust'), dealer: sumN(5, 'dealer') },
+    net20: { total: sumN(20, 'total'), foreign: sumN(20, 'foreign'), trust: sumN(20, 'trust'), dealer: sumN(20, 'dealer') },
+  };
+}
+// 基本面：月營收年增（YoY）/月增（MoM）+ 近6月年增趨勢
+function revenueStats(rows) {
+  if (!rows || !rows.length) return null;
+  const rs = [...rows].sort((a, b) => (a.revenue_year - b.revenue_year) || (a.revenue_month - b.revenue_month));
+  const latest = rs[rs.length - 1], prev = rs[rs.length - 2];
+  const yoyOf = r => { const y = rs.find(x => x.revenue_year === r.revenue_year - 1 && x.revenue_month === r.revenue_month); return y && y.revenue ? (r.revenue / y.revenue - 1) * 100 : null; };
+  return {
+    latest, yoy: yoyOf(latest), mom: prev && prev.revenue ? (latest.revenue / prev.revenue - 1) * 100 : null,
+    recent: rs.slice(-6).map(r => ({ ym: `${r.revenue_year}/${String(r.revenue_month).padStart(2, '0')}`, yoy: yoyOf(r) })),
+  };
+}
+// 估值：最新 PER/PBR/殖利率 + 近一年 PER 區間
+function perStats(rows) {
+  if (!rows || !rows.length) return null;
+  const last = rows[rows.length - 1], pers = rows.map(r => r.PER).filter(v => v > 0);
+  return { PER: last.PER, PBR: last.PBR, yield: last.dividend_yield, perLo: pers.length ? Math.min(...pers) : null, perHi: pers.length ? Math.max(...pers) : null };
 }
 function tdKeyOrThrow() {
   const k = (db.settings.twelveKey || '').trim();
@@ -1095,7 +1140,7 @@ $('fetchBtn').addEventListener('click', async () => {
   $('fetchBtn').disabled = true; $('aiBtn').disabled = true;
   try {
     const end = todayISO(), start = isoD(addMonths(new Date(), -12));
-    let days, name = pos?.name || '', idx, idxLabel, srcNote = '', divStats = null;
+    let days, name = pos?.name || '', idx, idxLabel, srcNote = '', divStats = null, chip = null, rev = null, per = null, news = null;
     if (market === 'tw') {
       const r = await fetchTWStock(symbol, start, end, m => st.textContent = m);
       days = r.days; name = name || r.name;
@@ -1113,6 +1158,17 @@ $('fetchBtn').addEventListener('click', async () => {
         const divs = await fmDividends(symbol, isoD(addMonths(new Date(), -72)));   // 近 6 年
         divStats = dividendStats(divs, days[days.length - 1].close);
       } catch (_) {}
+      st.textContent = '抓取籌碼／基本面／新聞…';
+      try {
+        const [inst, revR, perR, newsR] = await Promise.all([
+          fmDataset('TaiwanStockInstitutionalInvestorsBuySell', symbol, isoD(addMonths(new Date(), -3))),
+          fmDataset('TaiwanStockMonthRevenue', symbol, isoD(addMonths(new Date(), -30))),   // 多抓以利近6月年增比較
+          fmDataset('TaiwanStockPER', symbol, isoD(addMonths(new Date(), -12))),
+          fmDataset('TaiwanStockNews', symbol, isoD(addMonths(new Date(), -3))),
+        ]);
+        chip = chipStats(inst); rev = revenueStats(revR); per = perStats(perR);
+        news = (newsR || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 8);   // 取最新 8 則
+      } catch (_) {}
     } else {
       st.textContent = `美股 ${symbol}：抓取日線…`;
       const r = await tdDaily(symbol);
@@ -1125,7 +1181,7 @@ $('fetchBtn').addEventListener('click', async () => {
     if (!days || days.length < 30)
       throw new Error(`資料不足（僅 ${days ? days.length : 0} 個交易日，需 ≥30）：可能為新上市／新上櫃／興櫃，或代號有誤，請確認。`);
     const posStats = pos ? computeStock(pos) : null;
-    aiData = { market, symbol, name, days, idx: idx || [], idxLabel, pos, posStats, divStats };
+    aiData = { market, symbol, name, days, idx: idx || [], idxLabel, pos, posStats, divStats, chip, rev, per, news };
     st.textContent = `✅ ${symbol} ${name || ''}：${days.length} 個交易日（${days[0].date} ～ ${days[days.length - 1].date}）${srcNote}`;
     const info = [];
     info.push(`最新收盤 ${days[days.length - 1].close}`);
@@ -1552,7 +1608,35 @@ function buildStockPrompt() {
     divBlock = lines.join('\n');
   }
 
-  let posBlock = '目前未持有此標的。請在第 6 章改為「進場評估」：分析現在是否為合理的進場時機、適合的進場價位區間與條件。';
+  // 籌碼面＋基本面＋消息面（僅台股；皆來自 FinMind）
+  let fundBlock = '';
+  if (market === 'tw') {
+    const parts = [], k = v => nf.format(Math.round(v / 1000));
+    if (aiData.chip) {
+      const c = aiData.chip;
+      parts.push(`【籌碼面（三大法人買賣超，單位：張，正＝買超）】\n` +
+        `- 最近交易日（${c.lastDate}）：外資 ${k(c.lastDay.foreign)}、投信 ${k(c.lastDay.trust)}、自營 ${k(c.lastDay.dealer)}、合計 ${k(c.lastDay.total)}\n` +
+        `- 近5日合計 ${k(c.net5.total)}；近20日：外資 ${k(c.net20.foreign)}、投信 ${k(c.net20.trust)}、自營 ${k(c.net20.dealer)}、合計 ${k(c.net20.total)}`);
+    }
+    if (aiData.rev || aiData.per) {
+      let f = '【基本面】';
+      if (aiData.rev) {
+        const r = aiData.rev, e = v => fnum(v / 1e8, 0);
+        f += `\n- 最新月營收（${r.latest.revenue_year}/${String(r.latest.revenue_month).padStart(2, '0')}）：${e(r.latest.revenue)} 億，年增 ${fmtPct(r.yoy)}、月增 ${fmtPct(r.mom)}` +
+          `\n- 近6月營收年增：${r.recent.map(x => `${x.ym} ${fmtPct(x.yoy)}`).join('、')}`;
+      }
+      if (aiData.per) {
+        const p = aiData.per;
+        f += `\n- 本益比 PER=${fnum(p.PER)}（近一年區間 ${fnum(p.perLo)}–${fnum(p.perHi)}）、股價淨值比 PBR=${fnum(p.PBR)}、殖利率 ${fnum(p.yield)}%`;
+      }
+      parts.push(f);
+    }
+    if (aiData.news && aiData.news.length)
+      parts.push(`【近期新聞標題（僅標題，請審慎、勿過度延伸）】\n${aiData.news.map(n => `- ${(n.date || '').slice(0, 10)}（${n.source || ''}）${n.title || ''}`).join('\n')}`);
+    if (parts.length) fundBlock = '\n' + parts.join('\n\n') + '\n';
+  }
+
+  let posBlock = '目前未持有此標的。請在第 7 章改為「進場評估」：分析現在是否為合理的進場時機、適合的進場價位區間與條件。';
   if (posStats && posStats.qty > 0) {
     posBlock =
       `- 持有 ${nf.format(posStats.qty)} 股、加權平均成本 ${fnum(posStats.avgCost)}（首次買進 ${posStats.firstBuy}）\n` +
@@ -1583,7 +1667,7 @@ ${idxBlock}
 
 【配息與殖利率（現金股利，含除息／發放時間）】
 ${divBlock}
-
+${fundBlock}
 【近 ${weekly.length} 週週線（週一日期,開,高,低,收,量千股）】
 ${csvOf(weekly)}
 
@@ -1598,10 +1682,11 @@ ${posBlock}
 2. 支撐與壓力位（給出具體價位與理由）
 3. 技術指標解讀（均線排列、RSI、MACD、KD、布林通道、ATR、量價關係，並結合 OBV 能量潮與量比研判量價配合或背離）
 4. 相對大盤強弱（領先或落後大盤？意義為何）
-5. 配息與殖利率評估（現金殖利率是否具吸引力、配息穩定度與成長性；若臨近除息，說明參與除息／棄息的考量與填息、貼息風險；台股單次現金股利達 2 萬元以上需注意二代健保補充保費與股利所得稅。美股或查無配息資料則註明不適用）
-6. 我的持倉評估（從風險管理角度，就「續抱／加碼／減碼／停損」給出情境式分析與觸發條件，須對應我的成本與損益，並結合除息時點）
-7. 風險提醒
-8. 操作計畫表（**務必用 Markdown 表格**呈現，欄位為｜動作｜觸發條件與具體價位｜依據｜）：
+5. 籌碼、基本面與消息面（三大法人近期買賣超的方向與力道；月營收年增趨勢與 PER／PBR 估值是否合理；近期新聞題材對股價的可能影響與風險。請務實解讀、勿過度延伸新聞標題。美股或查無資料則註明不適用並略過）
+6. 配息與殖利率評估（現金殖利率是否具吸引力、配息穩定度與成長性；若臨近除息，說明參與除息／棄息的考量與填息、貼息風險；台股單次現金股利達 2 萬元以上需注意二代健保補充保費與股利所得稅。美股或查無配息資料則註明不適用）
+7. 我的持倉評估（從風險管理角度，就「續抱／加碼／減碼／停損」給出情境式分析與觸發條件，須對應我的成本與損益，並結合除息時點）
+8. 風險提醒
+9. 操作計畫表（**務必用 Markdown 表格**呈現，欄位為｜動作｜觸發條件與具體價位｜依據｜）：
    - 若持有此標的：列出「**加碼**、**續抱**、**減碼**、**停損**」四個動作，各給出明確的價位或價位區間。
    - 若未持有：改列「**進場區間**、**觀望**、**不參與**」。
    - 價位必須是**具體數字**（不可只寫「跌深」「過高」），並對應前面分析的支撐／壓力、布林通道、均線與 ATR（停損距離可用 ATR 倍數），且與我的成本與損益一致；目標是讓我能直接照表執行。
