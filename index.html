@@ -290,7 +290,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.3.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.4.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -440,6 +440,46 @@ async function fmDaily(stockNo, startISO, endISO) {
     date: r.date, open: r.open, high: r.max, low: r.min, close: r.close, volume: r.Trading_Volume || 0,
   })).filter(d => d.close > 0 && d.open > 0).sort((a, b) => a.date.localeCompare(b.date));
   return { days };
+}
+// FinMind 台股配息：含除息交易日 / 現金股利發放日 / 每股現金股利。抓不到回空陣列（不致命）。
+async function fmDividends(stockNo, startISO) {
+  const tok = (db.settings.finmindToken || '').trim();
+  let url = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockDividend&data_id=${encodeURIComponent(stockNo)}&start_date=${startISO}`;
+  if (tok) url += `&token=${encodeURIComponent(tok)}`;
+  let j;
+  try { j = await (await fetch(url)).json(); } catch (_) { return []; }
+  if (j.status !== 200 || !Array.isArray(j.data)) return [];
+  return j.data.map(r => ({
+    year: r.year || '',
+    cash: (r.CashEarningsDistribution || 0) + (r.CashStatutorySurplus || 0),
+    stock: r.StockEarningsDistribution || 0,
+    exDate: r.CashExDividendTradingDate || r.StockExDividendTradingDate || '',
+    payDate: r.CashDividendPaymentDate || '',
+  })).filter(d => d.cash > 0 || d.stock > 0)
+     .sort((a, b) => (a.exDate || '9999-' + a.year).localeCompare(b.exDate || '9999-' + b.year));
+}
+// 由配息明細算：現金殖利率(TTM)/配息頻率/連續配息年數/最近與即將到來的除息
+function dividendStats(divs, lastClose) {
+  if (!divs || !divs.length) return null;
+  const today = todayISO(), oneYrAgo = isoD(addMonths(new Date(), -12));
+  const withEx = divs.filter(d => d.exDate);
+  const ttmList = withEx.filter(d => d.exDate > oneYrAgo && d.exDate <= today);
+  const ttm = ttmList.reduce((s, d) => s + d.cash, 0);
+  const yieldPct = lastClose > 0 && ttm > 0 ? ttm / lastClose * 100 : null;
+  const perYr = ttmList.length;
+  const freq = perYr >= 4 ? '季配' : perYr === 2 ? '半年配' : perYr === 1 ? '年配' : (perYr ? perYr + ' 次/年' : '近一年無除息');
+  const past = withEx.filter(d => d.exDate <= today);
+  const last = past.length ? past[past.length - 1] : null;
+  const upcoming = withEx.filter(d => d.exDate > today);
+  const next = upcoming.length ? upcoming[0] : null;
+  const daysToNext = next ? daysBetween(today, next.exDate) : null;
+  const byYear = {};
+  for (const d of divs) { const y = (d.year.match(/(\d+)年/) || [])[1]; if (y) byYear[y] = (byYear[y] || 0) + d.cash; }
+  const ys = Object.keys(byYear).sort();
+  const last5 = ys.slice(-5).map(y => ({ year: +y + 1911, cash: byYear[y] }));
+  let streak = 0;
+  for (let i = ys.length - 1; i >= 0; i--) { if (byYear[ys[i]] > 0) streak++; else break; }
+  return { ttm, yieldPct, freq, last, next, daysToNext, last5, streak };
 }
 function tdKeyOrThrow() {
   const k = (db.settings.twelveKey || '').trim();
@@ -967,13 +1007,18 @@ $('fetchBtn').addEventListener('click', async () => {
   $('fetchBtn').disabled = true; $('aiBtn').disabled = true;
   try {
     const end = todayISO(), start = isoD(addMonths(new Date(), -12));
-    let days, name = pos?.name || '', idx, idxLabel, srcNote = '';
+    let days, name = pos?.name || '', idx, idxLabel, srcNote = '', divStats = null;
     if (market === 'tw') {
       const r = await fetchTWStock(symbol, start, end, m => st.textContent = m);
       days = r.days; name = name || r.name;
       if (r.source === 'FinMind') srcNote = '　·　來源 FinMind（上櫃）';
       idx = await fetchTWIndex(start, end, m => st.textContent = m);
       idxLabel = '加權指數';
+      st.textContent = '抓取配息資料…';
+      try {
+        const divs = await fmDividends(symbol, isoD(addMonths(new Date(), -72)));   // 近 6 年
+        divStats = dividendStats(divs, days[days.length - 1].close);
+      } catch (_) {}
     } else {
       st.textContent = `美股 ${symbol}：抓取日線…`;
       const r = await tdDaily(symbol);
@@ -986,7 +1031,7 @@ $('fetchBtn').addEventListener('click', async () => {
     if (!days || days.length < 30)
       throw new Error(`資料不足（僅 ${days ? days.length : 0} 個交易日，需 ≥30）：可能為新上市／新上櫃／興櫃，或代號有誤，請確認。`);
     const posStats = pos ? computeStock(pos) : null;
-    aiData = { market, symbol, name, days, idx: idx || [], idxLabel, pos, posStats };
+    aiData = { market, symbol, name, days, idx: idx || [], idxLabel, pos, posStats, divStats };
     st.textContent = `✅ ${symbol} ${name || ''}：${days.length} 個交易日（${days[0].date} ～ ${days[days.length - 1].date}）${srcNote}`;
     const info = [];
     info.push(`最新收盤 ${days[days.length - 1].close}`);
@@ -994,6 +1039,8 @@ $('fetchBtn').addEventListener('click', async () => {
       info.push(`我的均價 ${posStats.avgCost.toFixed(2)}`, `持有 ${nf.format(posStats.qty)} 股`,
         `未實現 ${fmtPct(posStats.unrealPct)}`);
     }
+    if (divStats && divStats.yieldPct != null) info.push(`現金殖利率 ${divStats.yieldPct.toFixed(2)}%`);
+    if (divStats && divStats.next) info.push(`下次除息 ${divStats.next.exDate}（${divStats.daysToNext} 天後）`);
     $('chartInfo').textContent = info.join('　·　');
     $('chartWrap').style.display = ''; $('chartLegend').style.display = '';
     drawChart();
@@ -1248,7 +1295,19 @@ function buildStockPrompt() {
       `- ${idxLabel} 近20日 ${fmtPct(i20)}、最新 ${fnum(idx[idx.length - 1].close)}`;
   }
 
-  let posBlock = '目前未持有此標的。請在第 5 章改為「進場評估」：分析現在是否為合理的進場時機、適合的進場價位區間與條件。';
+  let divBlock = market === 'tw' ? '（查無配息資料，可能未配息或為新上市櫃）' : '（本版配息分析僅支援台股）';
+  const ds = aiData.divStats;
+  if (market === 'tw' && ds) {
+    const lines = [];
+    lines.push(`- 現金殖利率（近12個月）≈ ${fnum(ds.yieldPct)}%（近12個月現金股利合計 ${fnum(ds.ttm)} 元 ÷ 最新收盤 ${last.close}）`);
+    lines.push(`- 配息頻率：${ds.freq}；連續配息 ${ds.streak} 年`);
+    if (ds.last) lines.push(`- 最近一次除息：${ds.last.exDate}，每股現金 ${fnum(ds.last.cash)} 元${ds.last.payDate ? `，發放日 ${ds.last.payDate}` : ''}`);
+    if (ds.next) lines.push(`- 即將除息：${ds.next.exDate}（距今 ${ds.daysToNext} 天），每股現金 ${fnum(ds.next.cash)} 元${ds.next.payDate ? `，發放日 ${ds.next.payDate}` : ''}`);
+    if (ds.last5 && ds.last5.length) lines.push(`- 近${ds.last5.length}年每年現金股利：${ds.last5.map(x => `${x.year} ${fnum(x.cash)}`).join('、')}`);
+    divBlock = lines.join('\n');
+  }
+
+  let posBlock = '目前未持有此標的。請在第 6 章改為「進場評估」：分析現在是否為合理的進場時機、適合的進場價位區間與條件。';
   if (posStats && posStats.qty > 0) {
     posBlock =
       `- 持有 ${nf.format(posStats.qty)} 股、加權平均成本 ${fnum(posStats.avgCost)}（首次買進 ${posStats.firstBuy}）\n` +
@@ -1275,6 +1334,9 @@ function buildStockPrompt() {
 【同期大盤對照】
 ${idxBlock}
 
+【配息與殖利率（現金股利，含除息／發放時間）】
+${divBlock}
+
 【近 ${weekly.length} 週週線（週一日期,開,高,低,收,量千股）】
 ${csvOf(weekly)}
 
@@ -1289,8 +1351,9 @@ ${posBlock}
 2. 支撐與壓力位（給出具體價位與理由）
 3. 技術指標解讀（均線排列、RSI、MACD、KD、量價關係，並結合 OBV 能量潮與量比研判量價配合或背離）
 4. 相對大盤強弱（領先或落後大盤？意義為何）
-5. 我的持倉評估（從風險管理角度，就「續抱／加碼／減碼／停損」給出情境式分析與觸發條件，須對應我的成本與損益）
-6. 風險提醒
+5. 配息與殖利率評估（現金殖利率是否具吸引力、配息穩定度與成長性；若臨近除息，說明參與除息／棄息的考量與填息、貼息風險；台股單次現金股利達 2 萬元以上需注意二代健保補充保費與股利所得稅。美股或查無配息資料則註明不適用）
+6. 我的持倉評估（從風險管理角度，就「續抱／加碼／減碼／停損」給出情境式分析與觸發條件，須對應我的成本與損益，並結合除息時點）
+7. 風險提醒
 
 最後請註明：本分析僅供參考，不構成投資建議。`;
 }
