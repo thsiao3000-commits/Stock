@@ -193,7 +193,7 @@
     </div>
     <div class="row">
       <button id="quoteBtn" class="primary">🔄 更新所有報價</button>
-      <span class="hint">台股每檔間隔 0.5 秒；美股一次批量；同時更新匯率。金額一律以「換算新台幣」加總。</span>
+      <span class="hint">台股每檔間隔 0.5 秒；美股每 6 支一批、批間隔 60 秒（避開 Twelve Data 每分鐘限額）；同時更新匯率。金額一律以「換算新台幣」加總。</span>
     </div>
     <div id="qStatus" class="status"></div>
   </section>
@@ -335,7 +335,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.13.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.13.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1078,6 +1078,14 @@ $('addBtn').addEventListener('click', () => {
 });
 
 /* ════════════════ 報價更新 ════════════════ */
+// 限流等待：顯示倒數，讓使用者知道在等 Twelve Data 的每分鐘額度重置（非當機）
+async function waitCountdown(secs, statusEl, prefix) {
+  for (let s = secs; s > 0; s--) {
+    statusEl.className = 'status';
+    statusEl.innerHTML = `<span class="spinner"></span>${esc(prefix)}（約 ${s} 秒）…`;
+    await sleep(1000);
+  }
+}
 $('quoteBtn').addEventListener('click', refreshQuotes);
 async function refreshQuotes() {
   const st = $('qStatus'); st.className = 'status';
@@ -1096,18 +1104,34 @@ async function refreshQuotes() {
     }
     const usPos = db.positions.filter(p => p.market === 'us');
     if (usPos.length) {
-      st.textContent = '美股報價（批量）…';
-      try {
-        const map = await tdQuotes(usPos.map(p => p.symbol));
-        for (const p of usPos) {
-          const q = map[p.symbol.toUpperCase()];
-          if (q) {
-            p.lastPrice = +q.close;
-            p.lastDate = (q.datetime || '').slice(0, 10);
-            if (q.name && !p.name) p.name = q.name;
-          } else errs.push(`${p.symbol} 無報價`);
-        }
-      } catch (e) { errs.push(e.message); }
+      // Twelve Data 免費版每分鐘 8 credits（每支 1）→ 分批（每批 6 留餘裕）、批間隔 60 秒
+      const TD_BATCH = 6;
+      for (let i = 0; i < usPos.length; i += TD_BATCH) {
+        const batch = usPos.slice(i, i + TD_BATCH);
+        st.textContent = `美股報價（${i + 1}–${i + batch.length}/${usPos.length}）…`;
+        try {
+          let map;
+          try {
+            map = await tdQuotes(batch.map(p => p.symbol));
+          } catch (e) {   // 撞到每分鐘限流 → 等一分鐘再重試一次
+            if (/credit|minute|limit/i.test(e.message || '')) {
+              await waitCountdown(60, st, '美股報價 — Twelve Data 限流，稍候重試');
+              map = await tdQuotes(batch.map(p => p.symbol));
+            } else throw e;
+          }
+          for (const p of batch) {
+            const q = map[p.symbol.toUpperCase()];
+            if (q) {
+              p.lastPrice = +q.close;
+              p.lastDate = (q.datetime || '').slice(0, 10);
+              if (q.name && !p.name) p.name = q.name;
+            } else errs.push(`${p.symbol} 無報價`);
+          }
+        } catch (e) { errs.push(e.message); }
+        saveDB(); renderAll();   // 每批更新即時反映到畫面
+        if (i + TD_BATCH < usPos.length)
+          await waitCountdown(60, st, `美股報價 — 每分鐘上限 8，已完成 ${i + batch.length}/${usPos.length}，等待額度重置`);
+      }
     }
     if (db.positions.some(p => posCcy(p) === 'USD')) {
       st.textContent = '更新匯率…';
