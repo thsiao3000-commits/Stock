@@ -294,8 +294,10 @@
     <div class="row">
       <button id="aiBtn" class="primary" disabled>🤖 產生個股 AI 分析</button>
       <button id="pfBtn" class="primary">💼 產生投資組合總評</button>
-      <span class="hint">回應以串流即時顯示。個股分析需先抓取資料。</span>
+      <button id="copyStockPrompt" class="ghost">📋 複製個股 Prompt</button>
+      <button id="copyPfPrompt" class="ghost">📋 複製組合 Prompt</button>
     </div>
+    <div class="hint" style="margin-top:4px">「產生 AI 分析」會呼叫 OpenAI（耗 token）；若想省 token，可改按「複製 Prompt」把同一份提問貼到訂閱制聊天機器人（如 Gemini）。新聞與美股基本面那段需該機器人能上網查詢才會生效；台股的技術面／籌碼／配息等數據已內含在 Prompt 中。</div>
     <div id="aiStatus" class="status"></div>
     <div id="aiMeta" style="display:none; align-items:center; gap:10px; margin-top:12px; padding:8px 12px; background:var(--panel2); border:1px solid var(--border); border-radius:8px; font-size:.82rem; color:var(--muted);">
       <span id="aiMetaText"></span>
@@ -333,7 +335,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.12.2';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.13.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1787,6 +1789,29 @@ $('pfBtn').addEventListener('click', async () => {
   } finally {
     $('aiBtn').disabled = false; $('pfBtn').disabled = false;
   }
+});
+// 複製 Prompt（給訂閱制聊天機器人，如 Gemini，省 OpenAI token）
+async function flashBtn(id, label, ok) {
+  const b = $(id); b.textContent = ok ? '✓ 已複製' : '✗ 複製失敗';
+  setTimeout(() => b.textContent = label, 1500);
+}
+$('copyStockPrompt').addEventListener('click', async () => {
+  const st = $('aiStatus'); st.className = 'status';
+  if (!aiData) { st.className = 'status error'; st.textContent = '請先「📊 抓取一年資料」再複製個股 Prompt'; return; }
+  const ok = await copyText(buildStockPrompt());
+  flashBtn('copyStockPrompt', '📋 複製個股 Prompt', ok);
+  if (ok) st.textContent = '✅ 個股 Prompt 已複製，可貼到 Gemini 等聊天機器人（新聞／美股基本面需該機器人能上網查詢）';
+});
+$('copyPfPrompt').addEventListener('click', async () => {
+  const st = $('aiStatus'); st.className = 'status';
+  if (!db.positions.length) { st.className = 'status error'; st.textContent = '尚無持倉'; return; }
+  if (db.positions.some(p => p.market !== 'bond' && p.lastPrice == null)) {
+    st.className = 'status error'; st.textContent = '請先「🔄 更新所有報價」再複製組合 Prompt'; return;
+  }
+  await ensureFX(false);
+  const ok = await copyText(buildPortfolioPrompt());
+  flashBtn('copyPfPrompt', '📋 複製組合 Prompt', ok);
+  if (ok) st.textContent = '✅ 投資組合 Prompt 已複製，可貼到其他聊天機器人';
 });
 
 /* ── 報告：時間戳記 / 複製 / 下載 ── */
