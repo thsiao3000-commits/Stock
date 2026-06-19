@@ -36,7 +36,7 @@
   }
   section h2 { margin: 0 0 14px; font-size: 1.1rem; color: var(--accent); }
   details.box > summary { cursor: pointer; color: var(--accent); font-weight: 600; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-top: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin-top: 12px; }
   label.field { display: flex; flex-direction: column; gap: 5px; font-size: .85rem; color: var(--muted); }
   input, select, button {
     font: inherit; color: var(--text); background: var(--panel2);
@@ -75,7 +75,14 @@
   .card .s { font-size: .75rem; color: var(--muted); margin-top: 2px; }
   .pos { color: var(--up); }
   .neg { color: var(--down); }
-  .tableWrap { overflow-x: auto; margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; }
+  .tableWrap { position: relative; margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; }
+  .tableScroll { overflow-x: auto; border-radius: 8px; }
+  /* 捲動陰影提示：表格還有欄位可往右（或往左）捲時，邊緣出現漸層，避免「總損益」等右側欄位被默默藏揉 */
+  .tableWrap::before, .tableWrap::after { content: ''; position: absolute; top: 1px; bottom: 1px; width: 36px; pointer-events: none; opacity: 0; transition: opacity .15s; z-index: 3; border-radius: 8px; }
+  .tableWrap::before { left: 1px; background: linear-gradient(90deg, rgba(15,20,25,.7), transparent); }
+  .tableWrap::after  { right: 1px; background: linear-gradient(270deg, rgba(15,20,25,.7), transparent); }
+  .tableWrap.more-l::before { opacity: 1; }
+  .tableWrap.more-r::after  { opacity: 1; }
   table { border-collapse: collapse; width: 100%; font-size: .84rem; }
   th, td { padding: 7px 10px; border-bottom: 1px solid var(--border); text-align: right; white-space: nowrap; }
   tr:last-child td { border-bottom: none; }
@@ -83,11 +90,26 @@
   td.l, th.l { text-align: left; }
   tr.prow { cursor: pointer; }
   tr.prow:hover td { background: rgba(74,163,255,.06); }
+  /* 新增持倉成功後，該列短暫高亮，讓使用者確認「加進去了」 */
+  @keyframes rowflash { 0% { background: rgba(246,185,59,.32); } 100% { background: transparent; } }
+  tr.flash td { animation: rowflash 1.6s ease-out; }
   .badge { display: inline-block; font-size: .72rem; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--border); color: var(--muted); }
   .badge.tw { color: #7cc7ff; border-color: #2b5d86; }
   .badge.us { color: #ffd28a; border-color: #8a6a2b; }
   .badge.bond { color: #9be8c5; border-color: #2b7a55; }
-  tr.expand > td { background: #141b25; padding: 14px 16px; white-space: normal; }
+  /* 持倉明細面板：移到表格外，永遠以可視寬度呈現，編輯／刪除 icon 不再被橫向捲動藏到最右邊 */
+  #posExpand { margin-top: 12px; }
+  .expandPanel { background: #141b25; border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .epHead { display: flex; align-items: center; gap: 10px; font-size: .95rem; margin-bottom: 10px; }
+  .epHead .epClose { margin-left: auto; color: var(--muted); padding: 5px 12px; }
+  .epHead .epClose:hover { border-color: var(--accent); color: var(--text); }
+  /* 交易明細的操作欄：黏在右緣，橫向捲動時 icon 永遠可見 */
+  .txTable th.act, .txTable td.act { position: sticky; right: 0; }
+  .txTable th.act { background: var(--panel2); z-index: 2; }
+  .txTable td.act { background: #141b25; box-shadow: -8px 0 8px -6px rgba(0,0,0,.5); }
+  .txTable td.act .tact { display: inline-flex; gap: 6px; }
+  .txTable td.act .tact button { padding: 5px 10px; font-size: .95rem; }
+  .tableWrap.txTable::after { display: none; }   /* \u64cd\u4f5c\u6b04\u5df2\u91d8\u53f3\uff0c\u4e0d\u9700\u53f3\u5074\u6372\u52d5\u63d0\u793a */
   .exGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 10px 0; }
   .exGrid .kv { font-size: .82rem; color: var(--muted); }
   .exGrid .kv b { color: var(--text); display: block; font-size: .92rem; }
@@ -114,7 +136,7 @@
   #aiOutput a { color: var(--accent); word-break: break-all; }
   footer { text-align: center; color: var(--muted); font-size: .78rem; padding: 0 20px 40px; }
   .empty { text-align: center; color: var(--muted); padding: 24px; }
-  @media (max-width: 600px) { main { padding: 8px 12px 40px; } section, details.box { padding: 14px; } }
+  @media (max-width: 600px) { main { padding: 8px 12px 40px; } section, details.box { padding: 14px; } th, td { padding: 6px 7px; } table { font-size: .8rem; } }
 </style>
 </head>
 <body>
@@ -186,10 +208,10 @@
     <h2>① 損益總覽</h2>
     <div class="cards" id="sumCards"></div>
     <div class="tableWrap" id="mktWrap" style="display:none">
-      <table id="mktTable">
+      <div class="tableScroll"><table id="mktTable">
         <thead><tr><th class="l">市場</th><th>市值</th><th>持有成本</th><th>未實現損益</th><th>已實現＋股息息收</th><th>總損益</th><th>占比</th></tr></thead>
         <tbody></tbody>
-      </table>
+      </table></div>
     </div>
     <div class="row">
       <button id="quoteBtn" class="primary">🔄 更新所有報價</button>
@@ -243,15 +265,16 @@
       <div id="addStatus" class="status"></div>
     </details>
     <div class="tableWrap">
-      <table id="posTable">
+      <div class="tableScroll"><table id="posTable">
         <thead><tr>
           <th class="l">市場</th><th class="l">代號／名稱</th><th>持有</th><th>均價／成本</th><th>現價</th>
           <th>市值</th><th>未實現損益</th><th>報酬率</th><th>已實現＋股息</th><th>總損益</th>
         </tr></thead>
         <tbody id="posBody"></tbody>
-      </table>
+      </table></div>
     </div>
-    <div class="hint" style="margin-top:8px">點任一列展開：交易明細、補登買賣／股息、債券配息資訊與市價更新、刪除。</div>
+    <div id="posExpand"></div>
+    <div class="hint" style="margin-top:8px">點任一列展開：交易明細、補登買賣／股息、債券配息資訊與市價更新、刪除（明細面板將顯示在表格下方）。</div>
   </section>
 
   <!-- ── 走勢圖與 AI 分析 ── -->
@@ -793,7 +816,25 @@ function toTWD(v, ccy) {
 /* ════════════════ 畫面渲染 ════════════════ */
 let expandedId = null;
 let editTxId = null;   // 正在編輯的交易 id（null＝新增模式）
+let flashId = null;    // 剛新增成功的持倉 id（用於高亮提示）
 function renderAll() { renderSummary(); renderTable(); renderAISelect(); renderPerf(); }
+
+// 表格捲動陰影：表格寬度超出容器、右側（或左側）還有欄位時，於邊緣顯示漸層提示
+function shadowOne(s) {
+  const w = s.closest('.tableWrap');
+  if (!w) return;
+  const max = s.scrollWidth - s.clientWidth;
+  w.classList.toggle('more-r', max - s.scrollLeft > 1);
+  w.classList.toggle('more-l', s.scrollLeft > 1);
+}
+function updateTableShadows(scope) {
+  $$('.tableScroll', scope || document).forEach(shadowOne);
+}
+document.addEventListener('scroll', e => {
+  const t = e.target;
+  if (t && t.classList && t.classList.contains('tableScroll')) shadowOne(t);
+}, true);
+window.addEventListener('resize', () => updateTableShadows());
 
 function renderSummary() {
   const rows = db.positions.map(p => ({ p, c: computeRow(p) }));
@@ -833,6 +874,7 @@ function renderSummary() {
       `<td class="${clsOf(g.total)}">${fmtMoney(g.total, 'TWD')}</td>` +
       `<td>${mvT > 0 ? (g.mv / mvT * 100).toFixed(1) + '%' : '—'}</td></tr>`;
   }).join('');
+  updateTableShadows();
 }
 
 function renderTable() {
@@ -851,7 +893,7 @@ function renderTable() {
                        : (c.avgCost != null ? c.avgCost.toFixed(2) : '—');
     const lastP = isBond ? (c.matured ? '已到期' : c.markPct.toFixed(2) + '%')
                          : (p.lastPrice != null ? p.lastPrice.toFixed(2) + (p.lastDate ? `<span class="hint"> (${p.lastDate.slice(5)})</span>` : '') : '—');
-    html += `<tr class="prow" data-id="${p.id}">` +
+    html += `<tr class="prow${flashId === p.id ? ' flash' : ''}" data-id="${p.id}">` +
       `<td class="l"><span class="badge ${p.market}">${MKT_NAME[p.market]}</span></td>` +
       `<td class="l"><b>${esc(p.symbol)}</b> ${esc(p.name || '')}</td>` +
       `<td>${hold}</td><td>${avg}</td><td>${lastP}</td>` +
@@ -860,10 +902,29 @@ function renderTable() {
       `<td class="${clsOf(c.unrealPct)}">${fmtPct(c.unrealPct)}</td>` +
       `<td class="${clsOf(c.realDiv)}">${fmtMoney(c.realDiv, ccy)}</td>` +
       `<td class="${clsOf(c.total)}">${fmtMoney(c.total, ccy)}</td></tr>`;
-    if (expandedId === p.id) html += `<tr class="expand"><td colspan="10">${expandHTML(p, c)}</td></tr>`;
   }
   tb.innerHTML = html;
-  if (expandedId) bindExpand(db.positions.find(x => x.id === expandedId));
+  flashId = null;
+  renderExpandPanel();
+  updateTableShadows();
+}
+
+// 明細面板独立渲染在表格外，不受持倉表橫向捲動影響（編輯／刪除按鈕永遠可見）
+function renderExpandPanel() {
+  const box = $('posExpand');
+  if (!box) return;
+  const p = expandedId ? db.positions.find(x => x.id === expandedId) : null;
+  if (!p) { box.innerHTML = ''; return; }
+  const c = computeRow(p);
+  box.innerHTML = `<div class="expandPanel">` +
+    `<div class="epHead"><span class="badge ${p.market}">${MKT_NAME[p.market]}</span>` +
+    `<b>${esc(p.symbol)}</b> ${esc(p.name || '')}` +
+    `<button class="ghost epClose" id="ex_close">收合 ⌃</button></div>` +
+    expandHTML(p, c) + `</div>`;
+  bindExpand(p);
+  const cl = $('ex_close');
+  if (cl) cl.onclick = () => { expandedId = null; renderTable(); };
+  updateTableShadows(box);
 }
 
 function expandHTML(p, c) {
@@ -886,7 +947,7 @@ function expandHTML(p, c) {
         <button id="ex_markBtn" class="ghost">儲存市價</button>
         <span class="hint">上次更新：${b.markDate || '未曾更新（以買進價計）'}</span>
         <span style="flex:1"></span>
-        <button id="ex_delPos" class="danger">刪除此持倉</button>
+        <button id="ex_delPos" class="danger">🗑 刪除整欌持倉</button>
       </div>`;
   }
   const txs = [...(p.txs || [])].sort((a, b2) => a.date.localeCompare(b2.date));
@@ -899,13 +960,13 @@ function expandHTML(p, c) {
       `<td>${t.type === 'dividend' ? '—' : t.price}</td><td>${t.type === 'dividend' ? '—' : nf.format(t.qty)}</td>` +
       `<td>${t.type === 'dividend' ? '—' : nf.format(Math.round(t.fee || 0))}</td>` +
       `<td class="${clsOf(amt)}">${fmtMoney(amt, ccy)}</td>` +
-      `<td><button class="ghost" data-edittx="${t.id}" style="padding:2px 7px" title="編輯此筆">✎</button> ` +
-      `<button class="danger" data-deltx="${t.id}" style="padding:2px 8px" title="刪除此筆">✕</button></td></tr>`;
+      `<td class="act"><span class="tact"><button class="ghost" data-edittx="${t.id}" title="編輯此筆">✎</button>` +
+      `<button class="danger" data-deltx="${t.id}" title="刪除此筆交易">✕</button></span></td></tr>`;
   }).join('');
   return `
     <div class="tableWrap txTable">
-      <table><thead><tr><th class="l">日期</th><th class="l">類別</th><th>價格</th><th>股數</th><th>費用</th><th>現金流</th><th></th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="7" class="empty">無交易紀錄</td></tr>'}</tbody></table>
+      <div class="tableScroll"><table><thead><tr><th class="l">日期</th><th class="l">類別</th><th>價格</th><th>股數</th><th>費用</th><th>現金流</th><th class="act"></th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="7" class="empty">無交易紀錄</td></tr>'}</tbody></table></div>
     </div>
     <div class="row" style="align-items:flex-end">
       <label class="field">類別
@@ -918,7 +979,7 @@ function expandHTML(p, c) {
       <label class="field ex-dv" style="display:none">股息金額 <input id="ex_amount" type="number" step="any" min="0" style="width:120px"></label>
       <button id="ex_addTx" class="primary">補登</button>
       <span style="flex:1"></span>
-      <button id="ex_delPos" class="danger">刪除此持倉</button>
+      <button id="ex_delPos" class="danger">🗑 刪除整欌持倉（含所有交易）</button>
     </div>
     <div id="ex_status" class="status"></div>`;
 }
@@ -985,7 +1046,7 @@ function bindExpand(p) {
     saveDB(); renderAll();
   };
   // 編輯單筆交易：載入到表單，按「更新」儲存
-  $$('#posBody [data-edittx]').forEach(btn => btn.onclick = e => {
+  $$('#posExpand [data-edittx]').forEach(btn => btn.onclick = e => {
     e.stopPropagation();
     const t = (p.txs || []).find(x => x.id === btn.dataset.edittx);
     if (!t) return;
@@ -999,7 +1060,7 @@ function bindExpand(p) {
     const st = $('ex_status'); st.className = 'status'; st.textContent = `編輯中：${t.date} ${lab}（改完按「更新」儲存）`;
   });
   // 刪除單筆交易
-  $$('#posBody [data-deltx]').forEach(btn => btn.onclick = e => {
+  $$('#posExpand [data-deltx]').forEach(btn => btn.onclick = e => {
     e.stopPropagation();
     if (!confirm('刪除此筆交易？')) return;
     p.txs = p.txs.filter(t => t.id !== btn.dataset.deltx);
@@ -1068,7 +1129,10 @@ $('addBtn').addEventListener('click', () => {
         txs: [{ id: uid(), type: 'buy', date, price, qty, fee: parseFloat($('ap_fee').value) || 0 }],
       });
     }
-    saveDB(); renderAll();
+    saveDB();
+    flashId = db.positions[db.positions.length - 1].id;   // 高亮新列，明確確認「加進去了」
+    renderAll();
+    $('addBox').open = false;   // 新增成功後自動收合表單
     st.textContent = '✅ 已新增。記得按「更新所有報價」取得現價。';
     ['ap_symbol', 'ap_price', 'ap_qty', 'ab_name', 'ab_face', 'ab_price', 'ab_rate', 'ab_mark'].forEach(id => $(id).value = '');
     $('ap_fee').value = 0;
