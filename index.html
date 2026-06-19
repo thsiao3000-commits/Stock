@@ -358,7 +358,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.13.2';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.14.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -947,7 +947,7 @@ function expandHTML(p, c) {
         <button id="ex_markBtn" class="ghost">儲存市價</button>
         <span class="hint">上次更新：${b.markDate || '未曾更新（以買進價計）'}</span>
         <span style="flex:1"></span>
-        <button id="ex_delPos" class="danger">🗑 刪除整欌持倉</button>
+        <button id="ex_delPos" class="danger">🗑 刪除整筆持倉（含所有交易）</button>
       </div>`;
   }
   const txs = [...(p.txs || [])].sort((a, b2) => a.date.localeCompare(b2.date));
@@ -979,7 +979,7 @@ function expandHTML(p, c) {
       <label class="field ex-dv" style="display:none">股息金額 <input id="ex_amount" type="number" step="any" min="0" style="width:120px"></label>
       <button id="ex_addTx" class="primary">補登</button>
       <span style="flex:1"></span>
-      <button id="ex_delPos" class="danger">🗑 刪除整欌持倉（含所有交易）</button>
+      <button id="ex_delPos" class="danger">🗑 刪除整筆持倉（含所有交易）</button>
     </div>
     <div id="ex_status" class="status"></div>`;
 }
