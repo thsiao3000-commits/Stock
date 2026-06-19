@@ -193,7 +193,7 @@
     </div>
     <div class="row">
       <button id="quoteBtn" class="primary">🔄 更新所有報價</button>
-      <span class="hint">台股每檔間隔 0.5 秒；美股每 6 支一批、批間隔 60 秒（避開 Twelve Data 每分鐘限額）；同時更新匯率。金額一律以「換算新台幣」加總。</span>
+      <span class="hint">台股每檔間隔 0.5 秒；美股每 7 支一批、批間隔 60 秒（避開 Twelve Data 每分鐘限額）；同時更新匯率。金額一律以「換算新台幣」加總。</span>
     </div>
     <div id="qStatus" class="status"></div>
   </section>
@@ -335,7 +335,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.13.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.13.2';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1104,8 +1104,8 @@ async function refreshQuotes() {
     }
     const usPos = db.positions.filter(p => p.market === 'us');
     if (usPos.length) {
-      // Twelve Data 免費版每分鐘 8 credits（每支 1）→ 分批（每批 6 留餘裕）、批間隔 60 秒
-      const TD_BATCH = 6;
+      // Twelve Data 免費版每分鐘 8 credits（每支 1）→ 分批（每批 7，留 1 credit 緩衝）、批間隔 60 秒
+      const TD_BATCH = 7;
       for (let i = 0; i < usPos.length; i += TD_BATCH) {
         const batch = usPos.slice(i, i + TD_BATCH);
         st.textContent = `美股報價（${i + 1}–${i + batch.length}/${usPos.length}）…`;
