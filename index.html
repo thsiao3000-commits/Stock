@@ -358,7 +358,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.15.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.15.2';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -738,7 +738,7 @@ function weeklyAgg(days) {   // 日線 → 週線（週一為一週起點）
 }
 
 /* ════════════════ 損益引擎（加權平均成本法） ════════════════ */
-function computeStock(p) {
+function computeStock(p, priceOverride = null) {
   let qty = 0, cost = 0, realized = 0, div = 0, firstBuy = null;
   const txs = [...(p.txs || [])].sort((a, b) => a.date.localeCompare(b.date));
   for (const t of txs) {
@@ -754,7 +754,7 @@ function computeStock(p) {
       div += t.amount || 0;
     }
   }
-  const last = p.lastPrice ?? null;
+  const last = priceOverride ?? p.lastPrice ?? null;
   const mv = last != null && qty > 0 ? qty * last : (qty > 0 ? null : 0);
   let estSellCost = 0;
   if (mv != null && p.market === 'tw') estSellCost = mv * (db.settings.twFee + db.settings.twTax) / 100;
@@ -1328,7 +1328,8 @@ $('fetchBtn').addEventListener('click', async () => {
     }
     if (!days || days.length < 30)
       throw new Error(`資料不足（僅 ${days ? days.length : 0} 個交易日，需 ≥30）：可能為新上市／新上櫃／興櫃，或代號有誤，請確認。`);
-    const posStats = pos ? computeStock(pos) : null;
+    // 持倉損益改用本次即時抓取的收盤價，與下方 Prompt 顯示的「現價」一致（不沿用持倉儲存的 lastPrice）
+    const posStats = pos ? computeStock(pos, days[days.length - 1].close) : null;
     aiData = { market, symbol, name, days, idx: idx || [], idxLabel, pos, posStats, divStats, chip, rev, per };
     st.textContent = `✅ ${symbol} ${name || ''}：${days.length} 個交易日（${days[0].date} ～ ${days[days.length - 1].date}）${srcNote}`;
     const info = [];
