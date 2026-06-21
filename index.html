@@ -317,8 +317,8 @@
     <div class="row">
       <button id="aiBtn" class="primary" disabled>🤖 產生個股 AI 分析</button>
       <button id="pfBtn" class="primary">💼 產生投資組合總評</button>
-      <button id="copyStockPrompt" class="ghost">📋 複製個股 Prompt</button>
-      <button id="copyPfPrompt" class="ghost">📋 複製組合 Prompt</button>
+      <button id="copyStockPrompt" class="primary">📋 複製個股 Prompt</button>
+      <button id="copyPfPrompt" class="primary">📋 複製組合 Prompt</button>
     </div>
     <div class="hint" style="margin-top:4px">「產生 AI 分析」會呼叫 OpenAI（耗 token）；若想省 token，可改按「複製 Prompt」把同一份提問貼到訂閱制聊天機器人（如 Gemini）。新聞與美股基本面那段需該機器人能上網查詢才會生效；台股的技術面／籌碼／配息等數據已內含在 Prompt 中。</div>
     <div id="aiStatus" class="status"></div>
@@ -358,7 +358,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.15.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.15.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -973,7 +973,7 @@ function expandHTML(p, c) {
   return `
     <div class="row" style="margin-top:0">
       <span class="hint">現價：<b style="color:var(--text)">${priceTxt}</b>${p.lastDate ? `（${p.lastDate}）` : '（未更新）'}</span>
-      <button id="ex_quoteBtn" class="ghost">🔄 更新此檔報價</button>
+      <button id="ex_quoteBtn" class="primary">🔄 更新此檔報價</button>
       <span id="ex_qStatus" class="hint" style="margin-top:0"></span>
     </div>
     <div class="tableWrap txTable">
