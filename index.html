@@ -358,7 +358,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.14.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.15.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -817,6 +817,7 @@ function toTWD(v, ccy) {
 let expandedId = null;
 let editTxId = null;   // 正在編輯的交易 id（null＝新增模式）
 let flashId = null;    // 剛新增成功的持倉 id（用於高亮提示）
+let quoteNote = null;  // {id, msg} 個股報價更新結果（renderAll 後於明細面板顯示）
 function renderAll() { renderSummary(); renderTable(); renderAISelect(); renderPerf(); }
 
 // 表格捲動陰影：表格寬度超出容器、右側（或左側）還有欄位時，於邊緣顯示漸層提示
@@ -924,6 +925,11 @@ function renderExpandPanel() {
   bindExpand(p);
   const cl = $('ex_close');
   if (cl) cl.onclick = () => { expandedId = null; renderTable(); };
+  if (quoteNote && quoteNote.id === p.id) {   // 報價更新後（renderAll 重繪面板）回填結果訊息
+    const qs = $('ex_qStatus');
+    if (qs) qs.textContent = quoteNote.msg;
+    quoteNote = null;
+  }
   updateTableShadows(box);
 }
 
@@ -963,7 +969,13 @@ function expandHTML(p, c) {
       `<td class="act"><span class="tact"><button class="ghost" data-edittx="${t.id}" title="編輯此筆">✎</button>` +
       `<button class="danger" data-deltx="${t.id}" title="刪除此筆交易">✕</button></span></td></tr>`;
   }).join('');
+  const priceTxt = p.lastPrice != null ? p.lastPrice.toFixed(2) : '—';
   return `
+    <div class="row" style="margin-top:0">
+      <span class="hint">現價：<b style="color:var(--text)">${priceTxt}</b>${p.lastDate ? `（${p.lastDate}）` : '（未更新）'}</span>
+      <button id="ex_quoteBtn" class="ghost">🔄 更新此檔報價</button>
+      <span id="ex_qStatus" class="hint" style="margin-top:0"></span>
+    </div>
     <div class="tableWrap txTable">
       <div class="tableScroll"><table><thead><tr><th class="l">日期</th><th class="l">類別</th><th>價格</th><th>股數</th><th>費用</th><th>現金流</th><th class="act"></th></tr></thead>
       <tbody>${rows || '<tr><td colspan="7" class="empty">無交易紀錄</td></tr>'}</tbody></table></div>
@@ -1001,6 +1013,9 @@ function bindExpand(p) {
     };
     return;
   }
+  // 股票：更新此檔報價
+  const qb = $('ex_quoteBtn');
+  if (qb) qb.onclick = () => refreshOneQuote(p);
   // 股票：交易補登／編輯
   editTxId = null;   // 每次重繪面板都回到「新增」模式
   const typeSel = $('ex_type');
@@ -1208,6 +1223,38 @@ async function refreshQuotes() {
     st.className = 'status error'; st.textContent = '❌ ' + e.message;
   } finally {
     $('quoteBtn').disabled = false;
+  }
+}
+
+// 單檔報價更新：只抓這一支（無需分批／等限額），更新後若為美股一併更新匯率。
+// 從持倉明細面板觸發；成功訊息透過 quoteNote 在 renderAll 重繪後回填。
+async function refreshOneQuote(p) {
+  if (p.market === 'bond') return;
+  const st = $('ex_qStatus'), btn = $('ex_quoteBtn');
+  if (btn) btn.disabled = true;
+  if (st) { st.className = 'hint'; st.innerHTML = `<span class="spinner"></span>更新 ${esc(p.symbol)} 報價…`; }
+  try {
+    if (p.market === 'tw') {
+      const q = await twLastClose(p.symbol);
+      p.lastPrice = q.close; p.lastDate = q.date;
+      if (q.name && !p.name) p.name = q.name;
+    } else {   // us
+      const map = await tdQuotes([p.symbol]);
+      const q = map[p.symbol.toUpperCase()];
+      if (!q) throw new Error(`${p.symbol} 無報價`);
+      p.lastPrice = +q.close;
+      p.lastDate = (q.datetime || '').slice(0, 10);
+      if (q.name && !p.name) p.name = q.name;
+    }
+    if (posCcy(p) === 'USD') {
+      if (st) st.innerHTML = `<span class="spinner"></span>更新匯率…`;
+      await ensureFX(true);
+    }
+    quoteNote = { id: p.id, msg: `✅ 已更新（${new Date().toLocaleTimeString('zh-TW')}）` };
+    saveDB(); renderAll();
+  } catch (e) {
+    if (btn) btn.disabled = false;
+    if (st) { st.className = 'status error'; st.style.marginTop = '0'; st.textContent = '❌ ' + e.message; }
   }
 }
 
