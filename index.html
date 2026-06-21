@@ -358,7 +358,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.15.4';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.15.5';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1174,6 +1174,15 @@ async function waitCountdown(secs, statusEl, prefix) {
     await sleep(1000);
   }
 }
+// 包一層吃 Twelve Data 額度的呼叫：撞到每分鐘限流就倒數 60 秒、重試一次（四個美股資料路徑共用）
+async function tdWithRetry(fn, statusEl, label) {
+  try { return await fn(); }
+  catch (e) {
+    if (!/credit|minute|limit/i.test(e.message || '')) throw e;
+    if (statusEl) await waitCountdown(60, statusEl, label); else await sleep(60000);
+    return await fn();
+  }
+}
 $('quoteBtn').addEventListener('click', refreshQuotes);
 async function refreshQuotes() {
   const st = $('qStatus'); st.className = 'status';
@@ -1198,15 +1207,7 @@ async function refreshQuotes() {
         const batch = usPos.slice(i, i + TD_BATCH);
         st.textContent = `美股報價（${i + 1}–${i + batch.length}/${usPos.length}）…`;
         try {
-          let map;
-          try {
-            map = await tdQuotes(batch.map(p => p.symbol));
-          } catch (e) {   // 撞到每分鐘限流 → 等一分鐘再重試一次
-            if (/credit|minute|limit/i.test(e.message || '')) {
-              await waitCountdown(60, st, '美股報價 — Twelve Data 限流，稍候重試');
-              map = await tdQuotes(batch.map(p => p.symbol));
-            } else throw e;
-          }
+          const map = await tdWithRetry(() => tdQuotes(batch.map(p => p.symbol)), st, '美股報價 — Twelve Data 限流，稍候重試');
           for (const p of batch) {
             const q = map[p.symbol.toUpperCase()];
             if (q) {
@@ -1248,7 +1249,7 @@ async function refreshOneQuote(p) {
       p.lastPrice = q.close; p.lastDate = q.date;
       if (q.name && !p.name) p.name = q.name;
     } else {   // us
-      const map = await tdQuotes([p.symbol]);
+      const map = await tdWithRetry(() => tdQuotes([p.symbol]), st, `${esc(p.symbol)} 報價 — Twelve Data 限流，稍候重試`);
       const q = map[p.symbol.toUpperCase()];
       if (!q) throw new Error(`${p.symbol} 無報價`);
       p.lastPrice = +q.close;
@@ -1327,7 +1328,7 @@ $('fetchBtn').addEventListener('click', async () => {
       } catch (_) {}   // 新聞改由 AI 以 web_search 即時搜尋（見 buildStockPrompt）
     } else {
       st.textContent = `美股 ${symbol}：抓取日線…`;
-      const r = await tdDaily(symbol);
+      const r = await tdWithRetry(() => tdDaily(symbol), st, `美股 ${symbol} — Twelve Data 限流，稍候重試`);
       days = r.days.filter(d => d.date >= start && d.date <= end);
       st.textContent = '抓取 SPY（大盤對照）…';
       try { idx = (await tdSPY()).filter(d => d.date >= start && d.date <= end); }
@@ -1549,16 +1550,9 @@ async function buildEquityCurve() {
       for (let j = 0; j < batch.length; j++) {
         const p = batch[j];
         st.innerHTML = `<span class="spinner"></span>抓取美股歷史股價 ${esc(p.symbol)}（${i + j + 1}/${usStocks.length}）…`;
-        const fetchDays = async () => (await tdDaily(p.symbol)).days.filter(d => d.date >= start && d.date <= end);
-        let days;
-        try {
-          days = await fetchDays();
-        } catch (e) {   // 撞到每分鐘限流 → 等一分鐘再重試一次
-          if (/credit|minute|limit/i.test(e.message || '')) {
-            await waitCountdown(60, st, `美股歷史股價 — Twelve Data 限流，稍候重試 ${esc(p.symbol)}`);
-            days = await fetchDays();
-          } else throw e;
-        }
+        const days = await tdWithRetry(
+          async () => (await tdDaily(p.symbol)).days.filter(d => d.date >= start && d.date <= end),
+          st, `美股歷史股價 — Twelve Data 限流，稍候重試 ${esc(p.symbol)}`);
         store(p, days);
       }
       if (i + TD_BATCH < usStocks.length)
