@@ -358,7 +358,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.15.2';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.15.3';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1521,14 +1521,39 @@ async function buildEquityCurve() {
   try {
     const start = isoD(addMonths(new Date(), -12)), end = todayISO();
     const hist = {};
-    for (let i = 0; i < stocks.length; i++) {
-      const p = stocks[i];
-      st.innerHTML = `<span class="spinner"></span>抓取 ${esc(p.symbol)} 歷史股價（${i + 1}/${stocks.length}）…`;
-      let days;
-      if (p.market === 'tw') days = (await fmDaily(p.symbol, start, end)).days;   // 上市櫃通吃，1 請求
-      else days = (await tdDaily(p.symbol)).days.filter(d => d.date >= start && d.date <= end);
+    const store = (p, days) => {
       const m = {}; days.forEach(d => m[d.date] = d.close);
       hist[p.id] = { map: m, dates: days.map(d => d.date) };
+    };
+    const twStocks = stocks.filter(p => p.market === 'tw');
+    const usStocks = stocks.filter(p => p.market === 'us');
+    // 台股：FinMind 上市櫃通吃，逐檔 1 請求（限額較寬鬆，不需分批）
+    for (let i = 0; i < twStocks.length; i++) {
+      const p = twStocks[i];
+      st.innerHTML = `<span class="spinner"></span>抓取台股歷史股價 ${esc(p.symbol)}（${i + 1}/${twStocks.length}）…`;
+      store(p, (await fmDaily(p.symbol, start, end)).days);
+    }
+    // 美股：Twelve Data 免費版每分鐘 8 credits（每支 1）→ 每 7 支一批、批間隔 60 秒，撞限流等 60 秒重試一次
+    const TD_BATCH = 7;
+    for (let i = 0; i < usStocks.length; i += TD_BATCH) {
+      const batch = usStocks.slice(i, i + TD_BATCH);
+      for (let j = 0; j < batch.length; j++) {
+        const p = batch[j];
+        st.innerHTML = `<span class="spinner"></span>抓取美股歷史股價 ${esc(p.symbol)}（${i + j + 1}/${usStocks.length}）…`;
+        const fetchDays = async () => (await tdDaily(p.symbol)).days.filter(d => d.date >= start && d.date <= end);
+        let days;
+        try {
+          days = await fetchDays();
+        } catch (e) {   // 撞到每分鐘限流 → 等一分鐘再重試一次
+          if (/credit|minute|limit/i.test(e.message || '')) {
+            await waitCountdown(60, st, `美股歷史股價 — Twelve Data 限流，稍候重試 ${esc(p.symbol)}`);
+            days = await fetchDays();
+          } else throw e;
+        }
+        store(p, days);
+      }
+      if (i + TD_BATCH < usStocks.length)
+        await waitCountdown(60, st, `美股歷史股價 — 每分鐘上限 8，已完成 ${i + batch.length}/${usStocks.length}，等待額度重置`);
     }
     st.innerHTML = `<span class="spinner"></span>抓取加權指數…`;
     const idx = await fetchTWIndex(start, end, () => {});
