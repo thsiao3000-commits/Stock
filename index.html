@@ -358,7 +358,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.15.5';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.16.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -587,11 +587,15 @@ function chipStats(rows) {
   const dates = Object.keys(byDate).sort();
   const sumN = (n, k) => dates.slice(-n).reduce((s, d) => s + byDate[d][k], 0);
   const last = dates[dates.length - 1];
-  return {
-    lastDate: last, lastDay: byDate[last],
-    net5: { total: sumN(5, 'total'), foreign: sumN(5, 'foreign'), trust: sumN(5, 'trust'), dealer: sumN(5, 'dealer') },
-    net20: { total: sumN(20, 'total'), foreign: sumN(20, 'foreign'), trust: sumN(20, 'trust'), dealer: sumN(20, 'dealer') },
-  };
+  const netN = n => ({ total: sumN(n, 'total'), foreign: sumN(n, 'foreign'), trust: sumN(n, 'trust'), dealer: sumN(n, 'dealer') });
+  // 法人合計連續買/賣超天數（由最近一日往回、同號累計）
+  let streak = 0, streakSign = 0;
+  for (let i = dates.length - 1; i >= 0; i--) {
+    const s = Math.sign(byDate[dates[i]].total);
+    if (s === 0 || (streak && s !== streakSign)) break;
+    streakSign = s; streak++;
+  }
+  return { lastDate: last, lastDay: byDate[last], net5: netN(5), net20: netN(20), net60: netN(60), streak, streakSign };
 }
 // 基本面：月營收年增（YoY）/月增（MoM）+ 近6月年增趨勢
 function revenueStats(rows) {
@@ -609,6 +613,29 @@ function perStats(rows) {
   if (!rows || !rows.length) return null;
   const last = rows[rows.length - 1], pers = rows.map(r => r.PER).filter(v => v > 0);
   return { PER: last.PER, PBR: last.PBR, yield: last.dividend_yield, perLo: pers.length ? Math.min(...pers) : null, perHi: pers.length ? Math.max(...pers) : null };
+}
+// 籌碼：外資持股比例趨勢（TaiwanStockShareholding，每日；比例單位 %、變化單位 pp）
+function foreignStats(rows) {
+  if (!rows || !rows.length) return null;
+  const rs = [...rows].sort((a, b) => a.date.localeCompare(b.date));
+  const L = rs.length, last = rs[L - 1];
+  const chg = n => { const j = L - 1 - n; return j >= 0 && rs[j].ForeignInvestmentSharesRatio != null ? last.ForeignInvestmentSharesRatio - rs[j].ForeignInvestmentSharesRatio : null; };
+  return { date: last.date, ratio: last.ForeignInvestmentSharesRatio, remainRatio: last.ForeignInvestmentRemainRatio, chg5: chg(5), chg20: chg(20) };
+}
+// 籌碼：融資融券餘額與增減（TaiwanStockMarginPurchaseShortSale，單位：張）
+function marginStats(rows) {
+  if (!rows || !rows.length) return null;
+  const rs = [...rows].sort((a, b) => a.date.localeCompare(b.date));
+  const L = rs.length, last = rs[L - 1];
+  const chg = (n, key) => { const j = L - 1 - n; return j >= 0 && rs[j][key] != null ? last[key] - rs[j][key] : null; };
+  const fin = last.MarginPurchaseTodayBalance, shrt = last.ShortSaleTodayBalance;
+  return {
+    date: last.date, fin, shrt,
+    finChg5: chg(5, 'MarginPurchaseTodayBalance'), finChg20: chg(20, 'MarginPurchaseTodayBalance'),
+    shrtChg5: chg(5, 'ShortSaleTodayBalance'),
+    finUsePct: last.MarginPurchaseLimit > 0 ? fin / last.MarginPurchaseLimit * 100 : null,
+    shortMarginPct: fin > 0 ? shrt / fin * 100 : null,
+  };
 }
 function tdKeyOrThrow() {
   const k = (db.settings.twelveKey || '').trim();
@@ -1299,7 +1326,7 @@ $('fetchBtn').addEventListener('click', async () => {
   $('fetchBtn').disabled = true; $('aiBtn').disabled = true;
   try {
     const end = todayISO(), start = isoD(addMonths(new Date(), -12));
-    let days, name = pos?.name || '', idx, idxLabel, srcNote = '', divStats = null, chip = null, rev = null, per = null;
+    let days, name = pos?.name || '', idx, idxLabel, srcNote = '', divStats = null, chip = null, rev = null, per = null, foreign = null, margin = null;
     if (market === 'tw') {
       const r = await fetchTWStock(symbol, start, end, m => st.textContent = m);
       days = r.days; name = name || r.name;
@@ -1319,12 +1346,15 @@ $('fetchBtn').addEventListener('click', async () => {
       } catch (_) {}
       st.textContent = '抓取籌碼／基本面…';
       try {
-        const [inst, revR, perR] = await Promise.all([
-          fmDataset('TaiwanStockInstitutionalInvestorsBuySell', symbol, isoD(addMonths(new Date(), -3))),
+        const [inst, revR, perR, shareR, marginR] = await Promise.all([
+          fmDataset('TaiwanStockInstitutionalInvestorsBuySell', symbol, isoD(addMonths(new Date(), -4))),   // -4 月確保近60日法人累計足量
           fmDataset('TaiwanStockMonthRevenue', symbol, isoD(addMonths(new Date(), -30))),   // 多抓以利近6月年增比較
           fmDataset('TaiwanStockPER', symbol, isoD(addMonths(new Date(), -12))),
+          fmDataset('TaiwanStockShareholding', symbol, isoD(addMonths(new Date(), -3))),         // 外資持股比例趨勢
+          fmDataset('TaiwanStockMarginPurchaseShortSale', symbol, isoD(addMonths(new Date(), -3))),   // 融資融券
         ]);
         chip = chipStats(inst); rev = revenueStats(revR); per = perStats(perR);
+        foreign = foreignStats(shareR); margin = marginStats(marginR);
       } catch (_) {}   // 新聞改由 AI 以 web_search 即時搜尋（見 buildStockPrompt）
     } else {
       st.textContent = `美股 ${symbol}：抓取日線…`;
@@ -1340,7 +1370,7 @@ $('fetchBtn').addEventListener('click', async () => {
       throw new Error(`資料不足（僅 ${days ? days.length : 0} 個交易日，需 ≥30）：可能為新上市／新上櫃／興櫃，或代號有誤，請確認。`);
     // 持倉損益改用本次即時抓取的收盤價，與下方 Prompt 顯示的「現價」一致（不沿用持倉儲存的 lastPrice）
     const posStats = pos ? computeStock(pos, days[days.length - 1].close) : null;
-    aiData = { market, symbol, name, days, idx: idx || [], idxLabel, pos, posStats, divStats, chip, rev, per };
+    aiData = { market, symbol, name, days, idx: idx || [], idxLabel, pos, posStats, divStats, chip, rev, per, foreign, margin };
     st.textContent = `✅ ${symbol} ${name || ''}：${days.length} 個交易日（${days[0].date} ～ ${days[days.length - 1].date}）${srcNote}`;
     const info = [];
     info.push(`最新收盤 ${days[days.length - 1].close}`);
@@ -1794,9 +1824,23 @@ function buildStockPrompt() {
     const parts = [], k = v => nf.format(Math.round(v / 1000));
     if (aiData.chip) {
       const c = aiData.chip;
+      const streakTxt = c.streak ? `；法人合計連續${c.streakSign > 0 ? '買超' : '賣超'} ${c.streak} 日` : '';
       parts.push(`【籌碼面（三大法人買賣超，單位：張，正＝買超）】\n` +
-        `- 最近交易日（${c.lastDate}）：外資 ${k(c.lastDay.foreign)}、投信 ${k(c.lastDay.trust)}、自營 ${k(c.lastDay.dealer)}、合計 ${k(c.lastDay.total)}\n` +
-        `- 近5日合計 ${k(c.net5.total)}；近20日：外資 ${k(c.net20.foreign)}、投信 ${k(c.net20.trust)}、自營 ${k(c.net20.dealer)}、合計 ${k(c.net20.total)}`);
+        `- 最近交易日（${c.lastDate}）：外資 ${k(c.lastDay.foreign)}、投信 ${k(c.lastDay.trust)}、自營 ${k(c.lastDay.dealer)}、合計 ${k(c.lastDay.total)}${streakTxt}\n` +
+        `- 近5日合計 ${k(c.net5.total)}；近20日：外資 ${k(c.net20.foreign)}、投信 ${k(c.net20.trust)}、自營 ${k(c.net20.dealer)}、合計 ${k(c.net20.total)}\n` +
+        `- 近60日累計：外資 ${k(c.net60.foreign)}、投信 ${k(c.net60.trust)}、自營 ${k(c.net60.dealer)}、合計 ${k(c.net60.total)}`);
+    }
+    if (aiData.foreign) {
+      const f = aiData.foreign, pp = v => v == null ? 'N/A' : (v >= 0 ? '+' : '') + v.toFixed(2) + 'pp';
+      parts.push(`【外資持股比例】\n` +
+        `- 最新 ${fnum(f.ratio)}%（${f.date}）；近5日 ${pp(f.chg5)}、近20日 ${pp(f.chg20)}（上升＝外資增持）\n` +
+        `- 距外資持股上限尚有 ${fnum(f.remainRatio)}%（外資可再買進空間）`);
+    }
+    if (aiData.margin) {
+      const m = aiData.margin, lot = v => v == null ? 'N/A' : nf.format(Math.round(v)), sgn2 = v => v == null ? 'N/A' : (v >= 0 ? '+' : '') + nf.format(Math.round(v));
+      parts.push(`【信用交易（融資融券，單位：張）】\n` +
+        `- 融資餘額 ${lot(m.fin)}（近5日 ${sgn2(m.finChg5)}、近20日 ${sgn2(m.finChg20)}）；融資使用率 ${fnum(m.finUsePct)}%（餘額÷限額）\n` +
+        `- 融券餘額 ${lot(m.shrt)}（近5日 ${sgn2(m.shrtChg5)}）；券資比 ${fnum(m.shortMarginPct)}%（融券÷融資）`);
     }
     if (aiData.rev || aiData.per) {
       let f = '【基本面】';
@@ -1861,7 +1905,7 @@ ${posBlock}
 2. 支撐與壓力位（給出具體價位與理由）
 3. 技術指標解讀（均線排列、RSI、MACD、KD、布林通道、ATR、量價關係，並結合 OBV 能量潮與量比研判量價配合或背離）
 4. 相對大盤強弱（領先或落後大盤？意義為何）
-5. 籌碼、基本面與消息面（**台股**：解讀上方已提供的三大法人買賣超方向與力道、月營收年增趨勢、PER（trailing）／PBR 估值；若為高成長股，請另以 web search 查 **forward 本益比／預估 EPS** 來修正 trailing PE 的偏誤（查無則註明）。**美股**：請用 web search 查估值（**trailing 與 forward 本益比**、市值）、獲利能力與營收成長、分析師評等與機構／內部人持股並解讀。**消息面（台美股皆適用）：用 web search 查詢「${symbol} ${name || ''}」的最新相關新聞**——重大消息、法說會、財報、訂單、產業政策等，擇要點評對股價的影響與風險，並**標註來源與日期**。forward PE 屬分析師預估、僅供估值脈絡參考，勿當精準觸發價；務實解讀、查無則註明不適用）
+5. 籌碼、基本面與消息面（**台股**：解讀上方已提供的三大法人買賣超方向與力道（含近60日累計與法人合計連續買/賣超天數）、外資持股比例趨勢（上升＝外資增持、下降＝調節）、融資融券（融資增＝散戶槓桿升高、融券增＝看空或避險、券資比偏高且股價走強＝潛在軋空題材）、月營收年增趨勢、PER（trailing）／PBR 估值；若為高成長股，請另以 web search 查 **forward 本益比／預估 EPS** 來修正 trailing PE 的偏誤（查無則註明）。**美股**：請用 web search 查估值（**trailing 與 forward 本益比**、市值）、獲利能力與營收成長、分析師評等與機構／內部人持股並解讀。**消息面（台美股皆適用）：用 web search 查詢「${symbol} ${name || ''}」的最新相關新聞**——重大消息、法說會、財報、訂單、產業政策等，擇要點評對股價的影響與風險，並**標註來源與日期**。forward PE 屬分析師預估、僅供估值脈絡參考，勿當精準觸發價；務實解讀、查無則註明不適用）
 6. 配息與殖利率評估（現金殖利率是否具吸引力、配息穩定度與成長性；若臨近除息，說明參與除息／棄息的考量與填息、貼息風險；台股單次現金股利達 2 萬元以上需注意二代健保補充保費與股利所得稅。美股或查無配息資料則註明不適用）
 7. 我的持倉評估（從風險管理角度，就「續抱／加碼／減碼／停損」給出情境式分析與觸發條件，須對應我的成本與損益，並結合除息時點與估值——**對成長股以 forward PE 衡量加碼空間，避免只看 trailing PE 而誤判過貴**）
 8. 風險提醒
