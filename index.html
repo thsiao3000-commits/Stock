@@ -349,6 +349,81 @@
     </div>
   </section>
 
+  <section id="helpBox">
+    <h2>📖 報告說明與名詞解釋</h2>
+    <p class="hint">不熟悉技術分析名詞嗎？這一區說明「報告怎麼來的」並逐一白話解釋每個指標的意思與怎麼看。點下方標題展開。</p>
+
+    <details style="margin-top:12px">
+      <summary style="cursor:pointer;color:var(--accent);font-weight:600">① 這份 AI 報告是怎麼生成的？參考了哪些指標？</summary>
+      <div style="margin-top:10px;line-height:1.85;font-size:.9rem">
+        <p style="margin:.5em 0"><b style="color:var(--gold)">核心原則：數字一律由「程式」精算，AI 只負責「解讀」</b>，AI 不自己算數字，盡量避免它亂編數據。</p>
+        <p style="margin:.5em 0"><b>產生步驟：</b></p>
+        <ol style="padding-left:1.4em;margin:.3em 0">
+          <li><b>抓資料</b>：近一年股價（日線、週線）、同期大盤、配息；台股再抓三大法人、外資持股、融資融券、月營收、本益比。</li>
+          <li><b>算指標</b>：程式用價量算出 MA、RSI、MACD、KD、布林通道、ATR、OBV、量比、均量、52週高低等。</li>
+          <li><b>組提示（Prompt）</b>：把算好的數字＋你的持倉成本，組成一份結構化提示交給 AI。</li>
+          <li><b>AI 解讀</b>：AI 依固定章節（趨勢／支撐壓力／技術指標／相對大盤／籌碼與基本面／配息／你的持倉評估／風險／操作計畫表）撰寫；最新新聞與美股估值由 AI 即時上網查並附來源。</li>
+        </ol>
+        <p style="margin:.5em 0"><b>報告會參考的指標：</b>技術面（MA／RSI／MACD／KD／布林通道／ATR／OBV／量比／均量／52週高低）、大盤對照、配息殖利率；台股另加三大法人、外資持股、融資融券、月營收年增、本益比／股價淨值比。每個名詞的白話解釋見下方 ②。</p>
+        <p style="margin:.5em 0;color:var(--gold)">⚠️ 報告僅供參考、不構成投資建議；AI 仍可能出錯，重要決策請自行查證。</p>
+      </div>
+    </details>
+
+    <details style="margin-top:12px">
+      <summary style="cursor:pointer;color:var(--accent);font-weight:600">② 名詞解釋（看不懂的詞都在這）</summary>
+      <div style="margin-top:10px;line-height:1.9;font-size:.9rem">
+
+        <div style="color:var(--gold);font-weight:700;margin:14px 0 6px">技術面 · 看價格走勢與力道</div>
+        <b>移動平均線 MA（MA5／20／60／120）</b>：最近 N 天收盤價的平均，用來抹平雜訊看趨勢；數字是天數（MA20≈月線、MA60≈季線）。股價站上均線＝偏多；短中長均線由上而下排列＝多頭排列。<br>
+        <b>黃金交叉／死亡交叉</b>：短期均線向上穿過長期均線＝黃金交叉（偏多）；向下穿過＝死亡交叉（偏空）。<br>
+        <b>RSI 相對強弱指標（0–100）</b>：近期漲跌力道。高於 70 偏過熱（易拉回）、低於 30 偏過冷（易反彈）、50 上下為中性。<br>
+        <b>MACD（DIF／MACD／柱狀）</b>：看中期動能與轉折。DIF 在 MACD 之上、柱狀翻正＝動能轉強；反之轉弱。<br>
+        <b>KD 隨機指標（K／D，0–100）</b>：看短線超買超賣。K 向上穿過 D＝偏多；高於 80 偏高、低於 20 偏低。<br>
+        <b>布林通道（上軌／中軌／下軌／帶寬）</b>：以均線±2 倍標準差畫出的上下通道，股價約 95% 落在其中。觸上軌＝相對偏高、觸下軌＝相對偏低；帶寬收斂＝波動變小，常醞釀變盤。<br>
+        <b>ATR 平均真實區間</b>：「每天大約震盪多少」的波動度，常用來抓停損距離（例如設在現價下方 1.5～2 倍 ATR）。<br>
+        <b>52週最高／最低、近20日高／低</b>：過去一年、近一個月的高低價，常當壓力／支撐參考。<br>
+        <b>均量（5日／20日）</b>：最近 5／20 天的平均成交量（單位「張」＝1000 股），看交易熱度。<br>
+        <b>量比</b>：當日量 ÷ 前 5 日均量。大於 1.5 明顯放量、約 1 持平、小於 0.7 量縮；放量上漲＝買盤積極。<br>
+        <b>OBV 能量潮</b>：上漲日加量、下跌日減量的累計線，看「量」是否支持「價」。價漲量增＝量價配合（健康）；價漲 OBV 卻不漲＝背離（警訊）。<br>
+        <b>乖離率</b>：股價偏離均線的百分比；太大代表短線漲／跌過頭，可能拉回／反彈。<br>
+        <b>支撐／壓力</b>：容易止跌反彈的價位＝支撐；容易遇阻回落的價位＝壓力。<br>
+
+        <div style="color:var(--gold);font-weight:700;margin:14px 0 6px">大盤對照</div>
+        <b>加權指數／櫃買指數／SPY</b>：分別是台股上市大盤、上櫃大盤、美股對照（SPY 是追蹤 S&amp;P 500 的 ETF）。<br>
+        <b>區間報酬／相對強弱</b>：個股這段期間漲跌 vs 大盤；跑贏大盤＝強勢、跑輸＝弱勢。<br>
+
+        <div style="color:var(--gold);font-weight:700;margin:14px 0 6px">籌碼面 · 誰在買賣（台股）</div>
+        <b>三大法人</b>：外資、投信（國內基金）、自營商（券商自有資金）。<br>
+        <b>買賣超</b>：買進張數減賣出張數；正＝買超（偏多）、負＝賣超（偏空）。<br>
+        <b>外資持股比例</b>：外資持有占公司總股數的百分比；上升＝外資增持（通常偏多）。<br>
+        <b>融資餘額</b>：投資人「借錢買股」尚未還的張數；增加＝散戶看多、槓桿升高。<br>
+        <b>融券餘額</b>：投資人「借股票賣出（看空）」尚未回補的張數。<br>
+        <b>券資比</b>：融券 ÷ 融資；偏高且股價走強時，易有「軋空」（空方被迫回補、反推股價上漲）題材。<br>
+        <b>融資使用率</b>：融資餘額 ÷ 融資限額，看融資水位高低。<br>
+        <b>連續買／賣超天數</b>：法人合計連續同方向買或賣的天數，看力道是否延續。<br>
+
+        <div style="color:var(--gold);font-weight:700;margin:14px 0 6px">基本面 · 公司賺不賺錢（台股）</div>
+        <b>月營收 年增 YoY</b>：當月營收 vs 去年同月的成長率，看長期動能（排除淡旺季）。<br>
+        <b>月增 MoM</b>：vs 上個月，看短期變化（受淡旺季影響大）。<br>
+        <b>本益比 PER（trailing）</b>：股價 ÷ 近四季每股盈餘（EPS）；越高＝市場願付越高的價買它的獲利，需與同業／自身歷史比較。<br>
+        <b>forward 本益比</b>：用「分析師預估的未來 EPS」算的本益比，成長股看這個較準（trailing 會高估它的貴）。<br>
+        <b>股價淨值比 PBR</b>：股價 ÷ 每股淨值，常用於資產股／景氣循環股。<br>
+
+        <div style="color:var(--gold);font-weight:700;margin:14px 0 6px">配息與殖利率</div>
+        <b>現金股利／配息</b>：公司發給股東的現金。<br>
+        <b>現金殖利率</b>：近一年現金股利 ÷ 股價，類似「存股的利息率」。<br>
+        <b>除息</b>：發放股利後股價往下調整（扣掉股利）；除息日當天起買進通常不享這次股利。<br>
+        <b>填息／貼息</b>：除息後股價漲回原價＝填息（好）；持續下跌＝貼息。<br>
+        <b>配息頻率／連續配息年數</b>：年配／半年配／季配；連續幾年都有配，看配息穩定度。<br>
+
+        <div style="color:var(--gold);font-weight:700;margin:14px 0 6px">你的持倉與損益</div>
+        <b>加權平均成本</b>：多次買進、依股數加權算出的平均每股成本。<br>
+        <b>未實現損益</b>：還沒賣、帳面上的賺賠（現價 vs 成本）。<b>已實現損益</b>：已賣出、實際入袋的賺賠。<br>
+        <b>XIRR 年化內部報酬率</b>：考慮每筆買賣的「時間」與「金額」後換算的年化報酬率，比單純報酬率更貼近真實績效。<br>
+      </div>
+    </details>
+  </section>
+
 </main>
 <footer>
   資料來源：台灣證券交易所（上市收盤）、<a href="https://finmindtrade.com" style="color:var(--muted)">FinMind</a>（上櫃）、Twelve Data（美股）、<a href="https://www.exchangerate-api.com" style="color:var(--muted)">Rates by Exchange Rate API</a>。
@@ -358,7 +433,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.16.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.17.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
