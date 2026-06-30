@@ -436,7 +436,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.20.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.20.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -2039,6 +2039,7 @@ ${csvOf(daily60)}
 ${posBlock}
 
 請依下列章節撰寫：
+（**開始前先自我檢查**：若你本次無法使用網路搜尋（web search），請在報告**最開頭**獨立標註一行「⚠️ 本次 AI 未啟用網路搜尋 → forward PE／分析師目標價／機構或內部人持股／最新新聞可能從缺或過時，建議開啟搜尋功能後重新產生」，其餘章節仍照常以上方已提供的數據撰寫；若能正常搜尋則無需此行。）
 1. 趨勢研判（短期看日線、中長期看週線，分別說明）
 2. 支撐與壓力位（給出具體價位與理由）
 3. 技術指標解讀（均線排列、RSI、MACD、KD、布林通道、ATR、量價關係，並結合 OBV 能量潮與量比研判量價配合或背離）
