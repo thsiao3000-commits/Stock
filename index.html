@@ -286,7 +286,7 @@
     <details style="margin-bottom:14px; font-size:.84rem; color:var(--muted)">
       <summary style="cursor:pointer; color:var(--accent)">ℹ️ 這份 AI 分析根據哪些資料？</summary>
       <div style="margin-top:8px; line-height:1.75">
-        <b style="color:var(--text)">程式精算的指標（AI 只解讀、不計算）：</b>技術面 MA／RSI／MACD／KD／布林通道／ATR／OBV／量比／量能；台股另含配息（殖利率、除息／發放日）、三大法人買賣超、外資持股、融資融券、月營收年增、本益比(trailing)／PBR；美股（填 Finnhub 金鑰）含估值 PER／PBR、獲利能力、營收成長、分析師評等與近期新聞。<br>
+        <b style="color:var(--text)">程式精算的指標（AI 只解讀、不計算）：</b>技術面 MA／RSI／MACD／KD／布林通道／ATR／OBV／量比／量能（含 5／20 日前對照、均線黃金死亡交叉與乖離率，供 AI 判斷指標走向）；台股另含配息（殖利率、除息／發放日）、三大法人買賣超、外資持股、融資融券、月營收年增、本益比(trailing)／PBR；美股（填 Finnhub 金鑰）含估值 PER／PBR、獲利能力、營收成長、分析師評等與近期新聞。<br>
         <b style="color:var(--text)">原始價量：</b>近 52 週週線＋近 60 日日線 OHLCV、同期大盤對照（上市配加權指數／上櫃配櫃買指數／美股配 SPY）。<br>
         <b style="color:var(--text)">AI 即時 web search：</b>最新新聞：台股用 web search；**美股改由 Finnhub 提供近期新聞**、AI 可再補充。美股的 forward 本益比、目標價與機構/內部人持股仍用 web search（trailing 估值、獲利、評等、新聞改由 Finnhub 提供，需填金鑰）。<br>
         <b style="color:var(--text)">你的持倉：</b>加權平均成本與損益（存於本機瀏覽器）。<br>
@@ -436,7 +436,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.20.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.21.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -772,6 +772,7 @@ async function fhFundamentals(symbol) {
   const reco = Array.isArray(recoR) && recoR.length ? recoR[0] : null;   // 最新一期排最前
   const num = v => (typeof v === 'number' && Number.isFinite(v)) ? v : null;
   const out = {
+    name: (profR && profR.name) || null,   // 公司名稱：未持有標的無報價名稱時補用，也讓 web search 查詢更準
     pe: num(m.peTTM), pb: num(m.pbAnnual ?? m.pbQuarterly),
     eps: num(m.epsTTM ?? m.epsBasicExclExtraItemsTTM ?? m.epsInclExtraItemsTTM),
     grossMargin: num(m.grossMarginTTM), opMargin: num(m.operatingMarginTTM), netMargin: num(m.netProfitMarginTTM),
@@ -819,6 +820,34 @@ async function ensureFX(force) {
 
 /* ════════════════ 技術指標 ════════════════ */
 function sma(arr, n) { if (arr.length < n) return null; let s = 0; for (let i = arr.length - n; i < arr.length; i++) s += arr[i]; return s / n; }
+function smaSeries(arr, n) {   // 移動平均全序列（前 n-1 筆為 null）；供均線交叉與斜率判斷
+  const out = new Array(arr.length).fill(null);
+  let s = 0;
+  for (let i = 0; i < arr.length; i++) {
+    s += arr[i];
+    if (i >= n) s -= arr[i - n];
+    if (i >= n - 1) out[i] = s / n;
+  }
+  return out;
+}
+function lastCross(fast, slow, dates) {   // 最近一次快慢線交叉；dir: 1=黃金交叉、-1=死亡交叉
+  for (let i = fast.length - 1; i > 0; i--) {
+    if (fast[i] == null || slow[i] == null || fast[i - 1] == null || slow[i - 1] == null) break;
+    const d = fast[i] - slow[i], p = fast[i - 1] - slow[i - 1];
+    if (p <= 0 && d > 0) return { date: dates[i], dir: 1, daysAgo: fast.length - 1 - i };
+    if (p >= 0 && d < 0) return { date: dates[i], dir: -1, daysAgo: fast.length - 1 - i };
+  }
+  return null;
+}
+function tailStreak(arr) {   // 序列尾端連續走升(+N)/走降(-N)天數；0=持平
+  const L = arr.length;
+  if (L < 2) return 0;
+  const s = Math.sign(arr[L - 1] - arr[L - 2]);
+  if (!s) return 0;
+  let n = 1;
+  for (let i = L - 2; i > 0 && Math.sign(arr[i] - arr[i - 1]) === s; i--) n++;
+  return n * s;
+}
 function emaSeries(arr, n) { const k = 2 / (n + 1); let e = arr[0]; return arr.map((v, i) => e = i === 0 ? v : v * k + e * (1 - k)); }
 function calcRSI(closes, n = 14) {
   if (closes.length < n + 1) return null;
@@ -832,12 +861,18 @@ function calcRSI(closes, n = 14) {
   }
   return al === 0 ? 100 : 100 - 100 / (1 + ag / al);
 }
-function calcMACD(closes) {
+function calcMACDSeries(closes) {   // MACD 全序列（供 5/20 日前對照與柱狀連續走升/走降判斷）
   if (closes.length < 35) return null;
   const e12 = emaSeries(closes, 12), e26 = emaSeries(closes, 26);
   const dif = closes.map((_, i) => e12[i] - e26[i]);
-  const dea = emaSeries(dif, 9), i = closes.length - 1;
-  return { dif: dif[i], macd: dea[i], hist: dif[i] - dea[i] };
+  const dea = emaSeries(dif, 9);
+  return { dif, dea, hist: dif.map((v, i) => v - dea[i]) };
+}
+function calcMACD(closes) {
+  const s = calcMACDSeries(closes);
+  if (!s) return null;
+  const i = closes.length - 1;
+  return { dif: s.dif[i], macd: s.dea[i], hist: s.hist[i] };
 }
 function calcKD(days, n = 9) {
   if (days.length < n) return null;
@@ -1488,6 +1523,7 @@ $('fetchBtn').addEventListener('click', async () => {
       idxLabel = 'S&P 500（SPY）';
       // 美股基本面：有填 Finnhub 金鑰才抓（估值/獲利/成長/評等）；forward PE、目標價與新聞仍由 AI web_search（見第 5 章）
       if (fhKey()) { st.textContent = '抓取基本面與新聞（Finnhub）…'; try { [usFund, usNews] = await Promise.all([fhFundamentals(symbol), fhNews(symbol)]); } catch (_) {} }
+      if (!name && usFund && usFund.name) name = usFund.name;   // 未持有的美股標的沒有名稱（報價 API 不回傳）→ 用 Finnhub 公司名補
     }
     if (!days || days.length < 30)
       throw new Error(`資料不足（僅 ${days ? days.length : 0} 個交易日，需 ≥30）：可能為新上市／新上櫃／興櫃，或代號有誤，請確認。`);
@@ -1904,6 +1940,25 @@ function buildStockPrompt() {
   const last = days[days.length - 1];
   const rsi = calcRSI(closes), macd = calcMACD(closes), kd = calcKD(days);
   const boll = calcBoll(closes), atr = calcATR(days);
+  // ── 指標時間深度（AI 只解讀、不重算）：5/20 日前對照、均線斜率與交叉、MACD 柱連續走升/走降 ──
+  const closes5 = closes.slice(0, -5);
+  const rsi5 = calcRSI(closes5), rsi20 = calcRSI(closes.slice(0, -20));
+  const kd5 = calcKD(days.slice(0, -5)), kd20 = calcKD(days.slice(0, -20));
+  const macdS = calcMACDSeries(closes);
+  const histAt = n => macdS && macdS.hist.length > n ? macdS.hist[macdS.hist.length - 1 - n] : null;
+  const histStreak = macdS ? tailStreak(macdS.hist) : null;
+  const trendTxt = n => n == null ? 'N/A' : n > 0 ? `連續 ${n} 日走升` : n < 0 ? `連續 ${-n} 日走降` : '持平';
+  const dateArr = days.map(d => d.date);
+  const cross520 = lastCross(smaSeries(closes, 5), smaSeries(closes, 20), dateArr);
+  const cross2060 = lastCross(smaSeries(closes, 20), smaSeries(closes, 60), dateArr);
+  const crossTxt = c => c ? `${c.date} ${c.dir > 0 ? '黃金交叉' : '死亡交叉'}${c.daysAgo === 0 ? '（今日）' : `（${c.daysAgo} 個交易日前）`}` : '資料區間內無交叉';
+  const ma20 = sma(closes, 20), ma60 = sma(closes, 60);
+  const slopeTxt = (cur, prev) => {
+    if (cur == null || prev == null) return 'N/A';
+    const s = (cur / prev - 1) * 100;
+    return (s >= 0 ? '+' : '') + s.toFixed(2) + '%' + (s > 0.05 ? '（上彎）' : s < -0.05 ? '（下彎）' : '（走平）');
+  };
+  const biasPct = base => base ? (last.close / base - 1) * 100 : null;   // 現價相對某基準的乖離／位置 %
   const vols = days.map(d => d.volume || 0);
   const vol5 = sma(vols, 5), vol20 = sma(vols, 20);
   const obvSeries = calcOBV(days);
@@ -1923,10 +1978,11 @@ function buildStockPrompt() {
 
   let idxBlock = '（無大盤資料）';
   if (idx && idx.length > 1) {
+    const retN = (arr, n) => arr.length > n ? (arr[arr.length - 1].close / arr[arr.length - 1 - n].close - 1) * 100 : null;
     const iRet = (idx[idx.length - 1].close / idx[0].close - 1) * 100;
-    const i20 = idx.length > 20 ? (idx[idx.length - 1].close / idx[idx.length - 21].close - 1) * 100 : null;
     idxBlock = `- ${idxLabel} 區間報酬 ${fmtPct(iRet)}（本標的同區間 ${fmtPct(stockRet)}）\n` +
-      `- ${idxLabel} 近20日 ${fmtPct(i20)}、最新 ${fnum(idx[idx.length - 1].close)}`;
+      `- 近20日：本標的 ${fmtPct(retN(days, 20))} vs ${idxLabel} ${fmtPct(retN(idx, 20))}；近60日：本標的 ${fmtPct(retN(days, 60))} vs ${idxLabel} ${fmtPct(retN(idx, 60))}\n` +
+      `- ${idxLabel} 最新 ${fnum(idx[idx.length - 1].close)}`;
   }
 
   let divBlock = market === 'tw' ? '（查無配息資料，可能未配息或為新上市櫃）' : '（本版配息分析僅支援台股）';
@@ -1979,6 +2035,8 @@ function buildStockPrompt() {
       parts.push(f);
     }
     if (parts.length) fundBlock = '\n' + parts.join('\n\n') + '\n';
+    // 全數抓取失敗時給明確占位，避免第 5 章指令引用不存在的區塊、誘發 AI 編造數字
+    else fundBlock = '\n【籌碼與基本面（台股）】\n（本次未能取得籌碼／基本面資料——可能為資料源限流或新上市櫃。**請勿自行推測或編造相關數字**；可改用 web search 查證並註明來源，查無則在報告中註明從缺。）\n';
   }
   // 美股基本面：有 Finnhub 資料則帶結構化區塊（估值/獲利/成長/評等）；forward PE、目標價、新聞由 AI web_search（見第 5 章）
   if (market === 'us' && aiData.usFund) {
@@ -2008,17 +2066,20 @@ function buildStockPrompt() {
   return `你是一位專業的${market === 'tw' ? '台股' : '美股'}技術分析師。請根據以下資料，以繁體中文撰寫一份技術分析報告（Markdown 格式）。
 
 【標的】${symbol} ${name || ''}
+【今日日期】${todayISO()}
 【資料區間】${days[0].date} ～ ${last.date}（共 ${days.length} 個交易日）
 【最新收盤】${last.close}（${last.date}）
 
-【技術指標（最新值，由程式計算）】
-- MA5=${fnum(sma(closes, 5))}、MA10=${fnum(sma(closes, 10))}、MA20=${fnum(sma(closes, 20))}、MA60=${fnum(sma(closes, 60))}、MA120=${fnum(sma(closes, 120))}
-- RSI(14)=${fnum(rsi)}
-- MACD(12,26,9)：DIF=${fnum(macd?.dif)}、MACD=${fnum(macd?.macd)}、柱狀=${fnum(macd?.hist)}
-- KD(9)：K=${fnum(kd?.K)}、D=${fnum(kd?.D)}
+【技術指標（由程式計算；含 5／20 個交易日前對照，供判斷指標走向）】
+- MA5=${fnum(sma(closes, 5))}、MA10=${fnum(sma(closes, 10))}、MA20=${fnum(ma20)}、MA60=${fnum(ma60)}、MA120=${fnum(sma(closes, 120))}
+- 均線動向：MA20 較5日前 ${slopeTxt(ma20, sma(closes5, 20))}、MA60 較5日前 ${slopeTxt(ma60, sma(closes5, 60))}；MA5/MA20 最近一次交叉：${crossTxt(cross520)}；MA20/MA60 最近一次交叉：${crossTxt(cross2060)}
+- RSI(14)=${fnum(rsi)}（5日前 ${fnum(rsi5)}、20日前 ${fnum(rsi20)}）
+- MACD(12,26,9)：DIF=${fnum(macd?.dif)}、MACD=${fnum(macd?.macd)}、柱狀=${fnum(macd?.hist)}（5日前 ${fnum(histAt(5))}、20日前 ${fnum(histAt(20))}；柱狀${trendTxt(histStreak)}）
+- KD(9)：K=${fnum(kd?.K)}、D=${fnum(kd?.D)}（5日前 K=${fnum(kd5?.K)}／D=${fnum(kd5?.D)}、20日前 K=${fnum(kd20?.K)}／D=${fnum(kd20?.D)}）
 - 布林通道(20,2σ)：上軌 ${fnum(boll?.up)}、中軌 ${fnum(boll?.mid)}、下軌 ${fnum(boll?.low)}、帶寬 ${fnum(boll?.bw)}%（現價 ${last.close}，可判斷是否觸及上/下軌或帶寬收斂）
 - ATR(14)＝${fnum(atr)}（約 ${fnum(atr != null && last.close ? atr / last.close * 100 : null)}% 日波動，可作停損與部位大小參考）
 - 52週最高=${hi52}、52週最低=${lo52}；近20日最高=${hi20}、最低=${lo20}
+- 現價位置：距52週高 ${fmtPct(biasPct(hi52))}、距52週低 ${fmtPct(biasPct(lo52))}；乖離率：距MA20 ${fmtPct(biasPct(ma20))}、距MA60 ${fmtPct(biasPct(ma60))}
 - 5日均量=${Math.round((vol5 || 0) / 1000)} 千股、20日均量=${Math.round((vol20 || 0) / 1000)} 千股
 - OBV 能量潮（千股，累計變化）：近5日 ${sgn(obvChg(5))}、近20日 ${sgn(obvChg(20))}、近60日 ${sgn(obvChg(60))}（與股價走勢比對：同向＝量價配合，背離＝警訊）
 - 量比（最新量÷前5日均量）=${fnum(volRatio)}（>1.5 明顯放量、約 1 持平、<0.7 量縮）
@@ -2042,7 +2103,7 @@ ${posBlock}
 （**開始前先自我檢查**：若你本次無法使用網路搜尋（web search），請在報告**最開頭**獨立標註一行「⚠️ 本次 AI 未啟用網路搜尋 → forward PE／分析師目標價／機構或內部人持股／最新新聞可能從缺或過時，建議開啟搜尋功能後重新產生」，其餘章節仍照常以上方已提供的數據撰寫；若能正常搜尋則無需此行。）
 1. 趨勢研判（短期看日線、中長期看週線，分別說明）
 2. 支撐與壓力位（給出具體價位與理由）
-3. 技術指標解讀（均線排列、RSI、MACD、KD、布林通道、ATR、量價關係，並結合 OBV 能量潮與量比研判量價配合或背離）
+3. 技術指標解讀（均線排列、斜率與最近一次黃金／死亡交叉的意義；RSI／MACD／KD 請對照 5／20 日前數值說明**指標正在走強或走弱**，不要只描述當下水位；布林通道、ATR、量價關係，並結合 OBV 能量潮與量比研判量價配合或背離）
 4. 相對大盤強弱（領先或落後大盤？意義為何）
 5. 籌碼、基本面與消息面（**台股**：解讀上方已提供的三大法人買賣超方向與力道（含近60日累計與法人合計連續買/賣超天數）、外資持股比例趨勢（上升＝外資增持、下降＝調節）、融資融券（融資增＝散戶槓桿升高、融券增＝看空或避險、券資比偏高且股價走強＝潛在軋空題材）、月營收年增趨勢、PER（trailing）／PBR 估值；若為高成長股，請另以 web search 查 **forward 本益比／預估 EPS** 來修正 trailing PE 的偏誤（查無則註明）。**美股**：若上方已附「基本面與評等（美股，來源 Finnhub）」區塊，請直接解讀其估值（trailing PER／PBR）、獲利能力、營收成長與分析師評等；**forward 本益比／預估 EPS、目標價、機構／內部人持股**再用 web search 補充（查無則註明）。若未提供該區塊（使用者未填 Finnhub 金鑰），則估值/獲利/評等也一併用 web search 查。**消息面**：**台股**用 web search 查「${symbol} ${name || ''}」的最新新聞。**美股**：若上方已附「近期新聞（美股，來源 Finnhub）」，請以這些**真實來源與日期**的新聞為基礎，評析對股價的影響與風險，並可再用 web search 補更深入／更即時的內容（若無該區塊則全部以 web search 查）。重大消息、法說會、財報、訂單、產業政策等擇要點評，並**標註來源與日期**。forward PE 屬分析師預估、僅供估值脈絡參考，勿當精準觸發價；務實解讀、查無則註明不適用）
 6. 配息與殖利率評估（現金殖利率是否具吸引力、配息穩定度與成長性；若臨近除息，說明參與除息／棄息的考量與填息、貼息風險；台股單次現金股利達 2 萬元以上需注意二代健保補充保費與股利所得稅。美股或查無配息資料則註明不適用）
@@ -2066,33 +2127,48 @@ function buildPortfolioPrompt() {
     const c = computeRow(p), ccy = posCcy(p);
     if (p.market === 'bond') {
       const b = p.bond;
+      const toMat = c.matured ? '已到期' : `距到期 ${(daysBetween(todayISO(), b.maturity) / 365).toFixed(1)} 年`;
       lines.push(`${MKT_NAME[p.market]},${p.symbol},面額 ${fmtMoney(b.face, ccy)},買進價 ${b.buyPricePct}%,市價 ${c.matured ? '到期' : c.markPct + '%'},` +
         `市值 ${fmtMoney(c.mv, ccy)},未實現 ${fmtMoney(c.unreal, ccy)}(${fmtPct(c.unrealPct)}),已收息 ${fmtMoney(c.received, ccy)},` +
-        `總損益 ${fmtMoney(c.total, ccy)},票息 ${b.rate}%/年,到期 ${b.maturity}`);
+        `總損益 ${fmtMoney(c.total, ccy)},票息 ${b.rate}%/年,到期 ${b.maturity}（${toMat}）,買進日 ${b.buyDate}`);
     } else {
+      const held = c.firstBuy ? `,首買 ${c.firstBuy}（持有 ${daysBetween(c.firstBuy, todayISO())} 天）` : '';
       lines.push(`${MKT_NAME[p.market]},${p.symbol} ${p.name || ''},${nf.format(c.qty)} 股,均價 ${fnum(c.avgCost)},現價 ${p.lastPrice ?? '未更新'},` +
-        `市值 ${fmtMoney(c.mv, ccy)},未實現 ${fmtMoney(c.unreal, ccy)}(${fmtPct(c.unrealPct)}),已實現+股息 ${fmtMoney(c.realDiv, ccy)},總損益 ${fmtMoney(c.total, ccy)}`);
+        `市值 ${fmtMoney(c.mv, ccy)},未實現 ${fmtMoney(c.unreal, ccy)}(${fmtPct(c.unrealPct)}),已實現+股息 ${fmtMoney(c.realDiv, ccy)},總損益 ${fmtMoney(c.total, ccy)}${held}`);
     }
   }
-  // 總計（TWD）
-  let mvT = 0, costT = 0, totalT = 0;
-  const w = [];
+  // 總計（TWD）＋市場/幣別配置＋XIRR＋淨值曲線 —— 全由程式精算，AI 只解讀
+  let mvT = 0, costT = 0, unrealT = 0, rdT = 0, totalT = 0;
+  const w = [], byMkt = {}, byCcy = {};
   for (const p of db.positions) {
     const c = computeRow(p), ccy = posCcy(p);
     const mv = toTWD(c.mv ?? c.cost, ccy);
     if (mv == null) continue;
-    mvT += mv; costT += toTWD(c.cost, ccy) ?? 0; totalT += toTWD(c.total, ccy) ?? 0;
+    mvT += mv; costT += toTWD(c.cost, ccy) ?? 0;
+    unrealT += toTWD(c.unreal ?? 0, ccy) ?? 0; rdT += toTWD(c.realDiv, ccy) ?? 0; totalT += toTWD(c.total, ccy) ?? 0;
+    byMkt[p.market] = (byMkt[p.market] || 0) + mv;
+    byCcy[ccy] = (byCcy[ccy] || 0) + mv;
     w.push([`${p.symbol}`, mv]);
   }
   const weights = w.map(([s, v]) => `${s} ${mvT > 0 ? (v / mvT * 100).toFixed(1) : 0}%`).join('、');
+  const alloc = obj => Object.entries(obj).map(([k, v]) => `${MKT_NAME[k] || k} ${mvT > 0 ? (v / mvT * 100).toFixed(1) : 0}%`).join('、');
+  const x = portfolioXIRR();
+  const xirrLine = x && x.rate != null ? `\n- XIRR 年化內部報酬率 ≈ ${fmtPct(x.rate * 100)}（money-weighted，自 ${x.firstDate} 起算，含未實現市值）` : '';
+  let curveLine = '';
+  if (perfData && perfData.port.length) {   // 使用者若已按過「建立近一年淨值曲線」，把結果一併給 AI
+    const pe = perfData.port[perfData.port.length - 1], be = perfData.bench[perfData.bench.length - 1];
+    curveLine = `\n- 近一年淨值曲線（股票部位，不含債券）：我的投組 ${pe != null ? fmtPct(pe - 100) : '—'} vs 加權指數 ${be != null ? fmtPct(be - 100) : '—'}（${perfData.dates[0]} ～ ${perfData.dates[perfData.dates.length - 1]}）`;
+  }
 
   return `你是一位專業的投資組合顧問。以下是我的投資組合現況（截至 ${todayISO()}，匯率 USD/TWD=${fx.rate ? fx.rate.toFixed(3) : '未知'}，加權平均成本法，台股未實現已扣預估賣出費稅）。請以繁體中文撰寫評估報告（Markdown 格式）。
 
 【持倉明細】
 ${lines.join('\n')}
 
-【總計（換算 TWD）】
-- 總市值 ${fmtMoney(mvT, 'TWD')}、持有成本 ${fmtMoney(costT, 'TWD')}、總損益（含已實現與息收）${fmtMoney(totalT, 'TWD')}
+【總計（換算 TWD，由程式精算）】
+- 總市值 ${fmtMoney(mvT, 'TWD')}、持有成本 ${fmtMoney(costT, 'TWD')}
+- 未實現損益 ${fmtMoney(unrealT, 'TWD')}（${costT > 0 ? fmtPct(unrealT / costT * 100) : '—'}）、已實現＋股息息收 ${fmtMoney(rdT, 'TWD')}、總損益 ${fmtMoney(totalT, 'TWD')}${xirrLine}${curveLine}
+- 市場配置：${alloc(byMkt) || '—'}；幣別配置：${alloc(byCcy) || '—'}
 - 個別部位占比：${weights || '—'}
 
 請依下列章節撰寫：
