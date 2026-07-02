@@ -38,11 +38,12 @@
   details.box > summary { cursor: pointer; color: var(--accent); font-weight: 600; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin-top: 12px; }
   label.field { display: flex; flex-direction: column; gap: 5px; font-size: .85rem; color: var(--muted); }
-  input, select, button {
+  input, select, button, textarea {
     font: inherit; color: var(--text); background: var(--panel2);
     border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
   }
-  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  textarea { resize: vertical; min-height: 44px; }
   input[type="checkbox"] { width: auto; accent-color: var(--accent); }
   .pw { position: relative; display: block; }
   .pw input { width: 100%; padding-right: 40px; }
@@ -190,6 +191,9 @@
         <input id="fxOverride" type="number" step="0.0001" min="0" placeholder="自動">
       </label>
     </div>
+    <label class="field" style="margin-top:12px">🎯 投資目標與風險偏好（選填；會寫進個股與組合的 AI Prompt，讓「加碼／減碼／停損」等建議貼合你的目標，而非通用答案）
+      <textarea id="aiProfile" rows="2" placeholder="例：偏長期存股、能忍受 -20% 回撤；美股以成長股為主、台股重視殖利率；每月約可再投入 5 萬元"></textarea>
+    </label>
     <div class="row">
       <label><input id="rememberKey" type="checkbox"> 記住 OpenAI API Key（存於本機 localStorage）</label>
       <label><input id="webSearchChk" type="checkbox" checked> 🌐 個股分析時用 web search 即時搜尋新聞</label>
@@ -289,7 +293,7 @@
         <b style="color:var(--text)">程式精算的指標（AI 只解讀、不計算）：</b>技術面 MA／RSI／MACD／KD／布林通道／ATR／OBV／量比／量能（含 5／20 日前對照、均線黃金死亡交叉與乖離率，供 AI 判斷指標走向）；台股另含配息（殖利率、除息／發放日）、三大法人買賣超、外資持股、融資融券、月營收年增、本益比(trailing)／PBR；美股（填 Finnhub 金鑰）含估值 PER／PBR、獲利能力、營收成長、分析師評等與近期新聞。<br>
         <b style="color:var(--text)">原始價量：</b>近 52 週週線＋近 60 日日線 OHLCV、同期大盤對照（上市配加權指數／上櫃配櫃買指數／美股配 SPY）。<br>
         <b style="color:var(--text)">AI 即時 web search：</b>最新新聞：台股用 web search；**美股改由 Finnhub 提供近期新聞**、AI 可再補充。美股的 forward 本益比、目標價與機構/內部人持股仍用 web search（trailing 估值、獲利、評等、新聞改由 Finnhub 提供，需填金鑰）。<br>
-        <b style="color:var(--text)">你的持倉：</b>加權平均成本與損益（存於本機瀏覽器）。<br>
+        <b style="color:var(--text)">你的持倉：</b>加權平均成本與損益（存於本機瀏覽器）；另可於設定填「投資目標與風險偏好」，AI 建議會貼合你的目標。<br>
         <span style="color:var(--gold)">資料來源：股價 TWSE／FinMind／Twelve Data；配息‧籌碼‧月營收‧本益比 FinMind（台股）；新聞與美股基本面 OpenAI web search；匯率 open.er-api。<b>所有數字皆由程式精算後才交給 AI，AI 僅負責解讀。</b></span>
       </div>
     </details>
@@ -323,9 +327,10 @@
       <button id="copyStockPrompt" class="primary">📋 複製個股 Prompt</button>
       <button id="copyPfPrompt" class="primary">📋 複製組合 Prompt</button>
     </div>
-    <div class="hint" style="margin-top:4px">「產生 AI 分析」會呼叫 OpenAI（耗 token）；若想省 token，可改按「複製 Prompt」把同一份提問貼到訂閱制聊天機器人（如 Gemini）。新聞與美股基本面那段需該機器人能上網查詢才會生效；台股的技術面／籌碼／配息等數據已內含在 Prompt 中。</div>
+    <div class="hint" style="margin-top:4px">「產生 AI 分析」會呼叫 OpenAI（耗 token）；若想省 token，可改按「複製 Prompt」把同一份提問貼到訂閱制聊天機器人（如 Gemini）。新聞與美股基本面那段需該機器人能上網查詢才會生效；台股的技術面／籌碼／配息等數據已內含在 Prompt 中。報告自動保留<b>最近 10 份</b>於本機（重新整理不消失），可由報告上方的下拉選單切換、對照前後觀點變化。</div>
     <div id="aiStatus" class="status"></div>
-    <div id="aiMeta" style="display:none; align-items:center; gap:10px; margin-top:12px; padding:8px 12px; background:var(--panel2); border:1px solid var(--border); border-radius:8px; font-size:.82rem; color:var(--muted);">
+    <div id="aiMeta" style="display:none; align-items:center; gap:10px; margin-top:12px; padding:8px 12px; background:var(--panel2); border:1px solid var(--border); border-radius:8px; font-size:.82rem; color:var(--muted); flex-wrap:wrap;">
+      <select id="histSel" title="切換歷史報告（自動保留最近 10 份）" style="max-width:320px; font-size:.82rem; padding:5px 8px;"></select>
       <span id="aiMetaText"></span>
       <span style="flex:1"></span>
       <button id="aiCopyBtn" class="ghost">📋 複製報告</button>
@@ -436,7 +441,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.21.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.22.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -469,11 +474,11 @@ function daysBetween(a, b) { return Math.round((parseD(b) - parseD(a)) / 8640000
 
 /* ════════════════ 資料儲存 ════════════════ */
 const DB_KEY = 'twpf_v1';
-let db = { positions: [], settings: { twelveKey: '', finmindToken: '', finnhubKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '' } };
+let db = { positions: [], settings: { twelveKey: '', finmindToken: '', finnhubKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '' } };
 function loadDB() {
   try {
     const j = JSON.parse(localStorage.getItem(DB_KEY) || 'null');
-    if (j && Array.isArray(j.positions)) { db = j; db.settings = Object.assign({ twelveKey: '', finmindToken: '', finnhubKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '' }, j.settings || {}); }
+    if (j && Array.isArray(j.positions)) { db = j; db.settings = Object.assign({ twelveKey: '', finmindToken: '', finnhubKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '' }, j.settings || {}); }
   } catch (_) {}
 }
 function saveDB() { localStorage.setItem(DB_KEY, JSON.stringify(db)); }
@@ -1850,16 +1855,26 @@ async function streamResponses(key, model, prompt, effort, onDelta, webSearch, o
     err.status = res.status; throw err;
   }
   let full = '', failMsg = null, truncated = null;
+  const anns = [];   // web search 引用（url_citation annotations）——過去只拼 delta、引用整批遺失，全靠模型自願把網址寫進正文
   await readSSE(res, j => {
     const t = j.type || '';
     if (t.endsWith('output_text.delta') && typeof j.delta === 'string') { full += j.delta; onDelta(full); }
+    else if (t.endsWith('output_text.annotation.added') && j.annotation && j.annotation.url) anns.push(j.annotation);
     else if (t.includes('web_search')) { onSearch && onSearch(); }   // 正在搜尋新聞
     else if (t === 'response.incomplete') truncated = j.response?.incomplete_details?.reason || 'incomplete';
     else if (t === 'response.failed' || t === 'error') failMsg = j.response?.error?.message || j.error?.message || j.message || '串流中斷';
   });
   if (failMsg) throw new Error(failMsg);
   if (!full) { const err = new Error('Responses API 未回傳內容'); err.status = 400; throw err; }
-  return { text: full, truncated };
+  return { text: full + citeBlock(anns), truncated };
+}
+// web search 引用 → 報告尾端「引用來源」清單（依 URL 去重；標題去掉 []，避免打壞 Markdown 連結）
+function citeBlock(anns) {
+  const seen = new Set();
+  const cites = (anns || []).filter(a => a && a.url && !seen.has(a.url) && seen.add(a.url));
+  if (!cites.length) return '';
+  return '\n\n---\n\n**📎 引用來源（web search）**\n' +
+    cites.map((a, i) => `${i + 1}. [${String(a.title || a.url).replace(/[\[\]]/g, ' ').trim()}](${a.url})`).join('\n');
 }
 async function streamChat(key, model, prompt, onDelta) {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -2055,6 +2070,10 @@ function buildStockPrompt() {
     fundBlock += `\n【近期新聞（美股，來源 Finnhub，近一個月、最新 ${aiData.usNews.length} 則）】\n${news}\n`;
   }
 
+  // 投資偏好（選填）：讓持倉評估／操作計畫／結論貼合使用者目標，而非通用建議
+  const profile = (db.settings.aiProfile || '').trim();
+  const profileBlock = profile ? `\n【我的投資偏好（請讓第 7、9、10 章的建議貼合此偏好；未提及之處以一般穩健原則處理）】\n${profile}\n` : '';
+
   let posBlock = '目前未持有此標的。請在第 7 章改為「進場評估」：分析現在是否為合理的進場時機、適合的進場價位區間與條件。';
   if (posStats && posStats.qty > 0) {
     posBlock =
@@ -2098,7 +2117,7 @@ ${csvOf(daily60)}
 
 【我的持倉】
 ${posBlock}
-
+${profileBlock}
 請依下列章節撰寫：
 （**開始前先自我檢查**：若你本次無法使用網路搜尋（web search），請在報告**最開頭**獨立標註一行「⚠️ 本次 AI 未啟用網路搜尋 → forward PE／分析師目標價／機構或內部人持股／最新新聞可能從缺或過時，建議開啟搜尋功能後重新產生」，其餘章節仍照常以上方已提供的數據撰寫；若能正常搜尋則無需此行。）
 1. 趨勢研判（短期看日線、中長期看週線，分別說明）
@@ -2154,6 +2173,8 @@ function buildPortfolioPrompt() {
   const alloc = obj => Object.entries(obj).map(([k, v]) => `${MKT_NAME[k] || k} ${mvT > 0 ? (v / mvT * 100).toFixed(1) : 0}%`).join('、');
   const x = portfolioXIRR();
   const xirrLine = x && x.rate != null ? `\n- XIRR 年化內部報酬率 ≈ ${fmtPct(x.rate * 100)}（money-weighted，自 ${x.firstDate} 起算，含未實現市值）` : '';
+  const profile = (db.settings.aiProfile || '').trim();
+  const profileBlock = profile ? `\n【我的投資偏好（請讓第 3、4、6 章的建議貼合此偏好；未提及之處以一般穩健原則處理）】\n${profile}\n` : '';
   let curveLine = '';
   if (perfData && perfData.port.length) {   // 使用者若已按過「建立近一年淨值曲線」，把結果一併給 AI
     const pe = perfData.port[perfData.port.length - 1], be = perfData.bench[perfData.bench.length - 1];
@@ -2170,7 +2191,7 @@ ${lines.join('\n')}
 - 未實現損益 ${fmtMoney(unrealT, 'TWD')}（${costT > 0 ? fmtPct(unrealT / costT * 100) : '—'}）、已實現＋股息息收 ${fmtMoney(rdT, 'TWD')}、總損益 ${fmtMoney(totalT, 'TWD')}${xirrLine}${curveLine}
 - 市場配置：${alloc(byMkt) || '—'}；幣別配置：${alloc(byCcy) || '—'}
 - 個別部位占比：${weights || '—'}
-
+${profileBlock}
 請依下列章節撰寫：
 1. 資產配置與集中度（單一標的、市場、幣別的集中風險）
 2. 幣別與市場風險（台幣 vs 美元曝險、利率與匯率敏感度）
@@ -2246,23 +2267,50 @@ $('copyPfPrompt').addEventListener('click', async () => {
   if (ok) st.textContent = '✅ 投資組合 Prompt 已複製，可貼到其他聊天機器人';
 });
 
-/* ── 報告：時間戳記 / 複製 / 下載 ── */
-let lastReport = null;   // { fullText, filename }
+/* ── 報告：歷史（localStorage 最近 10 份，重新整理不消失）/ 時間戳記 / 複製 / 下載 ── */
+const REPORTS_KEY = 'twpf_reports', REPORTS_MAX = 10;
+let reportHist = [];   // [{id, ts, title, filename, fullText}] 新的在前
+try { const _r = JSON.parse(localStorage.getItem(REPORTS_KEY) || '[]'); if (Array.isArray(_r)) reportHist = _r; } catch (_) {}
+let lastReport = null;   // { fullText, filename }（複製／下載按鈕的目標＝目前顯示中的報告）
 function nowStamp() {
   const d = new Date(), p = n => String(n).padStart(2, '0');
   return { date: isoD(d), full: `${isoD(d)} ${p(d.getHours())}:${p(d.getMinutes())}` };
+}
+function saveReports() {
+  for (;;) {
+    try { localStorage.setItem(REPORTS_KEY, JSON.stringify(reportHist)); return; }
+    catch (_) {   // localStorage 空間不足 → 丟最舊的再試；只剩一份仍塞不下就放棄保存（畫面照常顯示）
+      if (reportHist.length <= 1) return;
+      reportHist.pop();
+    }
+  }
+}
+function renderHistSel() {
+  $('histSel').innerHTML = reportHist.map(r => `<option value="${r.id}">${esc(r.ts)}　${esc(r.title)}</option>`).join('');
+}
+function showReport(r) {
+  lastReport = { fullText: r.fullText, filename: r.filename };
+  $('aiOutput').innerHTML = mdToHtml(r.fullText);
+  $('aiOutput').style.display = 'block';
+  $('aiMetaText').textContent = `📄 產生於 ${r.ts}`;
+  $('aiMeta').style.display = 'flex';
+  $('histSel').value = r.id;
 }
 function setReport(title, model, markdown, filenameBase) {
   const ts = nowStamp();
   // 時間戳與模型寫進報告開頭，讓畫面顯示、複製、下載三者內容一致
   const header = `# ${title}\n\n**產生時間：** ${ts.full}　｜　**AI 模型：** ${model}　｜　**工具：** 我的投資組合 ${APP_VERSION}\n\n---\n\n`;
-  const fullText = header + (markdown || '').trim() + '\n';
-  lastReport = { fullText, filename: `${filenameBase}_${ts.date}.md` };
-  $('aiOutput').innerHTML = mdToHtml(fullText);
-  $('aiOutput').style.display = 'block';
-  $('aiMetaText').textContent = `📄 報告產生於 ${ts.full}`;
-  $('aiMeta').style.display = 'flex';
+  const entry = { id: uid(), ts: ts.full, title, filename: `${filenameBase}_${ts.date}.md`, fullText: header + (markdown || '').trim() + '\n' };
+  reportHist.unshift(entry);
+  if (reportHist.length > REPORTS_MAX) reportHist.length = REPORTS_MAX;
+  saveReports();
+  renderHistSel();
+  showReport(entry);
 }
+$('histSel').addEventListener('change', () => {
+  const r = reportHist.find(x => x.id === $('histSel').value);
+  if (r) showReport(r);
+});
 async function copyText(text) {
   try { await navigator.clipboard.writeText(text); return true; }
   catch (_) {
@@ -2351,6 +2399,7 @@ function fillSettingsUI() {
   $('twFee').value = db.settings.twFee;
   $('twTax').value = db.settings.twTax;
   $('fxOverride').value = db.settings.fxOverride || '';
+  $('aiProfile').value = db.settings.aiProfile || '';
   const k = localStorage.getItem('twbt_apikey');
   $('apiKey').value = k || '';
   $('rememberKey').checked = !!k;
@@ -2377,7 +2426,7 @@ function importData(file) {
     if (!data || data.app !== 'twpf' || !Array.isArray(data.positions)) { ioStatus('❌ 不是本工具的備份檔', true); return; }
     if (!confirm(`匯入將「覆蓋」目前的 ${db.positions.length} 筆持倉與設定，改為備份檔的 ${data.positions.length} 筆。確定要繼續？`)) return;
     db.positions = data.positions.filter(p => p && p.id && p.market);
-    db.settings = Object.assign({ twelveKey: '', finmindToken: '', finnhubKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '' }, data.settings || {});
+    db.settings = Object.assign({ twelveKey: '', finmindToken: '', finnhubKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '' }, data.settings || {});
     if (data.openaiKey) localStorage.setItem('twbt_apikey', data.openaiKey);
     saveDB();
     fillSettingsUI();
@@ -2393,6 +2442,7 @@ function bindSettings() {
   $('tdKey').addEventListener('input', e => { db.settings.twelveKey = e.target.value.trim(); saveDB(); });
   $('fmToken').addEventListener('input', e => { db.settings.finmindToken = e.target.value.trim(); saveDB(); });
   $('finnhubKey').addEventListener('input', e => { db.settings.finnhubKey = e.target.value.trim(); saveDB(); });
+  $('aiProfile').addEventListener('input', e => { db.settings.aiProfile = e.target.value; saveDB(); });   // 投資偏好：不 trim（保留換行），組 prompt 時才 trim
   $('twFee').addEventListener('input', e => { db.settings.twFee = parseFloat(e.target.value) || 0; saveDB(); renderAll(); });
   $('twTax').addEventListener('input', e => { db.settings.twTax = parseFloat(e.target.value) || 0; saveDB(); renderAll(); });
   $('fxOverride').addEventListener('input', e => {
@@ -2445,6 +2495,7 @@ function bindSettings() {
   $('ab_date').value = todayISO();
   if (!db.positions.length) $('addBox').open = true;
   renderAll();
+  if (reportHist.length) { renderHistSel(); showReport(reportHist[0]); }   // 還原上次報告（重新整理不消失）
   ensureFX(false).then(renderSummary);
 })();
 </script>
