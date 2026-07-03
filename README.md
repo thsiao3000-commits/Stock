@@ -1,6 +1,6 @@
 # 💼 我的投資組合 + AI 分析
 
-**版本：v1.28.0**（版本號見 `index.html` 的 `APP_VERSION`，並對應 git tag；變更紀錄見 [CHANGELOG.md](CHANGELOG.md)）
+**版本：v1.28.1**（版本號見 `index.html` 的 `APP_VERSION`，並對應 git tag；變更紀錄見 [CHANGELOG.md](CHANGELOG.md)）
 
 追蹤**台股、美股、海外公司債**的個人投資組合工具：逐筆記錄交易、以**加權平均成本法**計算已實現／未實現損益（含台股費稅、股息、債券配息與匯率換算），並可一鍵產生 **AI 技術分析**（針對你的持倉個人化）與**投資組合總評**。
 
@@ -123,7 +123,7 @@
 
 **上線後的安全注意**
 
-- **金鑰**：只存在你自己的瀏覽器。建議給這工具用的 OpenAI／Twelve Data key 設**用量上限**；在公用電腦上**別勾「記住 API Key」**。
+- **金鑰**：只存在你自己的瀏覽器。注意儲存行為分兩種——**OpenAI Key** 勾「記住」才存；**Twelve Data／FinMind／Finnhub／xAI** 金鑰**輸入即自動儲存**於 localStorage。建議給這工具用的 key 都設**用量上限**；在公用電腦上除了別勾「記住」，**其他金鑰也不要輸入**（或用完手動清空欄位）。
 - **共用 origin** ⚠️：同帳號底下所有 Pages 專案共用 `https://thsiao3000-commits.github.io` 這個 origin，彼此的 localStorage 互通。若日後在同帳號掛其他頁面，那些頁面的 JS 讀得到本工具存的 key。化解：改用**自訂網域**取得獨立 origin，或別在同帳號放來路不明的頁面。
 - **想連「網站本身」都不公開**：改用 Cloudflare Pages／Netlify（可從 private repo 部署、原始碼不公開，並能加存取密碼）。
 

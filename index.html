@@ -210,10 +210,11 @@
       <textarea id="aiProfile" rows="2" placeholder="例：偏長期存股、能忍受 -20% 回撤；美股以成長股為主、台股重視殖利率；每月約可再投入 5 萬元"></textarea>
     </label>
     <div class="row">
-      <label><input id="rememberKey" type="checkbox"> 記住 OpenAI API Key（存於本機 localStorage）</label>
+      <label><input id="rememberKey" type="checkbox"> 記住 OpenAI API Key（不勾＝關閉頁面即忘、每次重填）</label>
       <label><input id="webSearchChk" type="checkbox" checked> 🌐 個股分析時用 web search 即時搜尋新聞</label>
     </div>
     <div class="hint" style="margin-top:2px">web search 由 OpenAI 即時搜尋並附來源；會多一筆搜尋費用、也稍慢。不需要時可取消勾選。</div>
+    <div class="hint" style="margin-top:2px">🔐 金鑰儲存方式：Twelve Data／FinMind／Finnhub／xAI 金鑰輸入後即<b>自動儲存</b>；OpenAI Key 則由上方勾選決定。所有金鑰都<b>只存在你這台裝置的瀏覽器（localStorage）</b>，本工具純前端、不會把金鑰上傳到任何伺服器；「匯出 JSON」預設也不含金鑰（可勾選包含）。</div>
     <div class="row" style="margin-top:6px">
       <span class="hint">資料備份：</span>
       <button id="exportBtn" class="ghost">⬇️ 匯出 JSON</button>
@@ -529,7 +530,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.28.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.28.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
