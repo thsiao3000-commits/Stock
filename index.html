@@ -320,7 +320,9 @@
           <option value="growth">成長動能派</option>
           <option value="tech">技術短線派</option>
           <option value="guard">風控防守派</option>
+          <option value="chokepoint">供應鏈瓶頸獵人</option>
           <option value="round">三師會診（價值×成長×技術）</option>
+          <option value="__custom__">自訂視角…</option>
         </select>
       </label>
       <div id="manualWrap" style="display:none">
@@ -331,6 +333,16 @@
         <input id="aiSymbol" placeholder="代號" style="width:110px">
       </div>
       <button id="fetchBtn" class="primary">📊 抓取一年資料</button>
+    </div>
+    <div id="customPersonaWrap" style="display:none; margin-top:10px">
+      <div class="grid" style="grid-template-columns: minmax(230px, 320px)">
+        <label class="field">自訂視角名稱
+          <input id="cpName" placeholder="例：某某分析師風格（AI 模擬）">
+        </label>
+      </div>
+      <label class="field" style="margin-top:8px">自訂視角判斷準則（寫進 AI Prompt；把你欣賞的分析師方法論用文字描述出來，AI 會以此風格分析。注意：這是 AI 模擬的「風格」，不等於本人的真實觀點）
+        <textarea id="cpDesc" rows="3" placeholder="例：只做總經順風的產業；先看流動性與利率環境再看個股；重視風險回報比至少 3:1，虧損部位絕不加碼……"></textarea>
+      </label>
     </div>
     <div id="fetchStatus" class="status"></div>
     <div id="chartInfo" class="hint" style="margin-top:6px"></div>
@@ -349,7 +361,7 @@
       <button id="copyStockPrompt" class="primary">📋 複製個股 Prompt</button>
       <button id="copyPfPrompt" class="primary">📋 複製組合 Prompt</button>
     </div>
-    <div class="hint" style="margin-top:4px">「產生 AI 分析」會呼叫 OpenAI（耗 token）；若想省 token，可改按「複製 Prompt」把同一份提問貼到訂閱制聊天機器人（如 Gemini）。新聞與美股基本面那段需該機器人能上網查詢才會生效；台股的技術面／籌碼／配息等數據已內含在 Prompt 中。報告自動保留<b>最近 10 份</b>於本機（重新整理不消失），可由報告上方的下拉選單切換、對照前後觀點變化。「分析視角」可切換單一風格或<b>三師會診</b>（價值×成長×技術各自表態、主持人裁決）；同一檔重複分析時會自動附上<b>上次建議檢討</b>（對照期間實際走勢、檢討上次判斷對錯）。</div>
+    <div class="hint" style="margin-top:4px">「產生 AI 分析」會呼叫 OpenAI（耗 token）；若想省 token，可改按「複製 Prompt」把同一份提問貼到訂閱制聊天機器人（如 Gemini）。新聞與美股基本面那段需該機器人能上網查詢才會生效；台股的技術面／籌碼／配息等數據已內含在 Prompt 中。報告自動保留<b>最近 10 份</b>於本機（重新整理不消失），可由報告上方的下拉選單切換、對照前後觀點變化。「分析視角」可切換單一風格（含<b>供應鏈瓶頸獵人</b>與<b>自訂視角</b>——把你欣賞的分析師方法論寫成準則）或<b>三師會診</b>（價值×成長×技術各自表態、主持人裁決）；同一檔重複分析時會自動附上<b>上次建議檢討</b>（對照期間實際走勢、檢討上次判斷對錯）。</div>
     <div id="aiStatus" class="status"></div>
     <div id="aiMeta" style="display:none; align-items:center; gap:10px; margin-top:12px; padding:8px 12px; background:var(--panel2); border:1px solid var(--border); border-radius:8px; font-size:.82rem; color:var(--muted); flex-wrap:wrap;">
       <select id="histSel" title="切換歷史報告（自動保留最近 10 份）" style="max-width:320px; font-size:.82rem; padding:5px 8px;"></select>
@@ -490,7 +502,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.25.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.26.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -523,11 +535,11 @@ function daysBetween(a, b) { return Math.round((parseD(b) - parseD(a)) / 8640000
 
 /* ════════════════ 資料儲存 ════════════════ */
 const DB_KEY = 'twpf_v1';
-let db = { positions: [], watchlist: [], settings: { twelveKey: '', finmindToken: '', finnhubKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '' } };
+let db = { positions: [], watchlist: [], settings: { twelveKey: '', finmindToken: '', finnhubKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '', cpName: '', cpDesc: '' } };
 function loadDB() {
   try {
     const j = JSON.parse(localStorage.getItem(DB_KEY) || 'null');
-    if (j && Array.isArray(j.positions)) { db = j; db.settings = Object.assign({ twelveKey: '', finmindToken: '', finnhubKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '' }, j.settings || {}); }
+    if (j && Array.isArray(j.positions)) { db = j; db.settings = Object.assign({ twelveKey: '', finmindToken: '', finnhubKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '', cpName: '', cpDesc: '' }, j.settings || {}); }
   } catch (_) {}
   if (!Array.isArray(db.watchlist)) db.watchlist = [];   // 舊資料無觀察清單 → 補空陣列
 }
@@ -2014,11 +2026,12 @@ $('wlBody').addEventListener('click', e => {
 function buildWatchPrompt() {
   const rows = (watchData?.rows || []).filter(r => !r.err);
   const pKey = selectedPersona();
-  // 快篩總評支援單一視角；三師會診對十幾檔快篩太冗長 → 回落預設綜合視角
+  // 快篩總評支援單一視角（含自訂）；三師會診對十幾檔快篩太冗長 → 回落預設綜合視角
   let roleIntro = '你是一位資深的證券分析師。', personaBlock = '';
-  if (PERSONAS[pKey]) {
-    roleIntro = `你是一位「${PERSONAS[pKey].name}」風格的資深證券分析師。`;
-    personaBlock = `\n【你的判斷準則】\n${PERSONAS[pKey].desc}\n`;
+  const pp = personaOf(pKey);
+  if (pp) {
+    roleIntro = `你是一位「${pp.name}」風格的資深證券分析師。`;
+    personaBlock = `\n【你的判斷準則】\n${pp.desc}\n`;
   }
   const profile = (db.settings.aiProfile || '').trim();
   const profileBlock = profile ? `\n【我的投資偏好】\n${profile}\n` : '';
@@ -2042,8 +2055,8 @@ $('wlAiBtn').addEventListener('click', async () => {
   $('wlAiBtn').disabled = true; $('wlScanBtn').disabled = true;
   try {
     const { text, model, truncated } = await runAI(buildWatchPrompt(), st);
-    const pv = personaLabel(selectedPersona());
-    setReport(`觀察清單快篩總評${PERSONAS[selectedPersona()] ? `（${pv}）` : ''}`, model, text, '觀察清單快篩');
+    const pv = personaOf(selectedPersona());   // 快篩不用三師會診 → 只有單一/自訂視角才標註
+    setReport(`觀察清單快篩總評${pv ? `（${pv.name}）` : ''}`, model, text, '觀察清單快篩');
     st.textContent = truncated ? `⚠️ 報告被截斷（${truncated}），建議調低推理深度重試。` : `✅ 快篩總評完成（報告顯示於上方 ③ 的報告區，並已存入歷史）`;
   } catch (e) { st.className = 'status error'; st.textContent = '❌ ' + e.message; }
   finally { $('wlAiBtn').disabled = false; $('wlScanBtn').disabled = false; }
@@ -2190,10 +2203,21 @@ const PERSONAS = {
   growth: { name: '成長動能派', desc: '重視營收年增與獲利成長動能、產業趨勢與法人籌碼方向；估值以 forward PE 對照成長性（PEG 思維），可接受偏高估值但必須有高成長支撐；順勢操作，動能轉弱或跌破關鍵支撐即果斷減碼，嚴設停損。' },
   tech:   { name: '技術短線派', desc: '以均線排列與交叉、量價關係、KD／MACD／RSI、布林通道、支撐壓力為主要依據，基本面只當背景；講究明確的進出場價位與停損（常用 ATR 倍數），波段操作、訊號轉弱不戀棧、絕不凹單。' },
   guard:  { name: '風控防守派', desc: '先想『最多會虧多少』再想『能賺多少』；緊盯 ATR 波動放大、乖離過大、量價背離、籌碼鬆動、融資過熱等警訊；重視部位控管、分批進出與停損紀律，避免過度集中，寧可錯過、不可大賠。' },
+  chokepoint: { name: '供應鏈瓶頸獵人', desc: '（風格參考 X 上的供應鏈分析師 Serenity，屬 AI 模擬）不追產業龍頭明牌，沿供應鏈往上游找「不可替代的卡點」：評估此標的的技術壁壘與替代方案成熟度、產能稀缺性與擴產週期、在關鍵客戶供應鏈中的占位與集中度——若它並非卡點請直說、勿硬套；偏好市值較小、機構覆蓋少、尚未被市場充分定價的隱形環節；接受高波動與集中押注，但必須給出明確的「失效條件」（卡點被替代、產能大量開出、大客戶轉單即出場）並嚴控單一部位比重。' },
 };
 const ROUND_KEYS = ['value', 'growth', 'tech'];   // 三師會診成員
 function selectedPersona() { return $('personaSel').value; }
-function personaLabel(k) { return PERSONAS[k] ? PERSONAS[k].name : k === 'round' ? '三師會診' : ''; }
+// 解析視角：內建 key → PERSONAS；__custom__ → 使用者自訂（準則未填視同綜合，回 null）
+function personaOf(key) {
+  if (PERSONAS[key]) return PERSONAS[key];
+  if (key === '__custom__') {
+    const d = (db.settings.cpDesc || '').trim();
+    if (!d) return null;
+    return { name: (db.settings.cpName || '').trim() || '自訂視角', desc: d };
+  }
+  return null;
+}
+function personaLabel(k) { const p = personaOf(k); return p ? p.name : k === 'round' ? '三師會診' : ''; }
 // 上次報告摘錄：從「操作計畫／結論／總結／會診」標題起擷取（找不到就取末尾），供 AI 檢討上次建議
 function reportTail(fullText, maxLen = 2200) {
   const m = fullText.match(/^#{1,6}\s*.*(操作計畫|結論|總結|會診).*$/m);
@@ -2345,9 +2369,10 @@ function buildStockPrompt() {
   if (pKey === 'round') {
     roleIntro = `你將主持一場「三師會診」：三位風格迥異的資深${mktName}分析師——${ROUND_KEYS.map(k => PERSONAS[k].name).join('、')}——共同評估同一檔標的，最後由你（主持人）整合裁決。第 1～8 章請以中性、共用的角度解讀數據，第 9～10 章進行會診與裁決。`;
     personaBlock = `\n【三位分析師的判斷準則】\n${ROUND_KEYS.map(k => `- ${PERSONAS[k].name}：${PERSONAS[k].desc}`).join('\n')}\n`;
-  } else if (PERSONAS[pKey]) {
-    roleIntro = `你是一位「${PERSONAS[pKey].name}」風格的資深${mktName}證券分析師。`;
-    personaBlock = `\n【你的判斷準則（請貫穿整份報告，尤其第 7、9、10 章的建議）】\n${PERSONAS[pKey].desc}\n`;
+  } else if (personaOf(pKey)) {
+    const pp = personaOf(pKey);
+    roleIntro = `你是一位「${pp.name}」風格的資深${mktName}證券分析師。`;
+    personaBlock = `\n【你的判斷準則（請貫穿整份報告，尤其第 7、9、10 章的建議）】\n${pp.desc}\n`;
   } else {
     roleIntro = `你是一位資深的${mktName}證券分析師，技術面與籌碼面見長、兼顧基本面與消息面。`;
   }
@@ -2441,7 +2466,7 @@ ${reviewInstr}1. 趨勢研判（短期看日線、中長期看週線，分別說
 2. 支撐與壓力位（給出具體價位與理由；可結合均線、布林通道、前波高低與量價密集區）
 3. 技術指標解讀（均線排列、斜率與最近一次黃金／死亡交叉的意義；RSI／MACD／KD 請對照 5／20 日前數值說明**指標正在走強或走弱**，不要只描述當下水位；布林通道、ATR、量價關係，並結合 OBV 能量潮與量比研判量價配合或背離）
 4. 相對大盤強弱（領先或落後大盤？意義為何）
-5. 籌碼、基本面與消息面（**台股**：解讀上方已提供的三大法人買賣超方向與力道（含近60日累計與法人合計連續買/賣超天數）、外資持股比例趨勢（上升＝外資增持、下降＝調節）、融資融券（融資增＝散戶槓桿升高、融券增＝看空或避險、券資比偏高且股價走強＝潛在軋空題材）、月營收年增趨勢、PER（trailing）／PBR 估值；若為高成長股，請另以 web search 查 **forward 本益比／預估 EPS** 來修正 trailing PE 的偏誤（查無則註明）。**美股**：若上方已附「基本面與評等（美股，來源 Finnhub）」區塊，請直接解讀其估值（trailing PER／PBR）、獲利能力、營收成長與分析師評等；**forward 本益比／預估 EPS、目標價、機構／內部人持股**再用 web search 補充（查無則註明）。若未提供該區塊（使用者未填 Finnhub 金鑰），則估值/獲利/評等也一併用 web search 查。**消息面**：**台股**用 web search 查「${symbol} ${name || ''}」的最新新聞（以最近 30 天為主，重大事件可回溯較久）。**美股**：若上方已附「近期新聞（美股，來源 Finnhub）」，請以這些**真實來源與日期**的新聞為基礎，評析對股價的影響與風險，並可再用 web search 補更深入／更即時的內容（若無該區塊則全部以 web search 查）。重大消息、法說會、財報、訂單、產業政策等擇要點評，並**標註來源與日期**。**社群輿情**：請再以 web search 概查散戶社群的討論氛圍——**台股**看 PTT 股板（Stock）／Threads，**美股**看 X（Twitter）／Reddit（r/stocks 等）——用一兩句概括「一致看多／一致看空／明顯分歧」與代表性論點即可，查不到就略過勿硬編；社群情緒**過熱常為反指標**，若與籌碼或技術面矛盾請特別點出。forward PE 屬分析師預估、僅供估值脈絡參考，勿當精準觸發價；務實解讀、查無則註明不適用）
+5. 籌碼、基本面與消息面（**台股**：解讀上方已提供的三大法人買賣超方向與力道（含近60日累計與法人合計連續買/賣超天數）、外資持股比例趨勢（上升＝外資增持、下降＝調節）、融資融券（融資增＝散戶槓桿升高、融券增＝看空或避險、券資比偏高且股價走強＝潛在軋空題材）、月營收年增趨勢、PER（trailing）／PBR 估值；若為高成長股，請另以 web search 查 **forward 本益比／預估 EPS** 來修正 trailing PE 的偏誤（查無則註明）。**美股**：若上方已附「基本面與評等（美股，來源 Finnhub）」區塊，請直接解讀其估值（trailing PER／PBR）、獲利能力、營收成長與分析師評等；**forward 本益比／預估 EPS、目標價、機構／內部人持股**再用 web search 補充（查無則註明）。若未提供該區塊（使用者未填 Finnhub 金鑰），則估值/獲利/評等也一併用 web search 查。**消息面**：**台股**用 web search 查「${symbol} ${name || ''}」的最新新聞（以最近 30 天為主，重大事件可回溯較久）。**美股**：若上方已附「近期新聞（美股，來源 Finnhub）」，請以這些**真實來源與日期**的新聞為基礎，評析對股價的影響與風險，並可再用 web search 補更深入／更即時的內容（若無該區塊則全部以 web search 查）。重大消息、法說會、財報、訂單、產業政策等擇要點評，並**標註來源與日期**。**社群輿情**：請再以 web search 概查散戶社群的討論氛圍——**台股**看 PTT 股板（Stock）／Threads，**美股**看 X（Twitter）／Reddit（r/stocks 等）——用一兩句概括「一致看多／一致看空／明顯分歧」與代表性論點即可，並留意**知名分析師／KOL 的近期公開點評**（如 X 上專注 AI 供應鏈瓶頸的 Serenity 等），查得到擇要引用並附日期與連結；查不到就略過勿硬編。社群情緒**過熱常為反指標**，若與籌碼或技術面矛盾請特別點出。forward PE 屬分析師預估、僅供估值脈絡參考，勿當精準觸發價；務實解讀、查無則註明不適用）
 6. 配息與殖利率評估（現金殖利率是否具吸引力、配息穩定度與成長性；若臨近除息，說明參與除息／棄息的考量與填息、貼息風險；台股單次現金股利達 2 萬元以上需注意二代健保補充保費與股利所得稅。美股若上方 Finnhub 區塊附有股息殖利率請據此簡評；查無配息資料則註明不適用）
 7. 我的持倉評估（從風險管理角度，就「續抱／加碼／減碼／停損」給出情境式分析與觸發條件，須對應我的成本與損益，並結合除息時點與估值——**對成長股以 forward PE 衡量加碼空間，避免只看 trailing PE 而誤判過貴**）
 8. 風險提醒
@@ -2496,9 +2521,10 @@ function buildPortfolioPrompt() {
   if (pKey === 'round') {
     roleIntro = `你將主持一場「三師會診」：三位風格迥異的投資組合顧問——${ROUND_KEYS.map(k => PERSONAS[k].name).join('、')}——共同檢視同一個投資組合，最後由你（主持人）整合裁決。第 1～5 章請以中性、共用的角度分析，第 6 章進行會診與裁決。`;
     personaBlock = `\n【三位顧問的判斷準則】\n${ROUND_KEYS.map(k => `- ${PERSONAS[k].name}：${PERSONAS[k].desc}`).join('\n')}\n`;
-  } else if (PERSONAS[pKey]) {
-    roleIntro = `你是一位「${PERSONAS[pKey].name}」風格的專業投資組合顧問。`;
-    personaBlock = `\n【你的判斷準則（請貫穿全報告，尤其第 3、4、6 章的建議）】\n${PERSONAS[pKey].desc}\n`;
+  } else if (personaOf(pKey)) {
+    const pp = personaOf(pKey);
+    roleIntro = `你是一位「${pp.name}」風格的專業投資組合顧問。`;
+    personaBlock = `\n【你的判斷準則（請貫穿全報告，尤其第 3、4、6 章的建議）】\n${pp.desc}\n`;
   } else {
     roleIntro = `你是一位專業的投資組合顧問。`;
   }
@@ -2767,7 +2793,7 @@ function importData(file) {
     if (!confirm(`匯入將「覆蓋」目前的 ${db.positions.length} 筆持倉與設定，改為備份檔的 ${data.positions.length} 筆。確定要繼續？`)) return;
     db.positions = data.positions.filter(p => p && p.id && p.market);
     db.watchlist = Array.isArray(data.watchlist) ? data.watchlist.filter(w => w && w.id && w.symbol && w.market) : [];
-    db.settings = Object.assign({ twelveKey: '', finmindToken: '', finnhubKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '' }, data.settings || {});
+    db.settings = Object.assign({ twelveKey: '', finmindToken: '', finnhubKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '', cpName: '', cpDesc: '' }, data.settings || {});
     if (data.openaiKey) localStorage.setItem('twbt_apikey', data.openaiKey);
     saveDB();
     fillSettingsUI();
@@ -2795,7 +2821,12 @@ function bindSettings() {
     localStorage.setItem('twbt_model', $('modelSel').value);
   });
   $('effortSel').addEventListener('change', () => localStorage.setItem('twbt_effort', $('effortSel').value));
-  $('personaSel').addEventListener('change', () => localStorage.setItem('twbt_persona', $('personaSel').value));
+  $('personaSel').addEventListener('change', () => {
+    localStorage.setItem('twbt_persona', $('personaSel').value);
+    $('customPersonaWrap').style.display = $('personaSel').value === '__custom__' ? '' : 'none';
+  });
+  $('cpName').addEventListener('input', e => { db.settings.cpName = e.target.value; saveDB(); });
+  $('cpDesc').addEventListener('input', e => { db.settings.cpDesc = e.target.value; saveDB(); });
   $('webSearchChk').addEventListener('change', () => localStorage.setItem('twbt_websearch', $('webSearchChk').checked ? '1' : '0'));
   $('exportBtn').addEventListener('click', exportData);
   $('importBtn').addEventListener('click', () => $('importFile').click());
@@ -2834,6 +2865,9 @@ function bindSettings() {
   if (savedEffort != null && [...$('effortSel').options].some(o => o.value === savedEffort)) $('effortSel').value = savedEffort;
   const savedPersona = localStorage.getItem('twbt_persona');
   if (savedPersona != null && [...$('personaSel').options].some(o => o.value === savedPersona)) $('personaSel').value = savedPersona;
+  $('cpName').value = db.settings.cpName || '';
+  $('cpDesc').value = db.settings.cpDesc || '';
+  $('customPersonaWrap').style.display = $('personaSel').value === '__custom__' ? '' : 'none';
   if (localStorage.getItem('twbt_websearch') === '0') $('webSearchChk').checked = false;   // 預設開啟
   $('ap_date').value = todayISO();
   $('ab_date').value = todayISO();
