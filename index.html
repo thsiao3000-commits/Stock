@@ -172,6 +172,9 @@
       <label class="field">Finnhub API Key（美股基本面用，選填）
         <span class="pw"><input id="finnhubKey" type="password" name="fh-key-x" placeholder="免費註冊 finnhub.io 取得；填了美股才有估值／評等" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true"><button type="button" class="eye" data-eye="finnhubKey" title="顯示／隱藏">👁</button></span>
       </label>
+      <label class="field">xAI API Key（Grok 直查 X 貼文用，選填）
+        <span class="pw"><input id="xaiKey" type="password" name="xai-key-x" placeholder="console.x.ai 取得；KOL 雷達可直讀 X 貼文" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true"><button type="button" class="eye" data-eye="xaiKey" title="顯示／隱藏">👁</button></span>
+      </label>
       <label class="field">OpenAI API Key
         <span class="pw"><input id="apiKey" type="password" name="oai-key-x" placeholder="sk-..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true"><button type="button" class="eye" data-eye="apiKey" title="顯示／隱藏">👁</button></span>
       </label>
@@ -409,9 +412,10 @@
           <button data-v="us" class="on">美股</button>
           <button data-v="tw">台股</button>
         </div>
-        <button id="kolSearchBtn" class="primary" style="align-self:flex-end">🔍 搜尋近期點名</button>
+        <button id="kolGrokBtn" class="primary" style="align-self:flex-end">⚡ Grok 直查 X</button>
+        <button id="kolSearchBtn" class="primary" style="align-self:flex-end">🔍 網路搜查</button>
       </div>
-      <div class="hint" style="margin-top:4px">用 AI web search 查該 KOL 近 60 天公開點名的標的。X 原文搜尋引擎覆蓋差，多半靠媒體／部落格轉述整理，<b>通常滯後數天～數週</b>；表格會列出<b>提及日期與當時價位</b>，時機是否太晚由你自行判斷。點名 ≠ 現在還看多（本人可能已出場）。</div>
+      <div class="hint" style="margin-top:4px">三種模式：<b>⚡ Grok 直查</b>（需填 xAI Key＋@帳號，x_search 鎖定<b>本人貼文</b>近 60 天直讀——一手、最即時，一次約 US$0.02–0.05）；<b>🔍 網路搜查</b>（OpenAI web search 靠媒體／部落格二手轉述，<b>滯後數天～數週</b>）；<b>✂️ 貼文擷取</b>（自己貼原文，本地零費用）。表格都會列<b>發文／提及日期與當時價位</b>，時機是否太晚由你自行判斷。點名 ≠ 現在還看多（本人可能已出場）。</div>
       <label class="field" style="margin-top:10px">或直接貼上 KOL 貼文原文（本地擷取代號——即時、精準、零 AI 費用）
         <textarea id="kolPaste" rows="3" placeholder="貼上含 $SIVE、$ALAB 這類 cashtag 的貼文（台股模式亦可貼含 2330 這類代號的文字）…"></textarea>
       </label>
@@ -525,7 +529,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.27.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.28.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -558,11 +562,11 @@ function daysBetween(a, b) { return Math.round((parseD(b) - parseD(a)) / 8640000
 
 /* ════════════════ 資料儲存 ════════════════ */
 const DB_KEY = 'twpf_v1';
-let db = { positions: [], watchlist: [], settings: { twelveKey: '', finmindToken: '', finnhubKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '', cpName: '', cpDesc: '' } };
+let db = { positions: [], watchlist: [], settings: { twelveKey: '', finmindToken: '', finnhubKey: '', xaiKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '', cpName: '', cpDesc: '' } };
 function loadDB() {
   try {
     const j = JSON.parse(localStorage.getItem(DB_KEY) || 'null');
-    if (j && Array.isArray(j.positions)) { db = j; db.settings = Object.assign({ twelveKey: '', finmindToken: '', finnhubKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '', cpName: '', cpDesc: '' }, j.settings || {}); }
+    if (j && Array.isArray(j.positions)) { db = j; db.settings = Object.assign({ twelveKey: '', finmindToken: '', finnhubKey: '', xaiKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '', cpName: '', cpDesc: '' }, j.settings || {}); }
   } catch (_) {}
   if (!Array.isArray(db.watchlist)) db.watchlist = [];   // 舊資料無觀察清單 → 補空陣列
 }
@@ -2114,6 +2118,27 @@ function extractCashtags(text, market) {
   }
   return [...out];
 }
+function kolHandleOf(name) {   // 從「Serenity @aleabitoreddit」抽出 X 帳號（Grok 直查用）
+  const m = String(name || '').match(/@([A-Za-z0-9_]{1,15})/);
+  return m ? m[1] : null;
+}
+// Grok 直查版：x_search 已鎖定本人帳號＋近 60 天，prompt 只負責整理與格式
+function buildGrokKolPrompt(name, handle, market) {
+  const mktName = market === 'tw' ? '台股' : '美股';
+  return `你可以直接搜尋 X（Twitter）貼文；本次 x_search 已鎖定 @${handle} 本人帳號、時間範圍近 60 天。請整理「${name}」在此期間**本人發文**中點名、討論或看好的${mktName}標的。
+
+請依下列格式輸出（繁體中文、Markdown）：
+1. **點名清單表**（務必用 Markdown 表格）：｜代號｜公司名稱｜發文日期｜發文時提及的價位（若有）｜一句話論點｜貼文連結｜
+   - **發文日期是最重要的欄位**：使用者要靠日期與當時價位，自行判斷現在跟進是否太晚。
+   - 同一標的多次提及取**最近一次**，並在論點欄註明提及次數與語氣變化（首次點名／續抱／加碼／已獲利了結）。
+   - 只收本人發文明確提到的內容，**不要推測或補充搜尋範圍以外的資訊**；貼文沒提價位就留空。
+2. **雷達摘要**：2～3 句總結其近期主軸方向與語氣變化（轉多／轉空／減碼獲利等）。
+3. 期間內查無相關貼文就直說查無，**不要編造代號或日期**。
+最後一行輸出機器可讀清單（僅代號、逗號分隔；查無則輸出 TICKERS: none）：
+TICKERS: AAA, BBB, CCC
+
+報告開頭請註明一行：「資料來源：@${handle} 於 X 的公開貼文（近 60 天，Grok x_search 直查）；點名 ≠ 本人目前仍持有或看多。」`;
+}
 function buildKolPrompt(name, market) {
   const mktName = market === 'tw' ? '台股' : '美股';
   return `你是一位金融資訊研究助理。請用 web search 調查「${name}」這位投資分析師／KOL 在**最近 60 天**內公開點名、討論或看好的${mktName}標的。
@@ -2168,7 +2193,7 @@ $('kolSearchBtn').addEventListener('click', async () => {
   const name = $('kolName').value.trim();
   if (!name) { st.className = 'status error'; st.textContent = '請先填 KOL 名稱／帳號'; return; }
   const market = segVal('kolMarket') || 'us';
-  $('kolSearchBtn').disabled = true;
+  $('kolSearchBtn').disabled = true; $('kolGrokBtn').disabled = true;
   try {
     // 雷達必開 web search（本功能的本質就是搜尋），不受 ③ 的勾選影響
     const { text, model } = await runAI(buildKolPrompt(name, market), st, { webSearch: true });
@@ -2179,7 +2204,28 @@ $('kolSearchBtn').addEventListener('click', async () => {
       ? `✅ 雷達完成：找到 ${kolFound.length} 檔（完整表格見上方 ③ 報告區；日期與當時價位請自行核對來源）`
       : '✅ 雷達完成，但未解析到代號清單 — 請看上方報告表格手動加入（或 AI 查無資料）';
   } catch (e) { st.className = 'status error'; st.textContent = '❌ ' + e.message; }
-  finally { $('kolSearchBtn').disabled = false; }
+  finally { $('kolSearchBtn').disabled = false; $('kolGrokBtn').disabled = false; }
+});
+$('kolGrokBtn').addEventListener('click', async () => {
+  const st = $('kolStatus'); st.className = 'status';
+  const name = $('kolName').value.trim();
+  if (!name) { st.className = 'status error'; st.textContent = '請先填 KOL 名稱／帳號'; return; }
+  const handle = kolHandleOf(name);
+  if (!handle) { st.className = 'status error'; st.textContent = 'Grok 直查需要 @帳號（例：Serenity @aleabitoreddit）——x_search 要鎖定本人貼文'; return; }
+  if (!(db.settings.xaiKey || '').trim()) { st.className = 'status error'; st.textContent = '請先在「API 與參數設定」填入 xAI API Key'; return; }
+  const market = segVal('kolMarket') || 'us';
+  $('kolGrokBtn').disabled = true; $('kolSearchBtn').disabled = true;
+  try {
+    const tools = [{ type: 'x_search', allowed_x_handles: [handle], from_date: isoD(addMonths(new Date(), -2)), to_date: todayISO() }];
+    const { text, model } = await runGrok(buildGrokKolPrompt(name, handle, market), tools, st);
+    setReport(`KOL 選股雷達（Grok 直查 @${handle}）`, model, text, 'KOL選股雷達_Grok');
+    kolFound = parseTickerLine(text).map(s => ({ symbol: s, market }));
+    renderKolChips();
+    st.textContent = kolFound.length
+      ? `✅ Grok 直查完成：@${handle} 近 60 天點名 ${kolFound.length} 檔（完整表格與貼文連結見上方 ③ 報告區）`
+      : `✅ Grok 直查完成：未解析到代號清單——可能期間內無點名，詳見上方報告`;
+  } catch (e) { st.className = 'status error'; st.textContent = '❌ ' + e.message; }
+  finally { $('kolGrokBtn').disabled = false; $('kolSearchBtn').disabled = false; }
 });
 $('kolExtractBtn').addEventListener('click', () => {
   const st = $('kolStatus'); st.className = 'status';
@@ -2251,6 +2297,77 @@ function citeBlock(anns) {
   if (!cites.length) return '';
   return '\n\n---\n\n**📎 引用來源（web search）**\n' +
     cites.map((a, i) => `${i + 1}. [${String(a.title || a.url).replace(/[\[\]]/g, ' ').trim()}](${a.url})`).join('\n');
+}
+// ── xAI（Grok）Responses API：KOL 雷達「直查 X」用；格式與 OpenAI Responses 相容（CORS 已實測全通）──
+// 引用可能以 response.citations（URL 陣列）或 annotation 事件回傳，兩者都接、去重後附文末
+function xaiCiteBlock(cites, anns) {
+  const urls = [...new Set([
+    ...(cites || []).map(c => typeof c === 'string' ? c : c && c.url).filter(Boolean),
+    ...(anns || []).map(a => a && a.url).filter(Boolean),
+  ])];
+  if (!urls.length) return '';
+  return '\n\n---\n\n**📎 引用來源（Grok x_search）**\n' + urls.map((u, i) => `${i + 1}. [${u}](${u})`).join('\n');
+}
+async function streamXai(key, model, prompt, tools, onDelta) {
+  const body = { model, input: [{ role: 'user', content: prompt }], stream: true, max_output_tokens: 16000 };
+  if (tools && tools.length) body.tools = tools;
+  const res = await fetch('https://api.x.ai/v1/responses', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    // xAI 錯誤格式兩種都見過：{error:{message}} 與 {error:"字串"}（實測後者）
+    throw new Error(e.error?.message || (typeof e.error === 'string' ? e.error : '') || ('xAI HTTP ' + res.status));
+  }
+  let full = '', failMsg = null, truncated = null, cites = [];
+  const anns = [];
+  await readSSE(res, j => {
+    const t = j.type || '';
+    if (t.endsWith('output_text.delta') && typeof j.delta === 'string') { full += j.delta; onDelta(full); }
+    else if (t.endsWith('output_text.annotation.added') && j.annotation && j.annotation.url) anns.push(j.annotation);
+    else if (t === 'response.completed' && Array.isArray(j.response?.citations)) cites = j.response.citations;
+    else if (t === 'response.incomplete') truncated = j.response?.incomplete_details?.reason || 'incomplete';
+    else if (t === 'response.failed' || t === 'error') failMsg = j.response?.error?.message || j.error?.message || j.message || '串流中斷';
+  });
+  if (failMsg) throw new Error(failMsg);
+  if (!full) throw new Error('xAI Responses API 未回傳內容');
+  return { text: full + xaiCiteBlock(cites, anns), truncated };
+}
+// Grok 執行器：與 runAI 相同的作業動畫（轉圈＋秒數＋階段），但走 xAI 端點、固定 grok-4.3（x_search 官方建議模型）
+async function runGrok(prompt, tools, statusEl) {
+  const key = (db.settings.xaiKey || '').trim();
+  if (!key) throw new Error('請先在「API 與參數設定」填入 xAI API Key');
+  const model = 'grok-4.3';
+  const out = $('aiOutput');
+  out.style.display = 'block'; out.innerHTML = '';
+  $('aiMeta').style.display = 'none';
+  const t0 = performance.now();
+  let chars = 0, phase = `${model} 搜尋 X 貼文中`;
+  const tick = () => {
+    const s = Math.round((performance.now() - t0) / 1000);
+    statusEl.className = 'status';
+    statusEl.innerHTML = `<span class="spinner"></span>⚡ ${esc(phase)}<span class="working-dots"></span>　已 ${s}s` +
+      (chars ? `　·　已產生 ${chars} 字` : '');
+  };
+  tick();
+  const timer = setInterval(tick, 250);
+  let lastPaint = 0;
+  const paint = (txt, force) => {
+    chars = txt.length; phase = `${model} 撰寫中`;
+    const now = performance.now();
+    if (!force && now - lastPaint < 120) return;
+    lastPaint = now;
+    out.innerHTML = mdToHtml(txt);
+  };
+  try {
+    const r = await streamXai(key, model, prompt, tools, paint);
+    paint(r.text, true);
+    return { text: r.text, model, truncated: r.truncated };
+  } finally {
+    clearInterval(timer);
+  }
 }
 async function streamChat(key, model, prompt, onDelta) {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -2884,6 +3001,7 @@ function fillSettingsUI() {
   $('tdKey').value = db.settings.twelveKey || '';
   $('fmToken').value = db.settings.finmindToken || '';
   $('finnhubKey').value = db.settings.finnhubKey || '';
+  $('xaiKey').value = db.settings.xaiKey || '';
   $('twFee').value = db.settings.twFee;
   $('twTax').value = db.settings.twTax;
   $('fxOverride').value = db.settings.fxOverride || '';
@@ -2895,7 +3013,7 @@ function fillSettingsUI() {
 function exportData() {
   const inclKeys = $('exportKeys').checked;
   const settings = { ...db.settings };
-  if (!inclKeys) { settings.twelveKey = ''; settings.finmindToken = ''; settings.finnhubKey = ''; }
+  if (!inclKeys) { settings.twelveKey = ''; settings.finmindToken = ''; settings.finnhubKey = ''; settings.xaiKey = ''; }
   const data = { app: 'twpf', version: APP_VERSION, exportedAt: new Date().toISOString(), positions: db.positions, watchlist: db.watchlist, settings };
   if (inclKeys) { const k = localStorage.getItem('twbt_apikey'); if (k) data.openaiKey = k; }
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -2915,7 +3033,7 @@ function importData(file) {
     if (!confirm(`匯入將「覆蓋」目前的 ${db.positions.length} 筆持倉與設定，改為備份檔的 ${data.positions.length} 筆。確定要繼續？`)) return;
     db.positions = data.positions.filter(p => p && p.id && p.market);
     db.watchlist = Array.isArray(data.watchlist) ? data.watchlist.filter(w => w && w.id && w.symbol && w.market) : [];
-    db.settings = Object.assign({ twelveKey: '', finmindToken: '', finnhubKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '', cpName: '', cpDesc: '' }, data.settings || {});
+    db.settings = Object.assign({ twelveKey: '', finmindToken: '', finnhubKey: '', xaiKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '', cpName: '', cpDesc: '' }, data.settings || {});
     if (data.openaiKey) localStorage.setItem('twbt_apikey', data.openaiKey);
     saveDB();
     fillSettingsUI();
@@ -2931,6 +3049,7 @@ function bindSettings() {
   $('tdKey').addEventListener('input', e => { db.settings.twelveKey = e.target.value.trim(); saveDB(); });
   $('fmToken').addEventListener('input', e => { db.settings.finmindToken = e.target.value.trim(); saveDB(); });
   $('finnhubKey').addEventListener('input', e => { db.settings.finnhubKey = e.target.value.trim(); saveDB(); });
+  $('xaiKey').addEventListener('input', e => { db.settings.xaiKey = e.target.value.trim(); saveDB(); });
   $('aiProfile').addEventListener('input', e => { db.settings.aiProfile = e.target.value; saveDB(); });   // 投資偏好：不 trim（保留換行），組 prompt 時才 trim
   $('twFee').addEventListener('input', e => { db.settings.twFee = parseFloat(e.target.value) || 0; saveDB(); renderAll(); });
   $('twTax').addEventListener('input', e => { db.settings.twTax = parseFloat(e.target.value) || 0; saveDB(); renderAll(); });
@@ -2962,7 +3081,7 @@ function bindSettings() {
   }));
   // 防瀏覽器／密碼管理員把同一組已存密碼自動填到所有金鑰欄位（例如把 OpenAI key 填進 Twelve Data 欄）：
   // 載入時設 readonly（自動填入會跳過 readonly 欄），使用者點擊／聚焦時才解鎖可編輯。
-  ['tdKey', 'fmToken', 'finnhubKey', 'apiKey'].forEach(id => {
+  ['tdKey', 'fmToken', 'finnhubKey', 'xaiKey', 'apiKey'].forEach(id => {
     const el = $(id);
     el.setAttribute('readonly', '');
     const unlock = () => el.removeAttribute('readonly');
