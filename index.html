@@ -304,7 +304,7 @@
       <div style="margin-top:8px; line-height:1.75">
         <b style="color:var(--text)">程式精算的指標（AI 只解讀、不計算）：</b>技術面 MA／RSI／MACD／KD／布林通道／ATR／OBV／量比／量能（含 5／20 日前對照、均線黃金死亡交叉、乖離率與量價密集區，供 AI 判斷指標走向與支撐壓力）；台股另含產業別、配息（殖利率、除息／發放日）、三大法人買賣超、外資持股、融資融券、月營收年增、本益比(trailing)／PBR；美股（填 Finnhub 金鑰）含估值 PER／PBR、獲利能力、營收成長、分析師評等與近期新聞。<br>
         <b style="color:var(--text)">原始價量：</b>近 52 週週線＋近 60 日日線 OHLCV、同期大盤對照（上市配加權指數／上櫃配櫃買指數／美股配 SPY）。<br>
-        <b style="color:var(--text)">AI 即時 web search：</b>最新新聞：台股用 web search；**美股改由 Finnhub 提供近期新聞**、AI 可再補充。美股的 forward 本益比、目標價與機構/內部人持股仍用 web search（trailing 估值、獲利、評等、新聞改由 Finnhub 提供，需填金鑰）。<br>
+        <b style="color:var(--text)">AI 即時 web search：</b>最新新聞：台股用 web search；**美股改由 Finnhub 提供近期新聞**、AI 可再補充。美股的 forward 本益比、目標價與機構/內部人持股仍用 web search（trailing 估值、獲利、評等、新聞改由 Finnhub 提供，需填金鑰）；另會概查**社群輿情**（台股 PTT／Threads、美股 X／Reddit）作為情緒參考。<br>
         <b style="color:var(--text)">你的持倉：</b>加權平均成本與損益（存於本機瀏覽器）；另可於設定填「投資目標與風險偏好」，AI 建議會貼合你的目標。<br>
         <span style="color:var(--gold)">資料來源：股價 TWSE／FinMind／Twelve Data；配息‧籌碼‧月營收‧本益比 FinMind（台股）；新聞與美股基本面 OpenAI web search；匯率 open.er-api。<b>所有數字皆由程式精算後才交給 AI，AI 僅負責解讀。</b></span>
       </div>
@@ -361,9 +361,36 @@
     <div id="aiOutput"></div>
   </section>
 
+  <!-- ── 觀察清單快篩 ── -->
+  <section>
+    <h2>④ 觀察清單快篩</h2>
+    <p class="hint">把「還沒買、但在觀察」的標的加進清單（上限 12 檔），一鍵抓一年價量、算指標並排比較，找出值得深入分析的對象。純價量快篩（不含籌碼／基本面／新聞）；台股走 FinMind、美股走 Twelve Data（每分鐘 8 檔限額，超過會自動分批等待）。</p>
+    <div class="row">
+      <div class="seg" id="wlMarket">
+        <button data-v="tw" class="on">台股</button>
+        <button data-v="us">美股</button>
+      </div>
+      <input id="wlSymbol" placeholder="代號：2330 / NVDA" style="width:150px">
+      <button id="wlAddBtn" class="ghost">＋ 加入</button>
+      <span style="flex:1"></span>
+      <button id="wlScanBtn" class="primary">🔍 快篩全部</button>
+      <button id="wlAiBtn" class="primary">🤖 AI 快篩總評</button>
+      <button id="wlCopyBtn" class="primary">📋 複製快篩 Prompt</button>
+    </div>
+    <div id="wlChips" class="row" style="gap:8px"></div>
+    <div id="wlStatus" class="status"></div>
+    <div class="tableWrap" id="wlWrap" style="display:none">
+      <div class="tableScroll"><table>
+        <thead><tr><th class="l">標的</th><th>現價</th><th>近20日</th><th>近60日</th><th class="l">均線趨勢</th><th class="l">MA5/20交叉</th><th>RSI</th><th>MACD動能</th><th>量比</th><th>距52週高</th><th class="l"></th></tr></thead>
+        <tbody id="wlBody"></tbody>
+      </table></div>
+    </div>
+    <div class="hint" style="margin-top:8px">「AI 快篩總評」會把整張表交給 AI 排序評分（報告顯示於上方 ③ 的報告區並存入歷史）；「深入」按鈕會把該檔帶入 ③ 直接抓資料，抓完即可產生完整個股分析。</div>
+  </section>
+
   <!-- ── 投資組合績效 ── -->
   <section>
-    <h2>④ 投資組合績效</h2>
+    <h2>⑤ 投資組合績效</h2>
     <div class="cards" id="perfCards"></div>
     <div class="row">
       <button id="curveBtn" class="primary">📈 建立近一年淨值曲線</button>
@@ -463,7 +490,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.24.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.25.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -496,12 +523,13 @@ function daysBetween(a, b) { return Math.round((parseD(b) - parseD(a)) / 8640000
 
 /* ════════════════ 資料儲存 ════════════════ */
 const DB_KEY = 'twpf_v1';
-let db = { positions: [], settings: { twelveKey: '', finmindToken: '', finnhubKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '' } };
+let db = { positions: [], watchlist: [], settings: { twelveKey: '', finmindToken: '', finnhubKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '' } };
 function loadDB() {
   try {
     const j = JSON.parse(localStorage.getItem(DB_KEY) || 'null');
     if (j && Array.isArray(j.positions)) { db = j; db.settings = Object.assign({ twelveKey: '', finmindToken: '', finnhubKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '' }, j.settings || {}); }
   } catch (_) {}
+  if (!Array.isArray(db.watchlist)) db.watchlist = [];   // 舊資料無觀察清單 → 補空陣列
 }
 function saveDB() { localStorage.setItem(DB_KEY, JSON.stringify(db)); }
 function posCcy(p) { return p.market === 'tw' ? 'TWD' : p.market === 'us' ? 'USD' : (p.bond.currency || 'USD'); }
@@ -1054,7 +1082,7 @@ let expandedId = null;
 let editTxId = null;   // 正在編輯的交易 id（null＝新增模式）
 let flashId = null;    // 剛新增成功的持倉 id（用於高亮提示）
 let quoteNote = null;  // {id, msg} 個股報價更新結果（renderAll 後於明細面板顯示）
-function renderAll() { renderSummary(); renderTable(); renderAISelect(); renderPerf(); }
+function renderAll() { renderSummary(); renderTable(); renderAISelect(); renderPerf(); renderWatchlist(); }
 
 // 表格捲動陰影：表格寬度超出容器、右側（或左側）還有欄位時，於邊緣顯示漸層提示
 function shadowOne(s) {
@@ -1855,6 +1883,179 @@ function drawPerfChart() {
 }
 window.addEventListener('resize', () => { if (perfData) drawPerfChart(); });
 
+/* ════════════════ 觀察清單快篩 ════════════════ */
+let watchData = null;   // { ts, rows:[{id,market,symbol,name,industry,close,date,ret20,ret60,trend,cross,rsi,hist,hist5,volRatio,offHigh,err}] }
+segBind('wlMarket');
+function renderWatchlist() {
+  const box = $('wlChips');
+  if (!box) return;
+  box.innerHTML = (db.watchlist || []).map(w =>
+    `<span class="badge ${w.market}" style="padding:4px 10px">${MKT_NAME[w.market]} <b>${esc(w.symbol)}</b> <button class="ghost" data-wlrm="${w.id}" title="移除" style="border:none;padding:0 2px;color:inherit">✕</button></span>`).join('');
+}
+$('wlAddBtn').addEventListener('click', () => {
+  const st = $('wlStatus'); st.className = 'status';
+  try {
+    const market = segVal('wlMarket');
+    let sym = $('wlSymbol').value.trim();
+    if (market === 'tw' && !/^[0-9A-Za-z]{4,6}$/.test(sym)) throw new Error('台股代號格式不對（例：2330、0050）');
+    if (market === 'us') { sym = sym.toUpperCase(); if (!/^[A-Z.\-]{1,10}$/.test(sym)) throw new Error('美股代號格式不對（例：AAPL）'); }
+    if ((db.watchlist || []).length >= 12) throw new Error('觀察清單上限 12 檔（避免撞 API 限額），請先移除幾檔');
+    if (db.watchlist.some(w => w.market === market && w.symbol === sym)) throw new Error(`${sym} 已在清單中`);
+    db.watchlist.push({ id: uid(), market, symbol: sym });
+    saveDB(); renderWatchlist();
+    $('wlSymbol').value = '';
+    st.textContent = `✅ 已加入 ${sym}，共 ${db.watchlist.length} 檔`;
+  } catch (e) { st.className = 'status error'; st.textContent = '❌ ' + e.message; }
+});
+$('wlChips').addEventListener('click', e => {
+  const b = e.target.closest('[data-wlrm]');
+  if (!b) return;
+  db.watchlist = db.watchlist.filter(w => w.id !== b.dataset.wlrm);
+  if (watchData) { watchData.rows = watchData.rows.filter(r => r.id !== b.dataset.wlrm); renderWatchTable(); }
+  saveDB(); renderWatchlist();
+});
+// 純價量指標（與個股分析共用同一批計算函式；快篩不抓籌碼/配息，保持輕量）
+function wlMetrics(days) {
+  const closes = days.map(d => d.close), last = days[days.length - 1];
+  const ma20 = sma(closes, 20), ma60 = sma(closes, 60);
+  const trend = ma20 != null && ma60 != null
+    ? (last.close > ma20 && ma20 > ma60 ? '多頭排列' : last.close < ma20 && ma20 < ma60 ? '空頭排列' : '盤整')
+    : '—';
+  const cross = lastCross(smaSeries(closes, 5), smaSeries(closes, 20), days.map(d => d.date));
+  const s = calcMACDSeries(closes);
+  const vols = days.map(d => d.volume || 0);
+  const prev5 = vols.slice(-6, -1);
+  const avg5 = prev5.length ? prev5.reduce((a, b) => a + b, 0) / prev5.length : 0;
+  const retN = n => days.length > n ? (last.close / days[days.length - 1 - n].close - 1) * 100 : null;
+  return {
+    close: last.close, date: last.date, ret20: retN(20), ret60: retN(60), trend, cross,
+    rsi: calcRSI(closes),
+    hist: s ? s.hist[s.hist.length - 1] : null,
+    hist5: s && s.hist.length > 5 ? s.hist[s.hist.length - 6] : null,
+    volRatio: avg5 > 0 ? vols[vols.length - 1] / avg5 : null,
+    offHigh: (last.close / Math.max(...days.map(d => d.high ?? d.close)) - 1) * 100,
+  };
+}
+$('wlScanBtn').addEventListener('click', wlScan);
+async function wlScan() {
+  const st = $('wlStatus'); st.className = 'status';
+  const list = db.watchlist || [];
+  if (!list.length) { st.className = 'status error'; st.textContent = '清單是空的，先加入幾檔標的'; return; }
+  $('wlScanBtn').disabled = true;
+  try {
+    const start = isoD(addMonths(new Date(), -12)), end = todayISO();
+    const rows = [];
+    const tw = list.filter(w => w.market === 'tw'), us = list.filter(w => w.market === 'us');
+    for (let i = 0; i < tw.length; i++) {   // 台股：FinMind 每檔 1 請求（上市櫃通吃）
+      const w = tw[i];
+      st.innerHTML = `<span class="spinner"></span>台股 ${esc(w.symbol)}（${i + 1}/${tw.length}）…`;
+      try {
+        const [r, info] = await Promise.all([fmDaily(w.symbol, start, end), fmInfo(w.symbol)]);
+        if (r.days.length < 30) throw new Error('資料不足（<30 交易日）');
+        rows.push({ ...w, name: info.name, industry: info.industry, ...wlMetrics(r.days), err: null });
+      } catch (e) { rows.push({ ...w, name: '', industry: '', err: e.message }); }
+      if (i < tw.length - 1) await sleep(350);
+    }
+    const TD_BATCH = 7;   // 美股：Twelve Data 每分鐘 8 credits → 7 檔一批
+    for (let i = 0; i < us.length; i += TD_BATCH) {
+      const batch = us.slice(i, i + TD_BATCH);
+      for (let j = 0; j < batch.length; j++) {
+        const w = batch[j];
+        st.innerHTML = `<span class="spinner"></span>美股 ${esc(w.symbol)}（${i + j + 1}/${us.length}）…`;
+        try {
+          const days = (await tdWithRetry(() => tdDaily(w.symbol), st, `美股 ${esc(w.symbol)} — Twelve Data 限流，稍候重試`)).days.filter(d => d.date >= start && d.date <= end);
+          if (days.length < 30) throw new Error('資料不足（<30 交易日）');
+          rows.push({ ...w, name: '', industry: '', ...wlMetrics(days), err: null });
+        } catch (e) { rows.push({ ...w, name: '', industry: '', err: e.message }); }
+      }
+      if (i + TD_BATCH < us.length) await waitCountdown(60, st, `美股 — 每分鐘上限 8，已完成 ${i + batch.length}/${us.length}，等待額度重置`);
+    }
+    watchData = { ts: new Date().toLocaleString('zh-TW'), rows };
+    renderWatchTable();
+    const ok = rows.filter(r => !r.err).length;
+    st.textContent = `${ok === rows.length ? '✅' : '⚠️'} 快篩完成：${ok}/${rows.length} 檔成功（${watchData.ts}）`;
+  } catch (e) {
+    st.className = 'status error'; st.textContent = '❌ ' + e.message;
+  } finally { $('wlScanBtn').disabled = false; }
+}
+function renderWatchTable() {
+  const rows = watchData ? watchData.rows : [];
+  $('wlWrap').style.display = rows.length ? '' : 'none';
+  $('wlBody').innerHTML = rows.map(r => {
+    const label = `<span class="badge ${r.market}">${MKT_NAME[r.market]}</span> <b>${esc(r.symbol)}</b> ${esc(r.name || '')}`;
+    if (r.err) return `<tr><td class="l">${label}</td><td colspan="9" class="l" style="color:var(--muted)">⚠️ ${esc(r.err)}</td><td class="act"></td></tr>`;
+    const crossTxt = r.cross && r.cross.daysAgo <= 15
+      ? `${r.cross.dir > 0 ? '⭐黃金' : '☠死亡'}${r.cross.daysAgo === 0 ? '（今日）' : `（${r.cross.daysAgo}日前）`}` : '—';
+    const rsiCls = r.rsi == null ? '' : r.rsi >= 70 ? 'pos' : r.rsi <= 30 ? 'neg' : '';
+    const momTxt = r.hist == null ? '—' : `${fnum(r.hist)}${r.hist5 == null ? '' : r.hist > r.hist5 ? ' ↑' : r.hist < r.hist5 ? ' ↓' : ' →'}`;
+    return `<tr><td class="l">${label}</td>` +
+      `<td>${fnum(r.close)}<span class="hint"> (${r.date.slice(5)})</span></td>` +
+      `<td class="${clsOf(r.ret20)}">${fmtPct(r.ret20)}</td><td class="${clsOf(r.ret60)}">${fmtPct(r.ret60)}</td>` +
+      `<td class="l">${r.trend}</td><td class="l">${crossTxt}</td>` +
+      `<td class="${rsiCls}">${fnum(r.rsi)}</td><td>${momTxt}</td><td>${fnum(r.volRatio)}</td>` +
+      `<td>${fmtPct(r.offHigh)}</td>` +
+      `<td class="l"><button class="ghost" data-wldeep="${r.id}" title="帶入上方 ③ 抓資料，可接著產生完整個股分析">📊 深入</button></td></tr>`;
+  }).join('');
+  updateTableShadows();
+}
+// 「深入」：把該檔帶入 ③ 的手動輸入並自動抓一年資料，接著即可產生完整 AI 個股分析
+$('wlBody').addEventListener('click', e => {
+  const b = e.target.closest('[data-wldeep]');
+  if (!b) return;
+  const w = (db.watchlist || []).find(x => x.id === b.dataset.wldeep);
+  if (!w) return;
+  $('aiTarget').value = '__manual__';
+  $('manualWrap').style.display = '';
+  $$('#aiMarket button').forEach(x => x.classList.toggle('on', x.dataset.v === w.market));
+  $('aiSymbol').value = w.symbol;
+  $('fetchBtn').scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+  $('fetchBtn').click();
+});
+function buildWatchPrompt() {
+  const rows = (watchData?.rows || []).filter(r => !r.err);
+  const pKey = selectedPersona();
+  // 快篩總評支援單一視角；三師會診對十幾檔快篩太冗長 → 回落預設綜合視角
+  let roleIntro = '你是一位資深的證券分析師。', personaBlock = '';
+  if (PERSONAS[pKey]) {
+    roleIntro = `你是一位「${PERSONAS[pKey].name}」風格的資深證券分析師。`;
+    personaBlock = `\n【你的判斷準則】\n${PERSONAS[pKey].desc}\n`;
+  }
+  const profile = (db.settings.aiProfile || '').trim();
+  const profileBlock = profile ? `\n【我的投資偏好】\n${profile}\n` : '';
+  const lines = rows.map(r =>
+    `${r.symbol} ${r.name || ''}${r.industry ? `（${r.industry}）` : ''}｜${MKT_NAME[r.market]}｜現價 ${r.close}（${r.date}）｜近20日 ${fmtPct(r.ret20)}｜近60日 ${fmtPct(r.ret60)}｜${r.trend}｜MA5/20交叉：${r.cross ? `${r.cross.dir > 0 ? '黃金' : '死亡'}（${r.cross.daysAgo} 交易日前）` : '區間內無'}｜RSI ${fnum(r.rsi)}｜MACD柱 ${fnum(r.hist)}（5日前 ${fnum(r.hist5)}）｜量比 ${fnum(r.volRatio)}｜距52週高 ${fmtPct(r.offHigh)}`);
+  return `${roleIntro}以下是我的「觀察清單」快篩數據（${todayISO()}，全部由程式計算；僅含價量技術面，不含籌碼／基本面／新聞）。這些都是我尚未持有、正在觀察的標的，請比較並告訴我哪些值得優先深入研究。
+${personaBlock}
+【快篩數據（每檔一行）】
+${lines.join('\n')}
+${profileBlock}
+請依下列格式輸出（繁體中文、Markdown）：
+1. **排序表**：依短中期吸引力排序全部標的，**務必用 Markdown 表格**，欄位為｜排名｜標的｜評分(1–10)｜一句話理由｜建議（深入研究／再觀察／略過）｜。
+2. **前 2 名簡評**：各 3～5 句——吸引點、主要風險、合理的進場觀察價位區間（需為具體數字）。
+3. **提醒**：本快篩僅含價量數據；對標為「深入研究」者，請先執行完整個股分析（含籌碼、基本面、消息面）再做決策。
+
+最後請註明：本分析僅供參考，不構成投資建議。`;
+}
+$('wlAiBtn').addEventListener('click', async () => {
+  const st = $('wlStatus'); st.className = 'status';
+  if (!watchData || !watchData.rows.some(r => !r.err)) { st.className = 'status error'; st.textContent = '請先「🔍 快篩全部」取得數據'; return; }
+  $('wlAiBtn').disabled = true; $('wlScanBtn').disabled = true;
+  try {
+    const { text, model, truncated } = await runAI(buildWatchPrompt(), st);
+    const pv = personaLabel(selectedPersona());
+    setReport(`觀察清單快篩總評${PERSONAS[selectedPersona()] ? `（${pv}）` : ''}`, model, text, '觀察清單快篩');
+    st.textContent = truncated ? `⚠️ 報告被截斷（${truncated}），建議調低推理深度重試。` : `✅ 快篩總評完成（報告顯示於上方 ③ 的報告區，並已存入歷史）`;
+  } catch (e) { st.className = 'status error'; st.textContent = '❌ ' + e.message; }
+  finally { $('wlAiBtn').disabled = false; $('wlScanBtn').disabled = false; }
+});
+$('wlCopyBtn').addEventListener('click', async () => {
+  const st = $('wlStatus'); st.className = 'status';
+  if (!watchData || !watchData.rows.some(r => !r.err)) { st.className = 'status error'; st.textContent = '請先「🔍 快篩全部」取得數據'; return; }
+  const ok = await copyText(buildWatchPrompt());
+  flashBtn('wlCopyBtn', '📋 複製快篩 Prompt', ok);
+  if (ok) st.textContent = '✅ 快篩 Prompt 已複製，可貼到 Gemini 等聊天機器人';
+});
+
 /* ════════════════ OpenAI（串流） ════════════════ */
 function selectedModel() {
   const v = $('modelSel').value;
@@ -2240,7 +2441,7 @@ ${reviewInstr}1. 趨勢研判（短期看日線、中長期看週線，分別說
 2. 支撐與壓力位（給出具體價位與理由；可結合均線、布林通道、前波高低與量價密集區）
 3. 技術指標解讀（均線排列、斜率與最近一次黃金／死亡交叉的意義；RSI／MACD／KD 請對照 5／20 日前數值說明**指標正在走強或走弱**，不要只描述當下水位；布林通道、ATR、量價關係，並結合 OBV 能量潮與量比研判量價配合或背離）
 4. 相對大盤強弱（領先或落後大盤？意義為何）
-5. 籌碼、基本面與消息面（**台股**：解讀上方已提供的三大法人買賣超方向與力道（含近60日累計與法人合計連續買/賣超天數）、外資持股比例趨勢（上升＝外資增持、下降＝調節）、融資融券（融資增＝散戶槓桿升高、融券增＝看空或避險、券資比偏高且股價走強＝潛在軋空題材）、月營收年增趨勢、PER（trailing）／PBR 估值；若為高成長股，請另以 web search 查 **forward 本益比／預估 EPS** 來修正 trailing PE 的偏誤（查無則註明）。**美股**：若上方已附「基本面與評等（美股，來源 Finnhub）」區塊，請直接解讀其估值（trailing PER／PBR）、獲利能力、營收成長與分析師評等；**forward 本益比／預估 EPS、目標價、機構／內部人持股**再用 web search 補充（查無則註明）。若未提供該區塊（使用者未填 Finnhub 金鑰），則估值/獲利/評等也一併用 web search 查。**消息面**：**台股**用 web search 查「${symbol} ${name || ''}」的最新新聞（以最近 30 天為主，重大事件可回溯較久）。**美股**：若上方已附「近期新聞（美股，來源 Finnhub）」，請以這些**真實來源與日期**的新聞為基礎，評析對股價的影響與風險，並可再用 web search 補更深入／更即時的內容（若無該區塊則全部以 web search 查）。重大消息、法說會、財報、訂單、產業政策等擇要點評，並**標註來源與日期**。forward PE 屬分析師預估、僅供估值脈絡參考，勿當精準觸發價；務實解讀、查無則註明不適用）
+5. 籌碼、基本面與消息面（**台股**：解讀上方已提供的三大法人買賣超方向與力道（含近60日累計與法人合計連續買/賣超天數）、外資持股比例趨勢（上升＝外資增持、下降＝調節）、融資融券（融資增＝散戶槓桿升高、融券增＝看空或避險、券資比偏高且股價走強＝潛在軋空題材）、月營收年增趨勢、PER（trailing）／PBR 估值；若為高成長股，請另以 web search 查 **forward 本益比／預估 EPS** 來修正 trailing PE 的偏誤（查無則註明）。**美股**：若上方已附「基本面與評等（美股，來源 Finnhub）」區塊，請直接解讀其估值（trailing PER／PBR）、獲利能力、營收成長與分析師評等；**forward 本益比／預估 EPS、目標價、機構／內部人持股**再用 web search 補充（查無則註明）。若未提供該區塊（使用者未填 Finnhub 金鑰），則估值/獲利/評等也一併用 web search 查。**消息面**：**台股**用 web search 查「${symbol} ${name || ''}」的最新新聞（以最近 30 天為主，重大事件可回溯較久）。**美股**：若上方已附「近期新聞（美股，來源 Finnhub）」，請以這些**真實來源與日期**的新聞為基礎，評析對股價的影響與風險，並可再用 web search 補更深入／更即時的內容（若無該區塊則全部以 web search 查）。重大消息、法說會、財報、訂單、產業政策等擇要點評，並**標註來源與日期**。**社群輿情**：請再以 web search 概查散戶社群的討論氛圍——**台股**看 PTT 股板（Stock）／Threads，**美股**看 X（Twitter）／Reddit（r/stocks 等）——用一兩句概括「一致看多／一致看空／明顯分歧」與代表性論點即可，查不到就略過勿硬編；社群情緒**過熱常為反指標**，若與籌碼或技術面矛盾請特別點出。forward PE 屬分析師預估、僅供估值脈絡參考，勿當精準觸發價；務實解讀、查無則註明不適用）
 6. 配息與殖利率評估（現金殖利率是否具吸引力、配息穩定度與成長性；若臨近除息，說明參與除息／棄息的考量與填息、貼息風險；台股單次現金股利達 2 萬元以上需注意二代健保補充保費與股利所得稅。美股若上方 Finnhub 區塊附有股息殖利率請據此簡評；查無配息資料則註明不適用）
 7. 我的持倉評估（從風險管理角度，就「續抱／加碼／減碼／停損」給出情境式分析與觸發條件，須對應我的成本與損益，並結合除息時點與估值——**對成長股以 forward PE 衡量加碼空間，避免只看 trailing PE 而誤判過貴**）
 8. 風險提醒
@@ -2547,7 +2748,7 @@ function exportData() {
   const inclKeys = $('exportKeys').checked;
   const settings = { ...db.settings };
   if (!inclKeys) { settings.twelveKey = ''; settings.finmindToken = ''; settings.finnhubKey = ''; }
-  const data = { app: 'twpf', version: APP_VERSION, exportedAt: new Date().toISOString(), positions: db.positions, settings };
+  const data = { app: 'twpf', version: APP_VERSION, exportedAt: new Date().toISOString(), positions: db.positions, watchlist: db.watchlist, settings };
   if (inclKeys) { const k = localStorage.getItem('twbt_apikey'); if (k) data.openaiKey = k; }
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
@@ -2565,6 +2766,7 @@ function importData(file) {
     if (!data || data.app !== 'twpf' || !Array.isArray(data.positions)) { ioStatus('❌ 不是本工具的備份檔', true); return; }
     if (!confirm(`匯入將「覆蓋」目前的 ${db.positions.length} 筆持倉與設定，改為備份檔的 ${data.positions.length} 筆。確定要繼續？`)) return;
     db.positions = data.positions.filter(p => p && p.id && p.market);
+    db.watchlist = Array.isArray(data.watchlist) ? data.watchlist.filter(w => w && w.id && w.symbol && w.market) : [];
     db.settings = Object.assign({ twelveKey: '', finmindToken: '', finnhubKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '' }, data.settings || {});
     if (data.openaiKey) localStorage.setItem('twbt_apikey', data.openaiKey);
     saveDB();
