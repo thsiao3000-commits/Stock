@@ -398,6 +398,29 @@
       </table></div>
     </div>
     <div class="hint" style="margin-top:8px">「AI 快篩總評」會把整張表交給 AI 排序評分（報告顯示於上方 ③ 的報告區並存入歷史）；「深入」按鈕會把該檔帶入 ③ 直接抓資料，抓完即可產生完整個股分析。</div>
+
+    <details style="margin-top:14px">
+      <summary style="cursor:pointer; color:var(--accent); font-weight:600">📡 KOL 選股雷達（把分析師點名的標的撈進觀察清單）</summary>
+      <div class="row" style="margin-top:10px">
+        <label class="field" style="min-width:240px">KOL 名稱／帳號
+          <input id="kolName" placeholder="例：Serenity @aleabitoreddit">
+        </label>
+        <div class="seg" id="kolMarket" style="align-self:flex-end">
+          <button data-v="us" class="on">美股</button>
+          <button data-v="tw">台股</button>
+        </div>
+        <button id="kolSearchBtn" class="primary" style="align-self:flex-end">🔍 搜尋近期點名</button>
+      </div>
+      <div class="hint" style="margin-top:4px">用 AI web search 查該 KOL 近 60 天公開點名的標的。X 原文搜尋引擎覆蓋差，多半靠媒體／部落格轉述整理，<b>通常滯後數天～數週</b>；表格會列出<b>提及日期與當時價位</b>，時機是否太晚由你自行判斷。點名 ≠ 現在還看多（本人可能已出場）。</div>
+      <label class="field" style="margin-top:10px">或直接貼上 KOL 貼文原文（本地擷取代號——即時、精準、零 AI 費用）
+        <textarea id="kolPaste" rows="3" placeholder="貼上含 $SIVE、$ALAB 這類 cashtag 的貼文（台股模式亦可貼含 2330 這類代號的文字）…"></textarea>
+      </label>
+      <div class="row">
+        <button id="kolExtractBtn" class="ghost">✂️ 擷取代號</button>
+      </div>
+      <div id="kolStatus" class="status"></div>
+      <div id="kolChips" class="row" style="gap:8px"></div>
+    </details>
   </section>
 
   <!-- ── 投資組合績效 ── -->
@@ -502,7 +525,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.26.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.27.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1904,20 +1927,23 @@ function renderWatchlist() {
   box.innerHTML = (db.watchlist || []).map(w =>
     `<span class="badge ${w.market}" style="padding:4px 10px">${MKT_NAME[w.market]} <b>${esc(w.symbol)}</b> <button class="ghost" data-wlrm="${w.id}" title="移除" style="border:none;padding:0 2px;color:inherit">✕</button></span>`).join('');
 }
+// 加入觀察清單（共用：手動輸入與 KOL 雷達 chips 皆走此路）；回傳 null=成功、否則錯誤訊息
+function wlAdd(market, symRaw) {
+  let sym = String(symRaw || '').trim();
+  if (market === 'tw' && !/^[0-9A-Za-z]{4,6}$/.test(sym)) return '台股代號格式不對（例：2330、0050）';
+  if (market === 'us') { sym = sym.toUpperCase(); if (!/^[A-Z.\-]{1,10}$/.test(sym)) return '美股代號格式不對（例：AAPL）'; }
+  if ((db.watchlist || []).length >= 12) return '觀察清單上限 12 檔（避免撞 API 限額），請先移除幾檔';
+  if (db.watchlist.some(w => w.market === market && w.symbol === sym)) return `${sym} 已在清單中`;
+  db.watchlist.push({ id: uid(), market, symbol: sym });
+  saveDB(); renderWatchlist();
+  return null;
+}
 $('wlAddBtn').addEventListener('click', () => {
   const st = $('wlStatus'); st.className = 'status';
-  try {
-    const market = segVal('wlMarket');
-    let sym = $('wlSymbol').value.trim();
-    if (market === 'tw' && !/^[0-9A-Za-z]{4,6}$/.test(sym)) throw new Error('台股代號格式不對（例：2330、0050）');
-    if (market === 'us') { sym = sym.toUpperCase(); if (!/^[A-Z.\-]{1,10}$/.test(sym)) throw new Error('美股代號格式不對（例：AAPL）'); }
-    if ((db.watchlist || []).length >= 12) throw new Error('觀察清單上限 12 檔（避免撞 API 限額），請先移除幾檔');
-    if (db.watchlist.some(w => w.market === market && w.symbol === sym)) throw new Error(`${sym} 已在清單中`);
-    db.watchlist.push({ id: uid(), market, symbol: sym });
-    saveDB(); renderWatchlist();
-    $('wlSymbol').value = '';
-    st.textContent = `✅ 已加入 ${sym}，共 ${db.watchlist.length} 檔`;
-  } catch (e) { st.className = 'status error'; st.textContent = '❌ ' + e.message; }
+  const err = wlAdd(segVal('wlMarket'), $('wlSymbol').value);
+  if (err) { st.className = 'status error'; st.textContent = '❌ ' + err; return; }
+  $('wlSymbol').value = '';
+  st.textContent = `✅ 已加入，共 ${db.watchlist.length} 檔`;
 });
 $('wlChips').addEventListener('click', e => {
   const b = e.target.closest('[data-wlrm]');
@@ -2067,6 +2093,102 @@ $('wlCopyBtn').addEventListener('click', async () => {
   const ok = await copyText(buildWatchPrompt());
   flashBtn('wlCopyBtn', '📋 複製快篩 Prompt', ok);
   if (ok) st.textContent = '✅ 快篩 Prompt 已複製，可貼到 Gemini 等聊天機器人';
+});
+
+/* ── KOL 選股雷達：web search 撈點名清單／貼文本地擷取代號 → 一鍵加入觀察清單 ── */
+let kolFound = [];   // [{symbol, market}] 最近一次雷達／擷取結果
+segBind('kolMarket');
+$('kolName').addEventListener('input', e => localStorage.setItem('twbt_kol', e.target.value));
+// 從 AI 報告末尾解析機器可讀清單：TICKERS: AAA, BBB（查無時為 TICKERS: none）
+function parseTickerLine(text) {
+  const m = [...String(text || '').matchAll(/TICKERS:\s*([^\n]+)/gi)].pop();
+  if (!m || /\bnone\b/i.test(m[1])) return [];
+  return [...new Set(m[1].split(/[,，\s]+/).map(s => s.trim().toUpperCase()).filter(s => /^[A-Z0-9.\-]{1,10}$/.test(s)))];
+}
+// 本地擷取：美股抓 $CASHTAG；台股另抓 4 位數代號（排除 1900–2100 的年份）
+function extractCashtags(text, market) {
+  const out = new Set();
+  for (const m of String(text || '').matchAll(/\$([A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?)\b/g)) out.add(m[1].toUpperCase());
+  if (market === 'tw') {
+    for (const m of String(text || '').matchAll(/\b(\d{4})\b/g)) { const n = +m[1]; if (n < 1900 || n > 2100) out.add(m[1]); }
+  }
+  return [...out];
+}
+function buildKolPrompt(name, market) {
+  const mktName = market === 'tw' ? '台股' : '美股';
+  return `你是一位金融資訊研究助理。請用 web search 調查「${name}」這位投資分析師／KOL 在**最近 60 天**內公開點名、討論或看好的${mktName}標的。
+
+搜尋策略：
+- 先搜其本人貼文與帳號；X（Twitter）原文若搜尋不到，改搜**轉述其觀點**的財經媒體、部落格、論壇整理文（中英文皆可）。
+- 區分「本人公開點名」與「網友替他點名」：只收本人發表過的；引用轉述文時盡量回溯**原始發文時間**。
+
+請依下列格式輸出（繁體中文、Markdown）：
+1. **點名清單表**（務必用 Markdown 表格）：｜代號｜公司名稱｜提及日期｜提及時價位（若可查）｜一句話論點｜來源連結｜
+   - **提及日期是最重要的欄位**：盡量精確到日；只能確定大概就寫「約 2026-06 中旬」；日期完全無法確認的條目請在論點欄註明「日期未確認」。使用者要靠日期與當時價位自行判斷現在跟進是否太晚。
+   - 每列必附來源連結；同一標的多次提及取最近一次。
+2. **雷達摘要**：2～3 句總結該 KOL 近期的主軸方向、以及與先前風格有無變化。
+3. 查無足夠資訊就直說查無，**不要編造代號或日期**。
+最後一行輸出機器可讀清單（僅代號、逗號分隔；查無則輸出 TICKERS: none）：
+TICKERS: AAA, BBB, CCC
+
+提醒：報告開頭請註明「點名 ≠ 本人目前仍持有或看多，僅供研究起點」。`;
+}
+function renderKolChips() {
+  const inList = (s, mk) => (db.watchlist || []).some(w => w.market === mk && w.symbol === s);
+  $('kolChips').innerHTML = kolFound.map((k, i) =>
+    `<span class="badge ${k.market}" style="padding:4px 10px">${MKT_NAME[k.market]} <b>${esc(k.symbol)}</b> ` +
+    (inList(k.symbol, k.market)
+      ? `<span style="opacity:.7">✓ 已在清單</span>`
+      : `<button class="ghost" data-koladd="${i}" style="border:none;padding:0 2px;color:inherit" title="加入觀察清單">＋</button>`) +
+    `</span>`).join('') +
+    (kolFound.length > 1 && kolFound.some(k => !inList(k.symbol, k.market))
+      ? `<button class="ghost" id="kolAddAll" style="padding:4px 12px">＋ 全部加入</button>` : '');
+  const all = $('kolAddAll');
+  if (all) all.onclick = () => {
+    let added = 0, skipped = [];
+    for (const k of kolFound) { const err = wlAdd(k.market, k.symbol); if (err) { if (!err.includes('已在清單')) skipped.push(`${k.symbol}：${err}`); } else added++; }
+    $('kolStatus').className = 'status';
+    $('kolStatus').textContent = `✅ 加入 ${added} 檔${skipped.length ? `；未加入 — ${skipped.join('；')}` : ''}`;
+    renderKolChips();
+  };
+}
+$('kolChips').addEventListener('click', e => {
+  const b = e.target.closest('[data-koladd]');
+  if (!b) return;
+  const k = kolFound[+b.dataset.koladd];
+  if (!k) return;
+  const st = $('kolStatus'); st.className = 'status';
+  const err = wlAdd(k.market, k.symbol);
+  st.textContent = err ? '❌ ' + err : `✅ 已加入 ${k.symbol}，共 ${db.watchlist.length} 檔`;
+  if (err) st.className = 'status error';
+  renderKolChips();
+});
+$('kolSearchBtn').addEventListener('click', async () => {
+  const st = $('kolStatus'); st.className = 'status';
+  const name = $('kolName').value.trim();
+  if (!name) { st.className = 'status error'; st.textContent = '請先填 KOL 名稱／帳號'; return; }
+  const market = segVal('kolMarket') || 'us';
+  $('kolSearchBtn').disabled = true;
+  try {
+    // 雷達必開 web search（本功能的本質就是搜尋），不受 ③ 的勾選影響
+    const { text, model } = await runAI(buildKolPrompt(name, market), st, { webSearch: true });
+    setReport(`KOL 選股雷達 — ${name}`, model, text, 'KOL選股雷達');
+    kolFound = parseTickerLine(text).map(s => ({ symbol: s, market }));
+    renderKolChips();
+    st.textContent = kolFound.length
+      ? `✅ 雷達完成：找到 ${kolFound.length} 檔（完整表格見上方 ③ 報告區；日期與當時價位請自行核對來源）`
+      : '✅ 雷達完成，但未解析到代號清單 — 請看上方報告表格手動加入（或 AI 查無資料）';
+  } catch (e) { st.className = 'status error'; st.textContent = '❌ ' + e.message; }
+  finally { $('kolSearchBtn').disabled = false; }
+});
+$('kolExtractBtn').addEventListener('click', () => {
+  const st = $('kolStatus'); st.className = 'status';
+  const market = segVal('kolMarket') || 'us';
+  const syms = extractCashtags($('kolPaste').value, market);
+  if (!syms.length) { st.className = 'status error'; st.textContent = `沒抽到代號 — 美股請確認貼文含 $代號（如 $SIVE）；台股模式可直接含 4 位數代號`; return; }
+  kolFound = syms.map(s => ({ symbol: s, market }));
+  renderKolChips();
+  st.textContent = `✅ 擷取到 ${syms.length} 檔，點「＋」逐檔或「＋ 全部加入」`;
 });
 
 /* ════════════════ OpenAI（串流） ════════════════ */
@@ -2868,6 +2990,7 @@ function bindSettings() {
   $('cpName').value = db.settings.cpName || '';
   $('cpDesc').value = db.settings.cpDesc || '';
   $('customPersonaWrap').style.display = $('personaSel').value === '__custom__' ? '' : 'none';
+  $('kolName').value = localStorage.getItem('twbt_kol') || '';
   if (localStorage.getItem('twbt_websearch') === '0') $('webSearchChk').checked = false;   // 預設開啟
   $('ap_date').value = todayISO();
   $('ab_date').value = todayISO();
