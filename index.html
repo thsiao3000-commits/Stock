@@ -313,6 +313,16 @@
       <label class="field" style="min-width:240px">分析標的
         <select id="aiTarget"></select>
       </label>
+      <label class="field" style="min-width:210px">分析視角（寫進 AI Prompt）
+        <select id="personaSel">
+          <option value="" selected>綜合分析（預設）</option>
+          <option value="value">價值存股派</option>
+          <option value="growth">成長動能派</option>
+          <option value="tech">技術短線派</option>
+          <option value="guard">風控防守派</option>
+          <option value="round">三師會診（價值×成長×技術）</option>
+        </select>
+      </label>
       <div id="manualWrap" style="display:none">
         <div class="seg" id="aiMarket" style="vertical-align:bottom">
           <button data-v="tw" class="on">台股</button>
@@ -339,7 +349,7 @@
       <button id="copyStockPrompt" class="primary">📋 複製個股 Prompt</button>
       <button id="copyPfPrompt" class="primary">📋 複製組合 Prompt</button>
     </div>
-    <div class="hint" style="margin-top:4px">「產生 AI 分析」會呼叫 OpenAI（耗 token）；若想省 token，可改按「複製 Prompt」把同一份提問貼到訂閱制聊天機器人（如 Gemini）。新聞與美股基本面那段需該機器人能上網查詢才會生效；台股的技術面／籌碼／配息等數據已內含在 Prompt 中。報告自動保留<b>最近 10 份</b>於本機（重新整理不消失），可由報告上方的下拉選單切換、對照前後觀點變化。</div>
+    <div class="hint" style="margin-top:4px">「產生 AI 分析」會呼叫 OpenAI（耗 token）；若想省 token，可改按「複製 Prompt」把同一份提問貼到訂閱制聊天機器人（如 Gemini）。新聞與美股基本面那段需該機器人能上網查詢才會生效；台股的技術面／籌碼／配息等數據已內含在 Prompt 中。報告自動保留<b>最近 10 份</b>於本機（重新整理不消失），可由報告上方的下拉選單切換、對照前後觀點變化。「分析視角」可切換單一風格或<b>三師會診</b>（價值×成長×技術各自表態、主持人裁決）；同一檔重複分析時會自動附上<b>上次建議檢討</b>（對照期間實際走勢、檢討上次判斷對錯）。</div>
     <div id="aiStatus" class="status"></div>
     <div id="aiMeta" style="display:none; align-items:center; gap:10px; margin-top:12px; padding:8px 12px; background:var(--panel2); border:1px solid var(--border); border-radius:8px; font-size:.82rem; color:var(--muted); flex-wrap:wrap;">
       <select id="histSel" title="切換歷史報告（自動保留最近 10 份）" style="max-width:320px; font-size:.82rem; padding:5px 8px;"></select>
@@ -453,7 +463,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.23.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.24.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1973,6 +1983,23 @@ async function runAI(prompt, statusEl, opts) {
 }
 
 /* ════════════════ AI Prompt 組裝 ════════════════ */
+// 分析視角（人格）：單選＝以該風格貫穿整份報告；round＝三師會診（各自表態＋主持人裁決）
+const PERSONAS = {
+  value:  { name: '價值存股派', desc: '重視估值合理性（PER／PBR 對照自身歷史區間與同業）、現金殖利率與配息穩定度、營收獲利的穩健性；偏好左側分批佈局、長期持有領息，估值過高寧可觀望不追高；技術訊號只用來挑選進出場時點。' },
+  growth: { name: '成長動能派', desc: '重視營收年增與獲利成長動能、產業趨勢與法人籌碼方向；估值以 forward PE 對照成長性（PEG 思維），可接受偏高估值但必須有高成長支撐；順勢操作，動能轉弱或跌破關鍵支撐即果斷減碼，嚴設停損。' },
+  tech:   { name: '技術短線派', desc: '以均線排列與交叉、量價關係、KD／MACD／RSI、布林通道、支撐壓力為主要依據，基本面只當背景；講究明確的進出場價位與停損（常用 ATR 倍數），波段操作、訊號轉弱不戀棧、絕不凹單。' },
+  guard:  { name: '風控防守派', desc: '先想『最多會虧多少』再想『能賺多少』；緊盯 ATR 波動放大、乖離過大、量價背離、籌碼鬆動、融資過熱等警訊；重視部位控管、分批進出與停損紀律，避免過度集中，寧可錯過、不可大賠。' },
+};
+const ROUND_KEYS = ['value', 'growth', 'tech'];   // 三師會診成員
+function selectedPersona() { return $('personaSel').value; }
+function personaLabel(k) { return PERSONAS[k] ? PERSONAS[k].name : k === 'round' ? '三師會診' : ''; }
+// 上次報告摘錄：從「操作計畫／結論／總結／會診」標題起擷取（找不到就取末尾），供 AI 檢討上次建議
+function reportTail(fullText, maxLen = 2200) {
+  const m = fullText.match(/^#{1,6}\s*.*(操作計畫|結論|總結|會診).*$/m);
+  let seg = m ? fullText.slice(fullText.indexOf(m[0])) : fullText.slice(-maxLen);
+  if (seg.length > maxLen) seg = seg.slice(0, maxLen) + '\n（…以下略）';
+  return seg;
+}
 const fnum = (x, n = 2) => x == null || !Number.isFinite(x) ? 'N/A' : x.toFixed(n);
 function csvOf(rows) {   // 量一律以「千股」（台股即「張」）
   return rows.map(d =>
@@ -2111,6 +2138,33 @@ function buildStockPrompt() {
   const profile = (db.settings.aiProfile || '').trim();
   const profileBlock = profile ? `\n【我的投資偏好（請讓第 7、9、10 章的建議貼合此偏好；未提及之處以一般穩健原則處理）】\n${profile}\n` : '';
 
+  // 分析視角：單一人格＝角色＋判斷準則貫穿全報告；三師會診＝1–8 章中性解讀、9/10 章各自表態＋主持人裁決
+  const pKey = selectedPersona(), mktName = market === 'tw' ? '台股' : '美股';
+  let roleIntro, personaBlock = '';
+  if (pKey === 'round') {
+    roleIntro = `你將主持一場「三師會診」：三位風格迥異的資深${mktName}分析師——${ROUND_KEYS.map(k => PERSONAS[k].name).join('、')}——共同評估同一檔標的，最後由你（主持人）整合裁決。第 1～8 章請以中性、共用的角度解讀數據，第 9～10 章進行會診與裁決。`;
+    personaBlock = `\n【三位分析師的判斷準則】\n${ROUND_KEYS.map(k => `- ${PERSONAS[k].name}：${PERSONAS[k].desc}`).join('\n')}\n`;
+  } else if (PERSONAS[pKey]) {
+    roleIntro = `你是一位「${PERSONAS[pKey].name}」風格的資深${mktName}證券分析師。`;
+    personaBlock = `\n【你的判斷準則（請貫穿整份報告，尤其第 7、9、10 章的建議）】\n${PERSONAS[pKey].desc}\n`;
+  } else {
+    roleIntro = `你是一位資深的${mktName}證券分析師，技術面與籌碼面見長、兼顧基本面與消息面。`;
+  }
+
+  // 上次建議檢討：找同標的最近一份報告（v1.24 起的報告才帶 symbol/close 中繼資料），
+  // 程式算好期間走勢事實，要求 AI 對照檢討上次的立場與價位——讓 AI 對自己說過的話負責
+  let reviewBlock = '', reviewInstr = '';
+  const prevRpt = reportHist.find(r => r.symbol === symbol && r.market === market && r.close > 0 && r.dataDate);
+  if (prevRpt && prevRpt.dataDate < last.date) {
+    const since = days.filter(d => d.date > prevRpt.dataDate);
+    const hiS = Math.max(...since.map(d => d.high ?? d.close));
+    const loS = Math.min(...since.map(d => d.low ?? d.close));
+    reviewBlock = `\n【上次 AI 報告檢討（上次產生於 ${prevRpt.ts}，當時收盤 ${prevRpt.close}）】\n` +
+      `- 自上次報告以來（${since.length} 個交易日）：現價 ${last.close}（${fmtPct((last.close / prevRpt.close - 1) * 100)}），期間最高 ${fnum(hiS)}、最低 ${fnum(loS)}\n` +
+      `- 上次報告的操作計畫與結論摘錄：\n"""\n${reportTail(prevRpt.fullText)}\n"""\n`;
+    reviewInstr = `（上方附有「上次 AI 報告檢討」：請在第 1 章之前先寫一節「**上次建議檢討**」，3～6 句——對照期間實際走勢，誠實評估上次的立場與關鍵價位哪些對、哪些錯、哪些觸發條件已實際發生、這次要修正什麼；請勿為上次的判斷辯護。）\n`;
+  }
+
   let posBlock = '目前未持有此標的。請在第 7 章改為「進場評估」：分析現在是否為合理的進場時機、適合的進場價位區間與條件。';
   if (posStats && posStats.qty > 0) {
     posBlock =
@@ -2119,8 +2173,32 @@ function buildStockPrompt() {
       `- 已實現損益 ${fmtMoney(posStats.realized, market === 'us' ? 'USD' : 'TWD')}、累計股息 ${fmtMoney(posStats.div, market === 'us' ? 'USD' : 'TWD')}`;
   }
 
-  return `你是一位資深的${market === 'tw' ? '台股' : '美股'}證券分析師，技術面與籌碼面見長、兼顧基本面與消息面。請根據以下資料，以繁體中文撰寫一份個股分析報告（Markdown 格式）。請直接給出解讀與判斷，不要逐條複述提供的原始數據。
+  // 第 9/10 章：預設＝操作計畫表＋結論；三師會診＝各自表態＋主持人裁決（1–8 章兩種模式共用）
+  const held = posStats && posStats.qty > 0;
+  const baseNote = `本表以 ${last.date} 收盤價 ${last.close} 為基準，參考時效約 1～2 週；行情大幅變動或逾時請重新產生報告。`;
+  const chTail = pKey === 'round'
+    ? `9. 三師會診（三位分析師各自獨立表態，一人一小節，不要互相妥協）：
+   - ${ROUND_KEYS.map(k => PERSONAS[k].name).join('、')} 每位依自己的判斷準則給出：**立場**（${held ? '加碼／續抱／減碼／停損出場' : '買進／觀望／不參與'}，明確擇一）、**2～3 個關鍵理由**（引用上方數據）、**自己認定的關鍵價位**（進場或加碼價／停利價／停損價）。
+   - 三位觀點不同時請如實呈現分歧，不要硬湊共識。
 
+10. **主持人總結（最重要，請用白話、直接給答案）**：
+   - 先點出三師的**共識與分歧**，並解讀分歧的含義（例：技術派看多但價值派嫌貴＝只適合短打、不宜重倉）。
+   - 以主持人身分做最終裁決，**務必用 Markdown 表格**給出操作計畫（欄位為｜動作｜觸發條件與具體價位｜依據｜；${held ? '列出「**加碼**、**續抱**、**減碼**、**停損**」' : '列出「**進場區間**、**觀望**、**不參與**」'}），價位必須是**具體數字**、與我的成本與損益一致。
+   - 表格下方請加註一行：「${baseNote}」
+   - 最後用 2～4 句白話總結「**現在到底該怎麼做**」＋此刻**最該盯的觸發點或風險**。`
+    : `9. 操作計畫表（**務必用 Markdown 表格**呈現，欄位為｜動作｜觸發條件與具體價位｜依據｜）：
+   - 若持有此標的：列出「**加碼**、**續抱**、**減碼**、**停損**」四個動作，各給出明確的價位或價位區間。
+   - 若未持有：改列「**進場區間**、**觀望**、**不參與**」。
+   - 價位必須是**具體數字**（不可只寫「跌深」「過高」），並對應前面分析的支撐／壓力、布林通道、均線與 ATR（停損距離可用 ATR 倍數），且與我的成本與損益一致；目標是讓我能直接照表執行。
+   - 表格下方請加註一行：「${baseNote}」
+
+10. **結論（最重要，請用白話、直接給答案，不要模稜兩可）**：用 2～4 句話總結「**現在到底該怎麼做**」：
+   - **若我持有**：現在該「**續抱／加碼／減碼／全部出場／停損**」哪一個（明確擇一）？並講清楚**最關鍵的價位與對應動作**——例如「續抱；漲到 X 元分批停利、跌破 Y 元停損出場、回檔到 Z 元可加碼」。
+   - **若我未持有**：現在「**該不該買進**」？可買的話給明確**進場價位區間**；不建議的話說清楚是「**觀望**（等回到 X 元再看）」還是「**不參與**」。
+   - 最後用一句點出此刻**最該盯的觸發點或風險**。所有價位需與上面分析及我的成本一致，讓我看完這段就能直接行動。`;
+
+  return `${roleIntro}請根據以下資料，以繁體中文撰寫一份個股分析報告（Markdown 格式）。請直接給出解讀與判斷，不要逐條複述提供的原始數據。
+${personaBlock}
 【標的】${symbol} ${name || ''}${industry ? `（產業別：${industry}）` : ''}
 【今日日期】${todayISO()}
 【資料區間】${days[0].date} ～ ${last.date}（共 ${days.length} 個交易日）
@@ -2155,10 +2233,10 @@ ${csvOf(daily60)}
 
 【我的持倉】
 ${posBlock}
-${profileBlock}
+${reviewBlock}${profileBlock}
 請依下列章節撰寫：
 （**開始前先自我檢查**：若你本次無法使用網路搜尋（web search），請在報告**最開頭**獨立標註一行「⚠️ 本次 AI 未啟用網路搜尋 → forward PE／分析師目標價／機構或內部人持股／最新新聞可能從缺或過時，建議開啟搜尋功能後重新產生」，其餘章節仍照常以上方已提供的數據撰寫；若能正常搜尋則無需此行。）
-1. 趨勢研判（短期看日線、中長期看週線，分別說明）
+${reviewInstr}1. 趨勢研判（短期看日線、中長期看週線，分別說明）
 2. 支撐與壓力位（給出具體價位與理由；可結合均線、布林通道、前波高低與量價密集區）
 3. 技術指標解讀（均線排列、斜率與最近一次黃金／死亡交叉的意義；RSI／MACD／KD 請對照 5／20 日前數值說明**指標正在走強或走弱**，不要只描述當下水位；布林通道、ATR、量價關係，並結合 OBV 能量潮與量比研判量價配合或背離）
 4. 相對大盤強弱（領先或落後大盤？意義為何）
@@ -2166,16 +2244,7 @@ ${profileBlock}
 6. 配息與殖利率評估（現金殖利率是否具吸引力、配息穩定度與成長性；若臨近除息，說明參與除息／棄息的考量與填息、貼息風險；台股單次現金股利達 2 萬元以上需注意二代健保補充保費與股利所得稅。美股若上方 Finnhub 區塊附有股息殖利率請據此簡評；查無配息資料則註明不適用）
 7. 我的持倉評估（從風險管理角度，就「續抱／加碼／減碼／停損」給出情境式分析與觸發條件，須對應我的成本與損益，並結合除息時點與估值——**對成長股以 forward PE 衡量加碼空間，避免只看 trailing PE 而誤判過貴**）
 8. 風險提醒
-9. 操作計畫表（**務必用 Markdown 表格**呈現，欄位為｜動作｜觸發條件與具體價位｜依據｜）：
-   - 若持有此標的：列出「**加碼**、**續抱**、**減碼**、**停損**」四個動作，各給出明確的價位或價位區間。
-   - 若未持有：改列「**進場區間**、**觀望**、**不參與**」。
-   - 價位必須是**具體數字**（不可只寫「跌深」「過高」），並對應前面分析的支撐／壓力、布林通道、均線與 ATR（停損距離可用 ATR 倍數），且與我的成本與損益一致；目標是讓我能直接照表執行。
-   - 表格下方請加註一行：「本表以 ${last.date} 收盤價 ${last.close} 為基準，參考時效約 1～2 週；行情大幅變動或逾時請重新產生報告。」
-
-10. **結論（最重要，請用白話、直接給答案，不要模稜兩可）**：用 2～4 句話總結「**現在到底該怎麼做**」：
-   - **若我持有**：現在該「**續抱／加碼／減碼／全部出場／停損**」哪一個（明確擇一）？並講清楚**最關鍵的價位與對應動作**——例如「續抱；漲到 X 元分批停利、跌破 Y 元停損出場、回檔到 Z 元可加碼」。
-   - **若我未持有**：現在「**該不該買進**」？可買的話給明確**進場價位區間**；不建議的話說清楚是「**觀望**（等回到 X 元再看）」還是「**不參與**」。
-   - 最後用一句點出此刻**最該盯的觸發點或風險**。所有價位需與上面分析及我的成本一致，讓我看完這段就能直接行動。
+${chTail}
 
 最後請註明：本分析僅供參考，不構成投資建議。`;
 }
@@ -2220,8 +2289,30 @@ function buildPortfolioPrompt() {
     curveLine = `\n- 近一年淨值曲線（股票部位，不含債券）：我的投組 ${pe != null ? fmtPct(pe - 100) : '—'} vs 加權指數 ${be != null ? fmtPct(be - 100) : '—'}（${perfData.dates[0]} ～ ${perfData.dates[perfData.dates.length - 1]}）`;
   }
 
-  return `你是一位專業的投資組合顧問。以下是我的投資組合現況（截至 ${todayISO()}，匯率 USD/TWD=${fx.rate ? fx.rate.toFixed(3) : '未知'}，加權平均成本法，台股未實現已扣預估賣出費稅）。請以繁體中文撰寫評估報告（Markdown 格式），直接給出解讀與建議，不要逐條複述原始持倉數據。
+  // 分析視角（與個股分析共用選單）：單一人格＝顧問風格貫穿；三師會診＝1–5 章中性、第 6 章各自表態＋主持人裁決
+  const pKey = selectedPersona();
+  let roleIntro, personaBlock = '';
+  if (pKey === 'round') {
+    roleIntro = `你將主持一場「三師會診」：三位風格迥異的投資組合顧問——${ROUND_KEYS.map(k => PERSONAS[k].name).join('、')}——共同檢視同一個投資組合，最後由你（主持人）整合裁決。第 1～5 章請以中性、共用的角度分析，第 6 章進行會診與裁決。`;
+    personaBlock = `\n【三位顧問的判斷準則】\n${ROUND_KEYS.map(k => `- ${PERSONAS[k].name}：${PERSONAS[k].desc}`).join('\n')}\n`;
+  } else if (PERSONAS[pKey]) {
+    roleIntro = `你是一位「${PERSONAS[pKey].name}」風格的專業投資組合顧問。`;
+    personaBlock = `\n【你的判斷準則（請貫穿全報告，尤其第 3、4、6 章的建議）】\n${PERSONAS[pKey].desc}\n`;
+  } else {
+    roleIntro = `你是一位專業的投資組合顧問。`;
+  }
+  const ch6 = pKey === 'round'
+    ? `6. **三師會診與主持人行動清單（最重要，請用白話、直接給答案）**：
+   - 三位顧問各以 2～3 句話獨立表態：整個組合現在最該做的一件事、與最想調整的 1～2 檔（依各自準則，觀點不同請如實呈現分歧）。
+   - 主持人點出**共識與分歧**後做最終裁決：用 **Markdown 表格**逐檔給建議，欄位為｜標的｜建議動作（續抱／加碼／減碼／出場／停損）｜參考價位或條件｜理由｜——**每個持倉都要一列**，價位盡量具體、與成本及損益一致。
+   - 最後點出**最該優先處理的 1～2 檔**及原因。`
+    : `6. **結論與行動清單（最重要，請用白話、直接給答案）**：
+   - 先用 2～3 句話總結**整個組合現在該怎麼調整**（加碼／減碼／再平衡／維持，重點為何）。
+   - 再用 **Markdown 表格**逐檔給可執行建議，欄位為｜標的｜建議動作（續抱／加碼／減碼／出場／停損）｜參考價位或條件｜理由｜——**每個持倉都要一列**，價位盡量具體、與成本及損益一致。
+   - 最後點出**最該優先處理的 1～2 檔**及原因。`;
 
+  return `${roleIntro}以下是我的投資組合現況（截至 ${todayISO()}，匯率 USD/TWD=${fx.rate ? fx.rate.toFixed(3) : '未知'}，加權平均成本法，台股未實現已扣預估賣出費稅）。請以繁體中文撰寫評估報告（Markdown 格式），直接給出解讀與建議，不要逐條複述原始持倉數據。
+${personaBlock}
 【持倉明細】
 ${lines.join('\n')}
 
@@ -2237,10 +2328,7 @@ ${profileBlock}
 3. 各部位簡評（特別針對大幅獲利或虧損的部位，給出處理思路）
 4. 再平衡建議（具體方向，不需精確到股數）
 5. 風險提醒
-6. **結論與行動清單（最重要，請用白話、直接給答案）**：
-   - 先用 2～3 句話總結**整個組合現在該怎麼調整**（加碼／減碼／再平衡／維持，重點為何）。
-   - 再用 **Markdown 表格**逐檔給可執行建議，欄位為｜標的｜建議動作（續抱／加碼／減碼／出場／停損）｜參考價位或條件｜理由｜——**每個持倉都要一列**，價位盡量具體、與成本及損益一致。
-   - 最後點出**最該優先處理的 1～2 檔**及原因。
+${ch6}
 
 最後請註明：本分析僅供參考，不構成投資建議。`;
 }
@@ -2251,8 +2339,11 @@ $('aiBtn').addEventListener('click', async () => {
   $('aiBtn').disabled = true; $('pfBtn').disabled = true;
   try {
     const { text, model, truncated } = await runAI(buildStockPrompt(), st, { webSearch: $('webSearchChk').checked });
-    const title = `${aiData.market === 'tw' ? '台股' : '美股'}個股分析 — ${aiData.symbol}${aiData.name ? ' ' + aiData.name : ''}`;
-    setReport(title, model, text, `${aiData.symbol}_個股分析`);
+    const pv = personaLabel(selectedPersona());
+    const title = `${aiData.market === 'tw' ? '台股' : '美股'}個股分析 — ${aiData.symbol}${aiData.name ? ' ' + aiData.name : ''}${pv ? `（${pv}）` : ''}`;
+    const lastD = aiData.days[aiData.days.length - 1];
+    setReport(title, model, text, `${aiData.symbol}_個股分析`,
+      { symbol: aiData.symbol, market: aiData.market, close: lastD.close, dataDate: lastD.date });
     st.textContent = truncated
       ? `⚠️ 報告達長度上限被截斷（${truncated}），僅顯示部分內容；建議把「AI 推理深度」調低後再產生一次。`
       : `✅ 個股分析完成（模型：${model}）`;
@@ -2272,7 +2363,8 @@ $('pfBtn').addEventListener('click', async () => {
   try {
     await ensureFX(false);
     const { text, model, truncated } = await runAI(buildPortfolioPrompt(), st);
-    setReport('投資組合總評', model, text, '投資組合總評');
+    const pvp = personaLabel(selectedPersona());
+    setReport(`投資組合總評${pvp ? `（${pvp}）` : ''}`, model, text, '投資組合總評');
     st.textContent = truncated
       ? `⚠️ 報告達長度上限被截斷（${truncated}），僅顯示部分內容；建議把「AI 推理深度」調低後再產生一次。`
       : `✅ 投資組合總評完成（模型：${model}）`;
@@ -2335,11 +2427,12 @@ function showReport(r) {
   $('aiMeta').style.display = 'flex';
   $('histSel').value = r.id;
 }
-function setReport(title, model, markdown, filenameBase) {
+function setReport(title, model, markdown, filenameBase, meta) {
   const ts = nowStamp();
   // 時間戳與模型寫進報告開頭，讓畫面顯示、複製、下載三者內容一致
   const header = `# ${title}\n\n**產生時間：** ${ts.full}　｜　**AI 模型：** ${model}　｜　**工具：** 我的投資組合 ${APP_VERSION}\n\n---\n\n`;
-  const entry = { id: uid(), ts: ts.full, title, filename: `${filenameBase}_${ts.date}.md`, fullText: header + (markdown || '').trim() + '\n' };
+  // meta（個股報告帶 symbol/market/close/dataDate）供「上次建議檢討」比對；組合總評不帶
+  const entry = { id: uid(), ts: ts.full, title, filename: `${filenameBase}_${ts.date}.md`, fullText: header + (markdown || '').trim() + '\n', ...(meta || {}) };
   reportHist.unshift(entry);
   if (reportHist.length > REPORTS_MAX) reportHist.length = REPORTS_MAX;
   saveReports();
@@ -2500,6 +2593,7 @@ function bindSettings() {
     localStorage.setItem('twbt_model', $('modelSel').value);
   });
   $('effortSel').addEventListener('change', () => localStorage.setItem('twbt_effort', $('effortSel').value));
+  $('personaSel').addEventListener('change', () => localStorage.setItem('twbt_persona', $('personaSel').value));
   $('webSearchChk').addEventListener('change', () => localStorage.setItem('twbt_websearch', $('webSearchChk').checked ? '1' : '0'));
   $('exportBtn').addEventListener('click', exportData);
   $('importBtn').addEventListener('click', () => $('importFile').click());
@@ -2536,6 +2630,8 @@ function bindSettings() {
   }
   const savedEffort = localStorage.getItem('twbt_effort');
   if (savedEffort != null && [...$('effortSel').options].some(o => o.value === savedEffort)) $('effortSel').value = savedEffort;
+  const savedPersona = localStorage.getItem('twbt_persona');
+  if (savedPersona != null && [...$('personaSel').options].some(o => o.value === savedPersona)) $('personaSel').value = savedPersona;
   if (localStorage.getItem('twbt_websearch') === '0') $('webSearchChk').checked = false;   // 預設開啟
   $('ap_date').value = todayISO();
   $('ab_date').value = todayISO();
