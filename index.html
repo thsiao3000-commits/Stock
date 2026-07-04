@@ -135,6 +135,9 @@
   .aiReport pre { background: #0d1117; padding: 12px; border-radius: 8px; overflow-x: auto; }
   .aiReport ul, .aiReport ol { padding-left: 22px; }
   .aiReport a { color: var(--accent); word-break: break-all; }
+  .aiReport blockquote { border-left: 3px solid var(--accent); margin: 8px 0; padding: 2px 12px; color: var(--muted); }
+  #wlWrap th[data-wlsort] { cursor: pointer; user-select: none; }
+  #wlWrap th[data-wlsort]:hover { color: var(--text); }
   footer { text-align: center; color: var(--muted); font-size: .78rem; padding: 0 20px 40px; }
   .empty { text-align: center; color: var(--muted); padding: 24px; }
   @media (max-width: 600px) { main { padding: 8px 12px 40px; } section, details.box { padding: 14px; } th, td { padding: 6px 7px; } table { font-size: .8rem; } }
@@ -397,7 +400,7 @@
     <div id="wlStatus" class="status"></div>
     <div class="tableWrap" id="wlWrap" style="display:none">
       <div class="tableScroll"><table>
-        <thead><tr><th class="l">標的</th><th>現價</th><th>近20日</th><th>近60日</th><th class="l">均線趨勢</th><th class="l">MA5/20交叉</th><th>RSI</th><th>MACD動能</th><th>量比</th><th>距52週高</th><th class="l"></th></tr></thead>
+        <thead><tr><th class="l" data-wlsort="symbol" data-label="標的">標的</th><th data-wlsort="close" data-label="現價">現價</th><th data-wlsort="ret20" data-label="近20日">近20日</th><th data-wlsort="ret60" data-label="近60日">近60日</th><th class="l" data-wlsort="trend" data-label="均線趨勢">均線趨勢</th><th class="l">MA5/20交叉</th><th data-wlsort="rsi" data-label="RSI">RSI</th><th data-wlsort="hist" data-label="MACD動能">MACD動能</th><th data-wlsort="volRatio" data-label="量比">量比</th><th data-wlsort="offHigh" data-label="距52週高">距52週高</th><th class="l"></th></tr></thead>
         <tbody id="wlBody"></tbody>
       </table></div>
     </div>
@@ -544,7 +547,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.31.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.32.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -2035,8 +2038,22 @@ async function wlScan() {
     st.className = 'status error'; st.textContent = '❌ ' + e.message;
   } finally { $('wlScanBtn').disabled = false; }
 }
+let wlSort = { key: null, dir: 1 };   // 快篩表排序：點欄位標題切換（首次點＝由大到小，再點反向）；失敗列永遠沉底
 function renderWatchTable() {
-  const rows = watchData ? watchData.rows : [];
+  let rows = watchData ? [...watchData.rows] : [];
+  if (wlSort.key) {
+    rows.sort((a, b) => {
+      if (a.err && b.err) return 0;
+      if (a.err) return 1;
+      if (b.err) return -1;
+      const va = a[wlSort.key], vb = b[wlSort.key];
+      if (typeof va === 'string' || typeof vb === 'string') return String(va ?? '').localeCompare(String(vb ?? '')) * wlSort.dir;
+      return (((va ?? -Infinity)) - ((vb ?? -Infinity))) * wlSort.dir;
+    });
+  }
+  $$('#wlWrap th[data-wlsort]').forEach(th => {
+    th.textContent = th.dataset.label + (th.dataset.wlsort === wlSort.key ? (wlSort.dir > 0 ? ' ▲' : ' ▼') : '');
+  });
   $('wlWrap').style.display = rows.length ? '' : 'none';
   $('wlBody').innerHTML = rows.map(r => {
     const label = `<span class="badge ${r.market}">${MKT_NAME[r.market]}</span> <b>${esc(r.symbol)}</b> ${esc(r.name || '')}`;
@@ -2055,6 +2072,14 @@ function renderWatchTable() {
   }).join('');
   updateTableShadows();
 }
+// 快篩表欄位排序：點標題切換
+$('wlWrap').addEventListener('click', e => {
+  const th = e.target.closest('th[data-wlsort]');
+  if (!th || !watchData) return;
+  const key = th.dataset.wlsort;
+  wlSort = wlSort.key === key ? { key, dir: -wlSort.dir } : { key, dir: -1 };
+  renderWatchTable();
+});
 // 「深入」：把該檔帶入 ③ 的手動輸入並自動抓一年資料，接著即可產生完整 AI 個股分析
 $('wlBody').addEventListener('click', e => {
   const b = e.target.closest('[data-wldeep]');
@@ -2668,6 +2693,15 @@ function buildStockPrompt() {
       `- 持有 ${nf.format(posStats.qty)} 股、加權平均成本 ${fnum(posStats.avgCost)}（首次買進 ${posStats.firstBuy}）\n` +
       `- 現價 ${last.close} → 未實現損益 ${fmtMoney(posStats.unreal, market === 'us' ? 'USD' : 'TWD')}（${fmtPct(posStats.unrealPct)}）\n` +
       `- 已實現損益 ${fmtMoney(posStats.realized, market === 'us' ? 'USD' : 'TWD')}、累計股息 ${fmtMoney(posStats.div, market === 'us' ? 'USD' : 'TWD')}`;
+    // 分批買賣紀錄：AI 看得到「前次加碼在哪個價位」，加碼/減碼建議才有節奏依據（走勢圖上的 ▲▼ 過去只有人看得到）
+    const txsAll = [...((aiData.pos && aiData.pos.txs) || [])].sort((a, b) => a.date.localeCompare(b.date));
+    if (txsAll.length) {
+      const recent = txsAll.slice(-10);
+      posBlock += `\n- 交易紀錄（${txsAll.length > 10 ? `最近 10 筆／共 ${txsAll.length} 筆` : `共 ${txsAll.length} 筆`}，供評估分批成本結構與加碼減碼節奏）：\n` +
+        recent.map(t => t.type === 'dividend'
+          ? `  · ${t.date} 現金股息 ${fmtMoney(t.amount, market === 'us' ? 'USD' : 'TWD')}`
+          : `  · ${t.date} ${t.type === 'buy' ? '買進' : '賣出'} ${nf.format(t.qty)} 股 @ ${t.price}`).join('\n');
+    }
   }
 
   // 第 9/10 章：預設＝操作計畫表＋結論；三師會診＝各自表態＋主持人裁決（1–8 章兩種模式共用）
@@ -3014,7 +3048,7 @@ function mdToHtml(md) {
     .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
     .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<i>$2</i>');
   const lines = escFn(md).split('\n');
-  let html = '', listStack = [], inCode = false, tableRows = [];
+  let html = '', listStack = [], inCode = false, inQuote = false, tableRows = [];
   // 關閉「縮排深度 > toIndent」的清單層（預設 -1＝全部關閉）；支援 AI 報告常用的巢狀 bullet
   const closeList = (toIndent = -1) => {
     while (listStack.length && listStack[listStack.length - 1].indent > toIndent) html += `</${listStack.pop().tag}>`;
@@ -3035,6 +3069,15 @@ function mdToHtml(md) {
     }
     if (inCode) { html += raw + '\n'; continue; }
     const line = raw.trimEnd();
+    // 引言區塊：連續的 > 行合併為一個 blockquote（原文的 > 已被 escFn 轉成 &gt;）
+    const bq = line.match(/^\s*&gt;\s?(.*)$/);
+    if (bq) {
+      closeList(); flushTable();
+      if (!inQuote) { html += '<blockquote>'; inQuote = true; }
+      if (bq[1].trim()) html += `<p>${inline(bq[1])}</p>`;
+      continue;
+    }
+    if (inQuote) { html += '</blockquote>'; inQuote = false; }
     if (/^\|.*\|\s*$/.test(line)) {
       closeList();
       const cells = line.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
@@ -3059,6 +3102,7 @@ function mdToHtml(md) {
     if (line.trim()) html += `<p>${inline(line)}</p>`;
   }
   closeList(); flushTable();
+  if (inQuote) html += '</blockquote>';
   if (inCode) html += '</pre>';
   return html;
 }
