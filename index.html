@@ -124,17 +124,17 @@
   }
   .legend { display: flex; gap: 18px; font-size: .8rem; color: var(--muted); margin-top: 6px; flex-wrap: wrap; }
   .legend i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
-  #aiOutput {
+  .aiReport {
     margin-top: 16px; background: var(--panel2); border: 1px solid var(--border);
     border-radius: 10px; padding: 16px 20px; display: none; overflow-x: auto;
   }
-  #aiOutput h1, #aiOutput h2, #aiOutput h3, #aiOutput h4 { color: var(--accent); margin: 14px 0 6px; }
-  #aiOutput h1 { font-size: 1.2rem; } #aiOutput h2 { font-size: 1.1rem; } #aiOutput h3 { font-size: 1rem; }
-  #aiOutput table { margin: 8px 0; } #aiOutput th, #aiOutput td { text-align: left; position: static; }
-  #aiOutput code { background: #0d1117; padding: 1px 6px; border-radius: 5px; font-size: .85em; }
-  #aiOutput pre { background: #0d1117; padding: 12px; border-radius: 8px; overflow-x: auto; }
-  #aiOutput ul, #aiOutput ol { padding-left: 22px; }
-  #aiOutput a { color: var(--accent); word-break: break-all; }
+  .aiReport h1, .aiReport h2, .aiReport h3, .aiReport h4 { color: var(--accent); margin: 14px 0 6px; }
+  .aiReport h1 { font-size: 1.2rem; } .aiReport h2 { font-size: 1.1rem; } .aiReport h3 { font-size: 1rem; }
+  .aiReport table { margin: 8px 0; } .aiReport th, .aiReport td { text-align: left; position: static; }
+  .aiReport code { background: #0d1117; padding: 1px 6px; border-radius: 5px; font-size: .85em; }
+  .aiReport pre { background: #0d1117; padding: 12px; border-radius: 8px; overflow-x: auto; }
+  .aiReport ul, .aiReport ol { padding-left: 22px; }
+  .aiReport a { color: var(--accent); word-break: break-all; }
   footer { text-align: center; color: var(--muted); font-size: .78rem; padding: 0 20px 40px; }
   .empty { text-align: center; color: var(--muted); padding: 24px; }
   @media (max-width: 600px) { main { padding: 8px 12px 40px; } section, details.box { padding: 14px; } th, td { padding: 6px 7px; } table { font-size: .8rem; } }
@@ -146,8 +146,8 @@
     #setupBox, #addBox, #chartWrap, #perfChartWrap, #manualWrap { display: none !important; }
     section, details.box { border-color: #ccc; }
     .expandPanel, .txTable td.act { background: #fff; box-shadow: none; }
-    #aiOutput { background: #fff; border: none; padding: 0; overflow: visible; }
-    #aiOutput code, #aiOutput pre { background: #f2f2f2; }
+    .aiReport { background: #fff; border: none; padding: 0; overflow: visible; }
+    .aiReport code, .aiReport pre { background: #f2f2f2; }
     a { color: #0b5cad; }
   }
 </style>
@@ -374,7 +374,7 @@
       <button id="aiCopyBtn" class="ghost">📋 複製報告</button>
       <button id="aiDownloadBtn" class="ghost">⬇️ 下載報告（.md）</button>
     </div>
-    <div id="aiOutput"></div>
+    <div id="aiOutput" class="aiReport"></div>
   </section>
 
   <!-- ── 觀察清單快篩 ── -->
@@ -425,6 +425,13 @@
       </div>
       <div id="kolStatus" class="status"></div>
       <div id="kolChips" class="row" style="gap:8px"></div>
+      <div id="kolMeta" style="display:none; align-items:center; gap:10px; margin-top:12px; padding:8px 12px; background:var(--panel2); border:1px solid var(--border); border-radius:8px; font-size:.82rem; color:var(--muted);">
+        <span id="kolMetaText"></span>
+        <span style="flex:1"></span>
+        <button id="kolCopyBtn" class="ghost">📋 複製報告</button>
+        <button id="kolDlBtn" class="ghost">⬇️ 下載報告（.md）</button>
+      </div>
+      <div id="kolOutput" class="aiReport"></div>
     </details>
   </section>
 
@@ -530,7 +537,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.28.2';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.29.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -2197,13 +2204,13 @@ $('kolSearchBtn').addEventListener('click', async () => {
   $('kolSearchBtn').disabled = true; $('kolGrokBtn').disabled = true;
   try {
     // 雷達必開 web search（本功能的本質就是搜尋），不受 ③ 的勾選影響
-    const { text, model } = await runAI(buildKolPrompt(name, market), st, { webSearch: true });
-    setReport(`KOL 選股雷達 — ${name}`, model, text, 'KOL選股雷達');
+    const { text, model } = await runAI(buildKolPrompt(name, market), st, { webSearch: true, outEl: $('kolOutput') });
+    setKolReport(`KOL 選股雷達 — ${name}`, model, text, 'KOL選股雷達');
     kolFound = parseTickerLine(text).map(s => ({ symbol: s, market }));
     renderKolChips();
     st.textContent = kolFound.length
-      ? `✅ 雷達完成：找到 ${kolFound.length} 檔（完整表格見上方 ③ 報告區；日期與當時價位請自行核對來源）`
-      : '✅ 雷達完成，但未解析到代號清單 — 請看上方報告表格手動加入（或 AI 查無資料）';
+      ? `✅ 雷達完成：找到 ${kolFound.length} 檔（完整表格見下方報告；日期與當時價位請自行核對來源）`
+      : '✅ 雷達完成，但未解析到代號清單 — 請看下方報告表格手動加入（或 AI 查無資料）';
   } catch (e) { st.className = 'status error'; st.textContent = '❌ ' + e.message; }
   finally { $('kolSearchBtn').disabled = false; $('kolGrokBtn').disabled = false; }
 });
@@ -2218,13 +2225,13 @@ $('kolGrokBtn').addEventListener('click', async () => {
   $('kolGrokBtn').disabled = true; $('kolSearchBtn').disabled = true;
   try {
     const tools = [{ type: 'x_search', allowed_x_handles: [handle], from_date: isoD(addMonths(new Date(), -2)), to_date: todayISO() }];
-    const { text, model } = await runGrok(buildGrokKolPrompt(name, handle, market), tools, st);
-    setReport(`KOL 選股雷達（Grok 直查 @${handle}）`, model, text, 'KOL選股雷達_Grok');
+    const { text, model } = await runGrok(buildGrokKolPrompt(name, handle, market), tools, st, $('kolOutput'));
+    setKolReport(`KOL 選股雷達（Grok 直查 @${handle}）`, model, text, 'KOL選股雷達_Grok');
     kolFound = parseTickerLine(text).map(s => ({ symbol: s, market }));
     renderKolChips();
     st.textContent = kolFound.length
-      ? `✅ Grok 直查完成：@${handle} 近 60 天點名 ${kolFound.length} 檔（完整表格與貼文連結見上方 ③ 報告區）`
-      : `✅ Grok 直查完成：未解析到代號清單——可能期間內無點名，詳見上方報告`;
+      ? `✅ Grok 直查完成：@${handle} 近 60 天點名 ${kolFound.length} 檔（完整表格與貼文連結見下方報告，不會蓋掉 ③ 的分析）`
+      : `✅ Grok 直查完成：未解析到代號清單——可能期間內無點名，詳見下方報告`;
   } catch (e) { st.className = 'status error'; st.textContent = '❌ ' + e.message; }
   finally { $('kolGrokBtn').disabled = false; $('kolSearchBtn').disabled = false; }
 });
@@ -2337,13 +2344,13 @@ async function streamXai(key, model, prompt, tools, onDelta) {
   return { text: full + xaiCiteBlock(cites, anns), truncated };
 }
 // Grok 執行器：與 runAI 相同的作業動畫（轉圈＋秒數＋階段），但走 xAI 端點、固定 grok-4.3（x_search 官方建議模型）
-async function runGrok(prompt, tools, statusEl) {
+async function runGrok(prompt, tools, statusEl, outEl) {
   const key = (db.settings.xaiKey || '').trim();
   if (!key) throw new Error('請先在「API 與參數設定」填入 xAI API Key');
   const model = 'grok-4.3';
-  const out = $('aiOutput');
+  const out = outEl || $('aiOutput');   // KOL 雷達寫進 ④ 自己的面板，不佔用 ③
   out.style.display = 'block'; out.innerHTML = '';
-  $('aiMeta').style.display = 'none';
+  if (!outEl) $('aiMeta').style.display = 'none';
   const t0 = performance.now();
   let chars = 0, phase = `${model} 搜尋 X 貼文中`;
   const tick = () => {
@@ -2394,9 +2401,9 @@ async function runAI(prompt, statusEl, opts) {
   if ($('rememberKey').checked) localStorage.setItem('twbt_apikey', key);
   else localStorage.removeItem('twbt_apikey');
   const model = selectedModel(), effort = $('effortSel').value, webSearch = !!(opts && opts.webSearch);
-  const out = $('aiOutput');
+  const out = (opts && opts.outEl) || $('aiOutput');   // 可指定輸出區（KOL 雷達寫進 ④ 自己的面板，不佔用 ③）
   out.style.display = 'block'; out.innerHTML = '';
-  $('aiMeta').style.display = 'none';   // 新報告開始：先收起上一份的時間戳與按鈕
+  if (!opts || !opts.outEl) $('aiMeta').style.display = 'none';   // 寫 ③ 時才收起上一份的時間戳與按鈕
 
   // ── 作業中動畫：轉圈 + 經過秒數 + 階段（思考中→撰寫中），讓使用者確知 AI 仍在運作 ──
   const t0 = performance.now();
@@ -2870,6 +2877,7 @@ const REPORTS_KEY = 'twpf_reports', REPORTS_MAX = 10;
 let reportHist = [];   // [{id, ts, title, filename, fullText}] 新的在前
 try { const _r = JSON.parse(localStorage.getItem(REPORTS_KEY) || '[]'); if (Array.isArray(_r)) reportHist = _r; } catch (_) {}
 let lastReport = null;   // { fullText, filename }（複製／下載按鈕的目標＝目前顯示中的報告）
+let lastShownId = null;  // ③ 目前顯示中的報告 id（雷達報告寫入歷史後，用來還原下拉選單的選取）
 function nowStamp() {
   const d = new Date(), p = n => String(n).padStart(2, '0');
   return { date: isoD(d), full: `${isoD(d)} ${p(d.getHours())}:${p(d.getMinutes())}` };
@@ -2888,12 +2896,46 @@ function renderHistSel() {
 }
 function showReport(r) {
   lastReport = { fullText: r.fullText, filename: r.filename };
+  lastShownId = r.id;
   $('aiOutput').innerHTML = mdToHtml(r.fullText);
   $('aiOutput').style.display = 'block';
   $('aiMetaText').textContent = `📄 產生於 ${r.ts}`;
   $('aiMeta').style.display = 'flex';
   $('histSel').value = r.id;
 }
+// KOL 雷達報告：存入歷史（可由 ③ 下拉切換），但顯示在 ④ 雷達面板內——不搶 ③ 的畫面，
+// 讓「雷達點名清單」與「快篩總評」可以同時對照著看
+let lastKolEntry = null;
+function setKolReport(title, model, markdown, filenameBase) {
+  const ts = nowStamp();
+  const header = `# ${title}\n\n**產生時間：** ${ts.full}　｜　**AI 模型：** ${model}　｜　**工具：** 我的投資組合 ${APP_VERSION}\n\n---\n\n`;
+  const entry = { id: uid(), ts: ts.full, title, filename: `${filenameBase}_${ts.date}.md`, fullText: header + (markdown || '').trim() + '\n' };
+  reportHist.unshift(entry);
+  if (reportHist.length > REPORTS_MAX) reportHist.length = REPORTS_MAX;
+  saveReports();
+  renderHistSel();
+  if (lastShownId) $('histSel').value = lastShownId;   // ③ 的顯示與下拉選取維持原樣
+  lastKolEntry = entry;
+  $('kolOutput').innerHTML = mdToHtml(entry.fullText);
+  $('kolOutput').style.display = 'block';
+  $('kolMetaText').textContent = `📄 產生於 ${ts.full}（已存入 ③ 的報告歷史）`;
+  $('kolMeta').style.display = 'flex';
+}
+function downloadText(filename, text) {   // 共用下載（③ 報告與 ④ 雷達報告）
+  const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+$('kolCopyBtn').addEventListener('click', async () => {
+  if (!lastKolEntry) return;
+  const ok = await copyText(lastKolEntry.fullText), b = $('kolCopyBtn');
+  b.textContent = ok ? '✓ 已複製' : '✗ 複製失敗';
+  setTimeout(() => b.textContent = '📋 複製報告', 1500);
+});
+$('kolDlBtn').addEventListener('click', () => { if (lastKolEntry) downloadText(lastKolEntry.filename, lastKolEntry.fullText); });
 function setReport(title, model, markdown, filenameBase, meta) {
   const ts = nowStamp();
   // 時間戳與模型寫進報告開頭，讓畫面顯示、複製、下載三者內容一致
@@ -2927,15 +2969,7 @@ $('aiCopyBtn').addEventListener('click', async () => {
   b.textContent = ok ? '✓ 已複製' : '✗ 複製失敗';
   setTimeout(() => b.textContent = '📋 複製報告', 1500);
 });
-$('aiDownloadBtn').addEventListener('click', () => {
-  if (!lastReport) return;
-  const blob = new Blob([lastReport.fullText], { type: 'text/markdown;charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = lastReport.filename;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-});
+$('aiDownloadBtn').addEventListener('click', () => { if (lastReport) downloadText(lastReport.filename, lastReport.fullText); });
 
 /* ── 極簡 Markdown 轉 HTML ── */
 function mdToHtml(md) {
