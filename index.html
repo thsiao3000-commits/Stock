@@ -530,7 +530,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.28.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.28.2';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -3110,7 +3110,7 @@ function bindSettings() {
   $('cpName').value = db.settings.cpName || '';
   $('cpDesc').value = db.settings.cpDesc || '';
   $('customPersonaWrap').style.display = $('personaSel').value === '__custom__' ? '' : 'none';
-  $('kolName').value = localStorage.getItem('twbt_kol') || '';
+  $('kolName').value = localStorage.getItem('twbt_kol') || 'Serenity @aleabitoreddit';   // 預設 KOL：讓不認識任何 KOL 的使用者也有起點（可自行改掉，會記住）
   if (localStorage.getItem('twbt_websearch') === '0') $('webSearchChk').checked = false;   // 預設開啟
   $('ap_date').value = todayISO();
   $('ab_date').value = todayISO();
