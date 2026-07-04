@@ -268,6 +268,7 @@
       </div>
       <div class="grid f-bond" style="display:none">
         <label class="field">債券名稱 <input id="ab_name" placeholder="例：APPLE 4.3% 2032"></label>
+        <label class="field">ISIN／識別碼（選填，AI 查發行人信用用）<input id="ab_isin" placeholder="例：XS2861550817" maxlength="20"></label>
         <label class="field">計價幣別
           <select id="ab_ccy"><option value="USD" selected>USD</option><option value="TWD">TWD</option></select>
         </label>
@@ -547,7 +548,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.32.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.33.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1273,6 +1274,9 @@ function expandHTML(p, c) {
         </label>
         <button id="ex_markBtn" class="ghost">儲存市價</button>
         <span class="hint">上次更新：${b.markDate || '未曾更新（以買進價計）'}</span>
+        <label class="field">ISIN／識別碼（選填，改完自動存）
+          <input id="ex_isin" value="${esc(b.isin || '')}" placeholder="XS2861550817" maxlength="20" style="width:170px">
+        </label>
         <span style="flex:1"></span>
         <button id="ex_delPos" class="danger">🗑 刪除整筆持倉（含所有交易）</button>
       </div>`;
@@ -1332,6 +1336,8 @@ function bindExpand(p) {
       p.bond.mark = v; p.bond.markDate = todayISO();
       saveDB(); renderAll();
     };
+    // ISIN 補填/修改：離開欄位即存（既有持倉當初沒填也能事後補）
+    $('ex_isin').addEventListener('change', e => { p.bond.isin = e.target.value.trim().toUpperCase() || null; saveDB(); });
     return;
   }
   // 股票：更新此檔報價
@@ -1444,9 +1450,11 @@ $('addBtn').addEventListener('click', () => {
       if (!(face > 0) || !(price > 0) || !(rate >= 0)) throw new Error('請確認面額、買進價、票面利率');
       if (!buyDate || !maturity || maturity <= buyDate) throw new Error('請確認買進日與到期日（到期日需晚於買進日）');
       const mark = parseFloat($('ab_mark').value);
+      const isin = $('ab_isin').value.trim().toUpperCase();
       db.positions.push({
         id: uid(), market: 'bond', symbol: name.slice(0, 24), name: '',
         bond: {
+          isin: isin || null,   // 選填：名稱給人看、ISIN 給 AI 精確查證發行人信用
           currency: $('ab_ccy').value, face, buyPricePct: price, buyDate,
           fee: parseFloat($('ab_fee').value) || 0, accruedPaid: parseFloat($('ab_accrued').value) || 0,
           rate, freq: +$('ab_freq').value, maturity,
@@ -1470,7 +1478,7 @@ $('addBtn').addEventListener('click', () => {
     renderAll();
     $('addBox').open = false;   // 新增成功後自動收合表單
     st.textContent = '✅ 已新增。記得按「更新所有報價」取得現價。';
-    ['ap_symbol', 'ap_price', 'ap_qty', 'ab_name', 'ab_face', 'ab_price', 'ab_rate', 'ab_mark'].forEach(id => $(id).value = '');
+    ['ap_symbol', 'ap_price', 'ap_qty', 'ab_name', 'ab_isin', 'ab_face', 'ab_price', 'ab_rate', 'ab_mark'].forEach(id => $(id).value = '');
     $('ap_fee').value = 0;
   } catch (e) {
     st.className = 'status error'; st.textContent = '❌ ' + e.message;
@@ -2788,7 +2796,7 @@ function buildPortfolioPrompt() {
       const toMat = c.matured ? '已到期' : `距到期 ${(daysBetween(todayISO(), b.maturity) / 365).toFixed(1)} 年`;
       lines.push(`${MKT_NAME[p.market]},${p.symbol},面額 ${fmtMoney(b.face, ccy)},買進價 ${b.buyPricePct}%,市價 ${c.matured ? '到期' : c.markPct + '%'},` +
         `市值 ${fmtMoney(c.mv, ccy)},未實現 ${fmtMoney(c.unreal, ccy)}(${fmtPct(c.unrealPct)}),已收息 ${fmtMoney(c.received, ccy)},` +
-        `總損益 ${fmtMoney(c.total, ccy)},票息 ${b.rate}%/年,到期 ${b.maturity}（${toMat}）,買進日 ${b.buyDate}`);
+        `總損益 ${fmtMoney(c.total, ccy)},票息 ${b.rate}%/年,到期 ${b.maturity}（${toMat}）,買進日 ${b.buyDate}${b.isin ? `,ISIN ${b.isin}` : ''}`);
     } else {
       const held = c.firstBuy ? `,首買 ${c.firstBuy}（持有 ${daysBetween(c.firstBuy, todayISO())} 天）` : '';
       lines.push(`${MKT_NAME[p.market]},${p.symbol} ${p.name || ''},${nf.format(c.qty)} 股,均價 ${fnum(c.avgCost)},現價 ${p.lastPrice ?? '未更新'},` +
@@ -2818,7 +2826,7 @@ function buildPortfolioPrompt() {
   const bondCount = db.positions.filter(p => p.market === 'bond').length;
   const bondNote = bondCount ? `\n【債券部位加查（web search）】
 本組合含 ${bondCount} 筆海外公司債。請以 web search 補充下列即時資訊（查無則註明，**勿編造**）：
-- 各債券**發行人**（可由債券名稱推斷，如「APPLE 4.3% 2032」→ Apple Inc.）的最新**信用評等與展望**（Moody's／S&P／Fitch 擇一即可），近期若有升降評、展望調整或重大信用事件（大額舉債、獲利惡化、大型併購）請點出——這是持有公司債的首要風險。
+- 各債券**發行人**的最新**信用評等與展望**（Moody's／S&P／Fitch 擇一即可）——持倉明細**有附 ISIN 者請優先以 ISIN 查證**發行人與債券資訊（精確不會認錯人）；未附者由債券名稱推斷（如「APPLE 4.3% 2032」→ Apple Inc.）。近期若有升降評、展望調整或重大信用事件（大額舉債、獲利惡化、大型併購）請點出——這是持有公司債的首要風險。
 - 目前**美國公債殖利率**（2 年與 10 年）與近期方向，作為第 2 章利率敏感度與第 3 章債券評價（現價 vs 殖利率環境、距到期年數 → 久期風險）的脈絡。
 - 上述資訊請標註日期與來源；第 3 章評論債券部位時，請結合信用評等與距到期年數，給出「續抱領息／持有到期／提前處分」的看法。\n` : '';
   const bondCheck = bondCount ? '（**開始前先自我檢查**：若你本次無法使用網路搜尋（web search），請在報告**最開頭**標註一行「⚠️ 本次未啟用網路搜尋 → 債券發行人信用評等與美債殖利率未能查證」，其餘章節照常撰寫。）\n' : '';
