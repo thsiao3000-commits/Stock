@@ -419,6 +419,9 @@
         </div>
         <label class="field" style="min-width:120px">搜尋範圍
           <select id="kolDays">
+            <option value="2">近 2 天</option>
+            <option value="5">近 5 天</option>
+            <option value="10">近 10 天</option>
             <option value="30">近 30 天</option>
             <option value="60" selected>近 60 天</option>
             <option value="90">近 90 天</option>
@@ -427,7 +430,7 @@
         <button id="kolGrokBtn" class="primary" style="align-self:flex-end">⚡ Grok 直查 X</button>
         <button id="kolSearchBtn" class="primary" style="align-self:flex-end">🔍 網路搜查</button>
       </div>
-      <div class="hint" style="margin-top:4px">三種模式：<b>⚡ Grok 直查</b>（需填 xAI Key＋@帳號，x_search 鎖定<b>本人貼文</b>依所選範圍（30／60／90 天）直讀——一手、最即時，一次約 US$0.02–0.05）；<b>🔍 網路搜查</b>（OpenAI web search 靠媒體／部落格二手轉述，<b>滯後數天～數週</b>）；<b>✂️ 貼文擷取</b>（自己貼原文，本地零費用）。表格都會列<b>發文／提及日期與當時價位</b>，時機是否太晚由你自行判斷。點名 ≠ 現在還看多（本人可能已出場）。</div>
+      <div class="hint" style="margin-top:4px">三種模式：<b>⚡ Grok 直查</b>（需填 xAI Key＋@帳號，x_search 鎖定<b>本人貼文</b>依所選範圍（2／5／10／30／60／90 天）直讀——一手、最即時，一次約 US$0.02–0.05；報告含<b>期間分段總結</b>，強迫覆蓋整個範圍而非只看最近幾天）；<b>🔍 網路搜查</b>（OpenAI web search 靠媒體／部落格二手轉述，<b>滯後數天～數週</b>）；<b>✂️ 貼文擷取</b>（自己貼原文，本地零費用）。表格都會列<b>發文／提及日期與當時價位</b>，時機是否太晚由你自行判斷。點名 ≠ 現在還看多（本人可能已出場）。</div>
       <label class="field" style="margin-top:10px">或直接貼上 KOL 貼文原文（本地擷取代號——即時、精準、零 AI 費用）
         <textarea id="kolPaste" rows="3" placeholder="貼上含 $SIVE、$ALAB 這類 cashtag 的貼文（台股模式亦可貼含 2330 這類代號的文字）…"></textarea>
       </label>
@@ -548,7 +551,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.33.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.34.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -2176,12 +2179,32 @@ function kolFromDate(days) {   // 搜尋範圍起日：今天往回 N 天（x_se
   return isoD(d);
 }
 function kolDaysSel() { return +$('kolDays').value || 60; }
-// Grok 直查版：x_search 已鎖定本人帳號＋近 60 天，prompt 只負責整理與格式
+function kolBuckets(days) {   // 期間分段（近2天／3–7／8–30／31–60／61–90，截到所選範圍）：給分段總結用，強迫覆蓋全期間
+  const edges = [[1, 2], [3, 7], [8, 30], [31, 60], [61, 90]];
+  const out = [];
+  for (const [a, b] of edges) {
+    if (a > days) break;
+    out.push(a === 1 ? `近 ${Math.min(b, days)} 天` : `${a}–${Math.min(b, days)} 天前`);
+    if (b >= days) break;
+  }
+  return out;
+}
+// Grok 直查版：x_search 已鎖定本人帳號＋所選天數，prompt 只負責整理與格式
 // 收錄標準採兩類制＋固定排序：邊緣提及不再於「收／不收」間搖擺，多次執行結果更穩定
+// x_search 結果排序偏重最新貼文，長範圍常只撈到最近兩三天——故加「搜尋覆蓋要求」＋「期間分段總結」強迫看完全期間
 function buildGrokKolPrompt(name, handle, market, days = 60) {
   const mktName = market === 'tw' ? '台股' : '美股';
+  const buckets = kolBuckets(days);
+  const segRule = buckets.length > 1
+    ? `3. **期間分段總結**（務必用 Markdown 表格）：將整個期間分為 ${buckets.join('、')}，每段一列：｜時間分段｜主要點名（代號）｜主軸話題與語氣｜。該分段搜不到貼文就寫「查無貼文」，**每個分段都要有一列、不可跳過**——這一節就是用來檢查是否只總結了最近幾天。
+4. **雷達摘要**：2～3 句總結**整個 ${days} 天**的主軸方向與語氣變化（轉多／轉空／減碼獲利等），須綜觀全期間、不可只看最近幾天。
+5. 期間內查無相關貼文就直說查無，**不要編造代號或日期**。`
+    : `3. **雷達摘要**：2～3 句總結其近期主軸方向與語氣變化（轉多／轉空／減碼獲利等）。
+4. 期間內查無相關貼文就直說查無，**不要編造代號或日期**。`;
   return `你可以直接搜尋 X（Twitter）貼文；本次 x_search 已鎖定 @${handle} 本人帳號、時間範圍近 ${days} 天。請整理「${name}」在此期間**本人發文**中提及的${mktName}標的，並依下列收錄標準分為兩類（**標準務必嚴格一致**，讓多次執行的結果穩定可比）：
-
+${buckets.length > 1 ? `
+【搜尋覆蓋要求】x_search 的結果排序偏重最新貼文，單次搜尋常只撈到最近兩三天。請**分多次搜尋、覆蓋完整 ${days} 天期間**（必要時針對較早的日期區間追加搜尋不同關鍵字），確保較早的貼文也被檢視；不可只總結最近幾天就交卷。
+` : ''}
 【收錄標準】
 - **主要點名**：本人明確**看好、持有、買進、加碼或積極闡述其投資價值**的標的（通常以 $代號 明確提及）。
 - **另類提及**：其餘一切——反向指標（批評他人操作時提到）、看空或減碼、僅順帶引用（如反駁第三方報告時提到）、語氣中性不明。**不確定歸哪類時，一律歸「另類提及」**。
@@ -2193,8 +2216,7 @@ function buildGrokKolPrompt(name, handle, market, days = 60) {
    - 同一標的多次提及取**最近一次**，並在論點欄註明提及次數與語氣變化（首次點名／續抱／加碼／已獲利了結）。
    - 只收本人發文明確提到的內容，**不要推測或補充搜尋範圍以外的資訊**；貼文沒提價位就留空。
 2. **另類提及**（列點即可，非表格；沒有就省略本節）：每檔一行——代號、發文日期、不列入主要點名的原因（反向指標／看空／順帶引用等）、貼文連結。
-3. **雷達摘要**：2～3 句總結其近期主軸方向與語氣變化（轉多／轉空／減碼獲利等）。
-4. 期間內查無相關貼文就直說查無，**不要編造代號或日期**。
+${segRule}
 最後一行輸出機器可讀清單（**僅含「主要點名」的代號**、不含另類提及，逗號分隔；查無則輸出 TICKERS: none）：
 TICKERS: AAA, BBB, CCC
 
