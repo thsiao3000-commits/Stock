@@ -32,6 +32,18 @@
 
 ---
 
+## [v1.36.0] — 2026-07-07
+
+### 新增
+- **AI 串流保活（修 Safari「Load failed」中斷）＋思考進度顯示**：
+  - **問題**：macOS Safari 底層（NSURLSession）會把「超過約 60 秒沒收到任何資料」的連線直接砍掉。AI 分析在長推理（思考）階段，OpenAI 串流可能長時間不吐任何 bytes——推理深度越高、prompt 越長越容易踩到，報告還沒開始寫就中斷並顯示「❌ Load failed」。
+  - **解法**：Responses API 請求加上 `reasoning: { summary: 'auto' }`，讓「思考中」階段持續有 `reasoning_summary_text.delta` 事件流動，Safari 的閒置計時器不斷被重置，連線不再被砍。
+  - **附帶好處**：狀態列在思考階段新增「**已思考 N 字**」進度（收到正文後照舊切為「已產生 N 字」），等待長推理時可確認 AI 仍在運作。
+  - **相容防護**：若 400 錯誤與 summary／reasoning 參數有關（組織未驗證、或自訂模型不支援 reasoning），自動拿掉問題參數**以 Responses API 原路重試**，不會退到沒有 web search 的 chat/completions 相容介面。
+  - 適用所有走 OpenAI 的分析：個股分析、投資組合總評、快篩總評、KOL 雷達（OpenAI 路徑）。Grok 直查走 xAI 端點，不在此列。
+
+---
+
 ## [v1.35.0] — 2026-07-06
 
 ### 改善

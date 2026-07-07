@@ -558,7 +558,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.35.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.36.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -2356,15 +2356,35 @@ async function readSSE(res, onJson) {
   }
   if (buf.trim()) handle(buf);   // 收尾：處理最後沒有 \n\n 結尾的殘留 frame
 }
-async function streamResponses(key, model, prompt, effort, onDelta, webSearch, onSearch) {
+async function streamResponses(key, model, prompt, effort, onDelta, webSearch, onSearch, onThink) {
   const body = { model, input: prompt, stream: true, max_output_tokens: 32000 };
-  if (effort) body.reasoning = { effort };
+  // reasoning summary 兼作串流「保活」：Safari（NSURLSession）對 ~60 秒沒收到任何 bytes 的連線
+  // 會直接砍線（Load failed）。長推理階段若沒有 summary 事件持續流動，正文還沒開始就會被切斷。
+  body.reasoning = effort ? { effort, summary: 'auto' } : { summary: 'auto' };
   if (webSearch) { body.tools = [{ type: 'web_search' }]; body.tool_choice = 'auto'; }
-  const res = await fetch('https://api.openai.com/v1/responses', {
+  const post = () => fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
     body: JSON.stringify(body),
   });
+  let res = await post();
+  if (!res.ok && res.status === 400 && body.reasoning) {
+    // 400 且與 reasoning／summary 相關 → 拿掉問題參數重試一次，保住 Responses API 與 web search
+    // （不能讓它落到 chat/completions 相容介面，那條路沒有 web search）：
+    // ① 組織未驗證不能用 summary（訊息含 verified/summaries）→ 只拿掉 summary、保留 effort
+    // ② 模型不支援 reasoning 參數（如自訂的非推理模型）→ 整個 reasoning 拿掉
+    const e = await res.json().catch(() => ({}));
+    const msg = e.error?.message || '';
+    if (/summar|verif/i.test(msg)) {
+      if (effort) body.reasoning = { effort }; else delete body.reasoning;
+      res = await post();
+    } else if (/reasoning/i.test(msg)) {
+      delete body.reasoning;
+      res = await post();
+    } else {
+      const err = new Error(msg || 'OpenAI HTTP 400'); err.status = 400; throw err;
+    }
+  }
   if (!res.ok) {
     const e = await res.json().catch(() => ({}));
     const err = new Error(e.error?.message || ('OpenAI HTTP ' + res.status));
@@ -2376,6 +2396,7 @@ async function streamResponses(key, model, prompt, effort, onDelta, webSearch, o
     const t = j.type || '';
     if (t.endsWith('output_text.delta') && typeof j.delta === 'string') { full += j.delta; onDelta(full); }
     else if (t.endsWith('output_text.annotation.added') && j.annotation && j.annotation.url) anns.push(j.annotation);
+    else if (t.endsWith('reasoning_summary_text.delta') && typeof j.delta === 'string') { onThink && onThink(j.delta); }   // 思考摘要（兼保活）
     else if (t.includes('web_search')) { onSearch && onSearch(); }   // 正在搜尋新聞
     else if (t === 'response.incomplete') truncated = j.response?.incomplete_details?.reason || 'incomplete';
     else if (t === 'response.failed' || t === 'error') failMsg = j.response?.error?.message || j.error?.message || j.message || '串流中斷';
@@ -2493,12 +2514,12 @@ async function runAI(prompt, statusEl, opts) {
 
   // ── 作業中動畫：轉圈 + 經過秒數 + 階段（思考中→撰寫中），讓使用者確知 AI 仍在運作 ──
   const t0 = performance.now();
-  let chars = 0, phase = `${model} 思考中`;
+  let chars = 0, thinkChars = 0, phase = `${model} 思考中`;
   const tick = () => {
     const s = Math.round((performance.now() - t0) / 1000);
     statusEl.className = 'status';
     statusEl.innerHTML = `<span class="spinner"></span>🤖 ${esc(phase)}<span class="working-dots"></span>　已 ${s}s` +
-      (chars ? `　·　已產生 ${chars} 字` : '');
+      (chars ? `　·　已產生 ${chars} 字` : (thinkChars ? `　·　已思考 ${thinkChars} 字` : ''));
   };
   tick();
   const timer = setInterval(tick, 250);
@@ -2512,10 +2533,11 @@ async function runAI(prompt, statusEl, opts) {
     out.innerHTML = mdToHtml(txt);
   };
   const onSearch = () => { if (chars === 0) phase = `${model} 搜尋新聞中`; };   // 撰寫前若在搜尋，顯示之
+  const onThink = d => { thinkChars += d.length; if (chars === 0) phase = `${model} 思考中`; };   // 收到思考摘要 → 從搜尋切回思考
   try {
     let r;
     try {
-      r = await streamResponses(key, model, prompt, effort, paint, webSearch, onSearch);
+      r = await streamResponses(key, model, prompt, effort, paint, webSearch, onSearch, onThink);
     } catch (e) {
       if ([400, 404, 422].includes(e.status)) {
         phase = `${model} 改用相容介面`;   // 退回 chat/completions（不支援 web_search）
