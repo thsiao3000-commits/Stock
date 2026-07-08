@@ -51,6 +51,11 @@
   .pw .eye:hover { color: var(--text); }
   .row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-top: 14px; }
   .hint { font-size: .8rem; color: var(--muted); }
+  /* 長說明摺疊：行內只留一句 summary，展開才看全文——避免灰色小字文字牆 */
+  details.hintFold { margin-top: 6px; }
+  details.hintFold > summary { cursor: pointer; color: var(--muted); font-size: .8rem; }
+  details.hintFold > summary:hover { color: var(--accent); }
+  details.hintFold > .hint { margin-top: 6px; line-height: 1.7; }
   button.primary {
     background: var(--accent); color: #04101f; font-weight: 700;
     padding: 10px 22px; cursor: pointer; border: none;
@@ -116,7 +121,7 @@
   .exGrid .kv b { color: var(--text); display: block; font-size: .92rem; }
   .txTable { margin-top: 8px; }
   #chartWrap { position: relative; margin-top: 16px; display: none; }
-  #chart { width: 100%; height: 320px; display: block; }
+  #chart { width: 100%; height: 360px; display: block; }
   #tooltip {
     position: absolute; pointer-events: none; display: none;
     background: rgba(15,20,25,.95); border: 1px solid var(--border);
@@ -226,7 +231,7 @@
       <label class="hint" style="display:flex; align-items:center; gap:5px"><input id="exportKeys" type="checkbox"> 匯出時包含 API 金鑰</label>
       <span id="ioStatus" class="hint"></span>
     </div>
-    <div class="hint" style="margin-top:4px">持倉與設定只存在本機瀏覽器；匯出 JSON 可備份或搬到其他裝置／瀏覽器，匯入會「覆蓋」目前資料。</div>
+    <div class="hint" style="margin-top:4px">持倉、設定、報告歷史與模型／視角等偏好都只存在本機瀏覽器；匯出 JSON 會一併備份，匯入會「覆蓋」目前資料。</div>
   </details>
 
   <!-- ── 損益總覽 ── -->
@@ -360,16 +365,22 @@
     </div>
     <div class="legend" id="chartLegend" style="display:none">
       <span><i style="background:var(--accent)"></i>收盤價</span>
+      <span><i style="background:#ff9f43"></i>MA20</span>
+      <span><i style="background:#b48ff0"></i>MA60</span>
       <span><i style="background:var(--gold)"></i>我的均價</span>
+      <span><i style="background:rgba(255,107,107,.5)"></i>量能（紅漲綠跌日）</span>
       <span><span style="color:var(--up)">▲</span> 買進　<span style="color:var(--down)">▼</span> 賣出</span>
     </div>
     <div class="row">
-      <button id="aiBtn" class="primary" disabled title="請先按「📊 載入走勢圖與數據」載入標的資料">🤖 產生個股 AI 分析</button>
+      <button id="aiBtn" class="primary">🤖 產生個股 AI 分析</button>
       <button id="pfBtn" class="primary">💼 產生投資組合總評</button>
       <button id="copyStockPrompt" class="ghost">📋 複製個股 Prompt</button>
       <button id="copyPfPrompt" class="ghost">📋 複製組合 Prompt</button>
     </div>
-    <div class="hint" style="margin-top:4px">「產生 AI 分析」會呼叫 OpenAI（耗 token）；若想省 token，可改按「複製 Prompt」把同一份提問貼到訂閱制聊天機器人（如 Gemini）。新聞與美股基本面那段需該機器人能上網查詢才會生效；台股的技術面／籌碼／配息等數據已內含在 Prompt 中。報告自動保留<b>最近 10 份</b>於本機（重新整理不消失），可由報告上方的下拉選單切換、對照前後觀點變化。「分析視角」可切換單一風格（含<b>供應鏈瓶頸獵人</b>與<b>自訂視角</b>——把你欣賞的分析師方法論寫成準則）或<b>三師會診</b>（價值×成長×技術各自表態、主持人裁決）；同一檔重複分析時會自動附上<b>上次建議檢討</b>（對照期間實際走勢、檢討上次判斷對錯）。</div>
+    <details class="hintFold">
+      <summary>ℹ️ 使用提示：省 token 技巧、報告歷史、分析視角、上次建議檢討</summary>
+      <div class="hint">「產生 AI 分析」會呼叫 OpenAI（耗 token）；若想省 token，可改按「複製 Prompt」把同一份提問貼到訂閱制聊天機器人（如 Gemini）。新聞與美股基本面那段需該機器人能上網查詢才會生效；台股的技術面／籌碼／配息等數據已內含在 Prompt 中。報告自動保留<b>最近 10 份</b>於本機（重新整理不消失），可由報告上方的下拉選單切換、對照前後觀點變化。「分析視角」可切換單一風格（含<b>供應鏈瓶頸獵人</b>與<b>自訂視角</b>——把你欣賞的分析師方法論寫成準則）或<b>三師會診</b>（價值×成長×技術各自表態、主持人裁決）；同一檔重複分析時會自動附上<b>上次建議檢討</b>（對照期間實際走勢、檢討上次判斷對錯）。</div>
+    </details>
     <div id="aiStatus" class="status"></div>
     <div id="aiMeta" style="display:none; align-items:center; gap:10px; margin-top:12px; padding:8px 12px; background:var(--panel2); border:1px solid var(--border); border-radius:8px; font-size:.82rem; color:var(--muted); flex-wrap:wrap;">
       <select id="histSel" title="切換歷史報告（自動保留最近 10 份）" style="max-width:320px; font-size:.82rem; padding:5px 8px;"></select>
@@ -437,7 +448,10 @@
         <button id="kolGrokBtn" class="primary" style="align-self:flex-end">⚡ Grok 直查 X</button>
         <button id="kolSearchBtn" class="primary" style="align-self:flex-end">🔍 網路搜查</button>
       </div>
-      <div class="hint" style="margin-top:4px">三種模式：<b>⚡ Grok 直查</b>（需填 xAI Key＋@帳號，x_search 鎖定<b>本人貼文</b>依所選範圍（2／5／10／30／60／90 天）直讀——一手、最即時，一次約 US$0.02–0.05；報告含<b>期間分段總結</b>，強迫覆蓋整個範圍而非只看最近幾天）；<b>🔍 網路搜查</b>（OpenAI web search 靠媒體／部落格二手轉述，<b>滯後數天～數週</b>）；<b>✂️ 貼文擷取</b>（自己貼原文，本地零費用）。表格都會列<b>發文／提及日期與當時價位</b>，時機是否太晚由你自行判斷。點名 ≠ 現在還看多（本人可能已出場）。</div>
+      <details class="hintFold">
+        <summary>ℹ️ 三種模式怎麼選：費用、即時性與注意事項</summary>
+        <div class="hint">三種模式：<b>⚡ Grok 直查</b>（需填 xAI Key＋@帳號，x_search 鎖定<b>本人貼文</b>依所選範圍（2／5／10／30／60／90 天）直讀——一手、最即時，一次約 US$0.02–0.05；報告含<b>期間分段總結</b>，強迫覆蓋整個範圍而非只看最近幾天）；<b>🔍 網路搜查</b>（OpenAI web search 靠媒體／部落格二手轉述，<b>滯後數天～數週</b>）；<b>✂️ 貼文擷取</b>（自己貼原文，本地零費用）。表格都會列<b>發文／提及日期與當時價位</b>，時機是否太晚由你自行判斷。點名 ≠ 現在還看多（本人可能已出場）。</div>
+      </details>
       <label class="field" style="margin-top:10px">或直接貼上 KOL 貼文原文（本地擷取代號——即時、精準、零 AI 費用）
         <textarea id="kolPaste" rows="3" placeholder="貼上含 $SIVE、$ALAB 這類 cashtag 的貼文（台股模式亦可貼含 2330 這類代號的文字）…"></textarea>
       </label>
@@ -558,7 +572,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.37.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.38.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1626,20 +1640,28 @@ $('aiTarget').addEventListener('change', () => {
 });
 segBind('aiMarket');
 
-$('fetchBtn').addEventListener('click', async () => {
-  const st = $('fetchStatus'); st.className = 'status';
-  let market, symbol, pos = null;
+// 解析 ③ 目前選定的分析標的；無效時在 fetchStatus 顯示原因並回 null
+function resolveAiTarget() {
+  const st = $('fetchStatus');
   const tv = $('aiTarget').value;
   if (tv === '__manual__') {
-    market = segVal('aiMarket'); symbol = $('aiSymbol').value.trim();
+    const market = segVal('aiMarket');
+    let symbol = $('aiSymbol').value.trim();
     if (market === 'us') symbol = symbol.toUpperCase();
-    if (!symbol) { st.className = 'status error'; st.textContent = '請輸入代號'; return; }
-  } else {
-    pos = db.positions.find(p => p.id === tv);
-    if (!pos) { st.className = 'status error'; st.textContent = '請先新增持倉或選擇自行輸入'; return; }
-    market = pos.market; symbol = pos.symbol;
+    if (!symbol) { st.className = 'status error'; st.textContent = '請輸入代號'; return null; }
+    return { market, symbol, pos: null };
   }
-  $('fetchBtn').disabled = true; $('aiBtn').disabled = true;
+  const pos = db.positions.find(p => p.id === tv);
+  if (!pos) { st.className = 'status error'; st.textContent = '請先新增持倉或選擇自行輸入'; return null; }
+  return { market: pos.market, symbol: pos.symbol, pos };
+}
+// 載入走勢圖與數據（③ 主資料流）：成功回 true。「產生個股 AI 分析」會在資料未載入或標的變更時自動先呼叫（一鍵分析）
+async function loadYearData() {
+  const st = $('fetchStatus'); st.className = 'status';
+  const t = resolveAiTarget();
+  if (!t) return false;
+  const { market, symbol, pos } = t;
+  $('fetchBtn').disabled = true;
   try {
     const end = todayISO(), start = isoD(addMonths(new Date(), -12));
     let days, name = pos?.name || '', idx, idxLabel, srcNote = '', industry = '', divStats = null, chip = null, rev = null, per = null, foreign = null, margin = null, usFund = null, usNews = null;
@@ -1704,7 +1726,7 @@ $('fetchBtn').addEventListener('click', async () => {
     $('chartInfo').textContent = info.join('　·　');
     $('chartWrap').style.display = ''; $('chartLegend').style.display = '';
     drawChart();
-    $('aiBtn').disabled = false; $('aiBtn').title = '';
+    return true;
   } catch (e) {
     st.className = 'status error'; st.textContent = '❌ ' + e.message;
     // 清掉上一檔留下的殘影，避免「失敗了卻還顯示舊價格／持倉」的誤導
@@ -1712,31 +1734,37 @@ $('fetchBtn').addEventListener('click', async () => {
     $('chartInfo').textContent = '';
     $('chartWrap').style.display = 'none';
     $('chartLegend').style.display = 'none';
-    $('aiBtn').disabled = true; $('aiBtn').title = '請先按「📊 載入走勢圖與數據」載入標的資料';   // 無有效資料 → 不能產生個股分析
+    return false;
   } finally {
     $('fetchBtn').disabled = false;
   }
-});
+}
+$('fetchBtn').addEventListener('click', loadYearData);
 
+const fmtVol = v => v >= 1e8 ? (v / 1e8).toFixed(2) + ' 億' : v >= 1e4 ? (v / 1e4).toFixed(1) + ' 萬' : String(v);   // 成交量（股）縮寫
 function drawChart(hoverIdx = -1) {
   if (!aiData) return;
   const { days, posStats, pos } = aiData;
   const c = $('chart'), dpr = window.devicePixelRatio || 1;
-  const W = c.clientWidth, H = 320;
+  const W = c.clientWidth, H = 360;
   c.width = W * dpr; c.height = H * dpr;
   const ctx = c.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
 
   const padL = 56, padR = 14, padT = 14, padB = 28;
+  const volH = 46, volGap = 8;               // 底部量能區高度、與價格區的間距
+  const priceB = H - padB - volH - volGap;   // 價格區底界
   const closes = days.map(d => d.close);
+  // MA 序列快取在 aiData 上（drawChart 在滑鼠移動時高頻重繪；換標的時 aiData 重建、快取自然失效）
+  if (!aiData._ma20) { aiData._ma20 = smaSeries(closes, 20); aiData._ma60 = smaSeries(closes, 60); }
   const avg = posStats && posStats.qty > 0 ? posStats.avgCost : null;
   let lo = Math.min(...closes), hi = Math.max(...closes);
   if (avg != null) { lo = Math.min(lo, avg); hi = Math.max(hi, avg); }
   if (hi - lo < 1e-9) { hi += 1; lo -= 1; }
   const pad = (hi - lo) * 0.04; lo -= pad; hi += pad;
   const xAt = i => padL + (W - padL - padR) * (days.length === 1 ? .5 : i / (days.length - 1));
-  const yAt = v => padT + (H - padT - padB) * (1 - (v - lo) / (hi - lo));
+  const yAt = v => padT + (priceB - padT) * (1 - (v - lo) / (hi - lo));
 
   ctx.strokeStyle = '#2d3a4b'; ctx.fillStyle = '#8b9bb0';
   ctx.font = '11px -apple-system, "PingFang TC", sans-serif'; ctx.lineWidth = 1;
@@ -1751,6 +1779,28 @@ function drawChart(hoverIdx = -1) {
     const i = Math.round(s * (days.length - 1) / Math.max(1, ticks - 1));
     ctx.fillText(days[i].date.slice(2), xAt(i), H - 8);
   }
+  // 底部量能柱：紅漲綠跌「日」（依收盤 vs 前日收盤；台股慣例配色），高度相對期間最大量
+  const vols = days.map(d => d.volume || 0);
+  const vMax = Math.max(...vols, 1);
+  const bw = Math.max(1, (W - padL - padR) / days.length * 0.7);
+  days.forEach((d, i) => {
+    const v = vols[i]; if (!v) return;
+    const up = d.close >= (i === 0 ? (d.open ?? d.close) : days[i - 1].close);
+    ctx.fillStyle = up ? 'rgba(255,107,107,.5)' : 'rgba(46,204,143,.5)';
+    const bh = v / vMax * volH;
+    ctx.fillRect(xAt(i) - bw / 2, H - padB - bh, bw, bh);
+  });
+  ctx.fillStyle = '#8b9bb0'; ctx.textAlign = 'right';
+  ctx.fillText('量', padL - 6, H - padB - volH / 2 + 4);
+  // MA20／MA60 疊線（讓圖跟 AI 報告談的均線對得上）；先畫均線再畫收盤價，收盤線蓋在最上層
+  const drawMA = (arr, col) => {
+    ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.beginPath();
+    let started = false;
+    arr.forEach((v, i) => { if (v == null) return; const x = xAt(i), y = yAt(v); if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y); });
+    ctx.stroke();
+  };
+  drawMA(aiData._ma20, '#ff9f43');
+  drawMA(aiData._ma60, '#b48ff0');
   // 收盤價
   ctx.strokeStyle = '#4aa3ff'; ctx.lineWidth = 2; ctx.beginPath();
   closes.forEach((v, i) => i === 0 ? ctx.moveTo(xAt(i), yAt(v)) : ctx.lineTo(xAt(i), yAt(v)));
@@ -1796,7 +1846,11 @@ $('chart').addEventListener('mousemove', e => {
   drawChart(i);
   const tip = $('tooltip');
   tip.style.display = 'block';
+  const m20 = aiData._ma20 && aiData._ma20[i], m60 = aiData._ma60 && aiData._ma60[i];
   let html = `<b>${days[i].date}</b><br>收盤：${days[i].close}`;
+  if (m20 != null) html += `　MA20：${m20.toFixed(2)}`;
+  if (m60 != null) html += `　MA60：${m60.toFixed(2)}`;
+  html += `<br>量：${fmtVol(days[i].volume || 0)}`;
   if (posStats && posStats.qty > 0)
     html += `<br>vs 均價：${fmtPct((days[i].close / posStats.avgCost - 1) * 100)}`;
   tip.innerHTML = html;
@@ -2950,9 +3004,16 @@ ${ch6}
 
 $('aiBtn').addEventListener('click', async () => {
   const st = $('aiStatus'); st.className = 'status';
-  if (!aiData) { st.className = 'status error'; st.textContent = '請先抓取資料'; return; }
+  if ($('fetchBtn').disabled) { st.textContent = '數據載入中，請待完成後再按一次'; return; }
+  const t = resolveAiTarget();   // 無效時 resolveAiTarget 已在上方 fetchStatus 顯示原因
+  if (!t) { st.className = 'status error'; st.textContent = '請先選擇或輸入分析標的（原因見上方訊息）'; return; }
   $('aiBtn').disabled = true; $('pfBtn').disabled = true;
   try {
+    // 一鍵分析：尚未載入資料、或選定標的與已載入的不同 → 自動先載入再分析
+    if (!aiData || aiData.symbol !== t.symbol || aiData.market !== t.market) {
+      st.textContent = '先自動載入標的數據…';
+      if (!await loadYearData()) { st.className = 'status error'; st.textContent = '❌ 數據載入失敗（原因見上方「載入」狀態列）'; return; }
+    }
     const { text, model, truncated } = await runAI(buildStockPrompt(), st, { webSearch: $('webSearchChk').checked });
     const pv = personaLabel(selectedPersona());
     const title = `${aiData.market === 'tw' ? '台股' : '美股'}個股分析 — ${aiData.symbol}${aiData.name ? ' ' + aiData.name : ''}${pv ? `（${pv}）` : ''}`;
@@ -3209,7 +3270,16 @@ function exportData() {
   const inclKeys = $('exportKeys').checked;
   const settings = { ...db.settings };
   if (!inclKeys) { settings.twelveKey = ''; settings.finmindToken = ''; settings.finnhubKey = ''; settings.xaiKey = ''; }
-  const data = { app: 'twpf', version: APP_VERSION, exportedAt: new Date().toISOString(), positions: db.positions, watchlist: db.watchlist, settings };
+  const data = {
+    app: 'twpf', version: APP_VERSION, exportedAt: new Date().toISOString(),
+    positions: db.positions, watchlist: db.watchlist, settings,
+    reports: reportHist,   // 報告歷史（最近 10 份）——換裝置不再遺失
+    prefs: {               // UI 偏好（twbt_*；不含任何金鑰）
+      model: localStorage.getItem('twbt_model') || '', effort: localStorage.getItem('twbt_effort') || '',
+      persona: localStorage.getItem('twbt_persona') || '', websearch: localStorage.getItem('twbt_websearch') || '',
+      kol: localStorage.getItem('twbt_kol') || '', koldays: localStorage.getItem('twbt_koldays') || '',
+    },
+  };
   if (inclKeys) { const k = localStorage.getItem('twbt_apikey'); if (k) data.openaiKey = k; }
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
@@ -3217,7 +3287,7 @@ function exportData() {
   a.download = `portfolio_backup_${todayISO()}.json`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  ioStatus(`✅ 已匯出 ${db.positions.length} 筆持倉${inclKeys ? '（含金鑰，請妥善保管）' : '（不含金鑰）'}`);
+  ioStatus(`✅ 已匯出 ${db.positions.length} 筆持倉＋${reportHist.length} 份報告歷史${inclKeys ? '（含金鑰，請妥善保管）' : '（不含金鑰）'}`);
 }
 function importData(file) {
   const r = new FileReader();
@@ -3230,12 +3300,19 @@ function importData(file) {
     db.watchlist = Array.isArray(data.watchlist) ? data.watchlist.filter(w => w && w.id && w.symbol && w.market) : [];
     db.settings = Object.assign({ twelveKey: '', finmindToken: '', finnhubKey: '', xaiKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '', cpName: '', cpDesc: '' }, data.settings || {});
     if (data.openaiKey) localStorage.setItem('twbt_apikey', data.openaiKey);
+    if (Array.isArray(data.reports)) { reportHist = data.reports.slice(0, REPORTS_MAX); saveReports(); }   // 舊版備份無此欄位 → 保留現有歷史
+    if (data.prefs && typeof data.prefs === 'object') {   // UI 偏好（v1.38.0 起）；空值不覆蓋
+      const P = { model: 'twbt_model', effort: 'twbt_effort', persona: 'twbt_persona', websearch: 'twbt_websearch', kol: 'twbt_kol', koldays: 'twbt_koldays' };
+      for (const [k, lsKey] of Object.entries(P)) if (data.prefs[k] != null && data.prefs[k] !== '') localStorage.setItem(lsKey, String(data.prefs[k]));
+    }
     saveDB();
     fillSettingsUI();
+    restorePrefsUI();
     expandedId = null;
     renderAll();
+    if (reportHist.length) { renderHistSel(); showReport(reportHist[0]); }
     ensureFX(false).then(renderSummary);
-    ioStatus(`✅ 已匯入 ${db.positions.length} 筆持倉${data.exportedAt ? `（備份於 ${data.exportedAt.slice(0, 10)}）` : ''}`);
+    ioStatus(`✅ 已匯入 ${db.positions.length} 筆持倉${Array.isArray(data.reports) ? `＋${reportHist.length} 份報告歷史` : ''}${data.exportedAt ? `（備份於 ${data.exportedAt.slice(0, 10)}）` : ''}`);
   };
   r.readAsText(file);
 }
@@ -3284,14 +3361,8 @@ function bindSettings() {
     el.addEventListener('pointerdown', unlock);
   });
 }
-(function init() {
-  loadDB();
-  bindSettings();
-  $('appVer').textContent = APP_VERSION;
-  const _yr = new Date().getFullYear();
-  $('appVerFoot').textContent = `© 2026${_yr > 2026 ? '–' + _yr : ''} Tony Hsiao　·　我的投資組合 + AI 分析 ${APP_VERSION}`;
-  // 還原設定（含 API 金鑰，沿用舊回測工具的 localStorage key）
-  fillSettingsUI();
+// 還原 UI 偏好（模型／推理深度／視角／web search／KOL 欄位）：init 與「匯入 JSON」後共用
+function restorePrefsUI() {
   const savedModel = localStorage.getItem('twbt_model');
   if (savedModel && [...$('modelSel').options].some(o => o.value === savedModel)) {
     $('modelSel').value = savedModel;
@@ -3307,12 +3378,22 @@ function bindSettings() {
   $('kolName').value = localStorage.getItem('twbt_kol') || 'Serenity @aleabitoreddit';   // 預設 KOL：讓不認識任何 KOL 的使用者也有起點（可自行改掉，會記住）
   const savedKolDays = localStorage.getItem('twbt_koldays');
   if (savedKolDays && [...$('kolDays').options].some(o => o.value === savedKolDays)) $('kolDays').value = savedKolDays;
-  if (localStorage.getItem('twbt_websearch') === '0') $('webSearchChk').checked = false;   // 預設開啟
+  $('webSearchChk').checked = localStorage.getItem('twbt_websearch') !== '0';   // 預設開啟
+}
+(function init() {
+  loadDB();
+  bindSettings();
+  $('appVer').textContent = APP_VERSION;
+  const _yr = new Date().getFullYear();
+  $('appVerFoot').textContent = `© 2026${_yr > 2026 ? '–' + _yr : ''} Tony Hsiao　·　我的投資組合 + AI 分析 ${APP_VERSION}`;
+  // 還原設定（含 API 金鑰，沿用舊回測工具的 localStorage key）
+  fillSettingsUI();
+  restorePrefsUI();
   $('ap_date').value = todayISO();
   $('ab_date').value = todayISO();
   if (!db.positions.length) $('addBox').open = true;
-  // ③ 的操作順序提示：說明個股分析按鈕為何反灰（一開始操作就會被正常狀態訊息取代）
-  $('fetchStatus').textContent = '提示：先選「分析標的」→ 按「📊 載入走勢圖與數據」→ 完成後即可產生個股 AI 分析。';
+  // ③ 的操作提示（一開始操作就會被正常狀態訊息取代）
+  $('fetchStatus').textContent = '提示：選好「分析標的」後直接按「🤖 產生個股 AI 分析」即可（會自動載入數據）；想先看走勢圖可按「📊 載入走勢圖與數據」。';
   renderAll();
   if (reportHist.length) { renderHistSel(); showReport(reportHist[0]); }   // 還原上次報告（重新整理不消失）
   ensureFX(false).then(renderSummary);
