@@ -558,7 +558,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.36.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.36.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -2357,7 +2357,7 @@ async function readSSE(res, onJson) {
   if (buf.trim()) handle(buf);   // 收尾：處理最後沒有 \n\n 結尾的殘留 frame
 }
 async function streamResponses(key, model, prompt, effort, onDelta, webSearch, onSearch, onThink) {
-  const body = { model, input: prompt, stream: true, max_output_tokens: 32000 };
+  const body = { model, input: prompt, stream: true, max_output_tokens: 64000 };
   // reasoning summary 兼作串流「保活」：Safari（NSURLSession）對 ~60 秒沒收到任何 bytes 的連線
   // 會直接砍線（Load failed）。長推理階段若沒有 summary 事件持續流動，正文還沒開始就會被切斷。
   body.reasoning = effort ? { effort, summary: 'auto' } : { summary: 'auto' };
