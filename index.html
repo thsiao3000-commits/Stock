@@ -340,7 +340,7 @@
         </div>
         <input id="aiSymbol" placeholder="代號" style="width:110px">
       </div>
-      <button id="fetchBtn" class="primary">📊 抓取一年資料</button>
+      <button id="fetchBtn" class="primary">📊 載入走勢圖與數據</button>
     </div>
     <div id="customPersonaWrap" style="display:none; margin-top:10px">
       <div class="grid" style="grid-template-columns: minmax(230px, 320px)">
@@ -364,10 +364,10 @@
       <span><span style="color:var(--up)">▲</span> 買進　<span style="color:var(--down)">▼</span> 賣出</span>
     </div>
     <div class="row">
-      <button id="aiBtn" class="primary" disabled>🤖 產生個股 AI 分析</button>
+      <button id="aiBtn" class="primary" disabled title="請先按「📊 載入走勢圖與數據」載入標的資料">🤖 產生個股 AI 分析</button>
       <button id="pfBtn" class="primary">💼 產生投資組合總評</button>
-      <button id="copyStockPrompt" class="primary">📋 複製個股 Prompt</button>
-      <button id="copyPfPrompt" class="primary">📋 複製組合 Prompt</button>
+      <button id="copyStockPrompt" class="ghost">📋 複製個股 Prompt</button>
+      <button id="copyPfPrompt" class="ghost">📋 複製組合 Prompt</button>
     </div>
     <div class="hint" style="margin-top:4px">「產生 AI 分析」會呼叫 OpenAI（耗 token）；若想省 token，可改按「複製 Prompt」把同一份提問貼到訂閱制聊天機器人（如 Gemini）。新聞與美股基本面那段需該機器人能上網查詢才會生效；台股的技術面／籌碼／配息等數據已內含在 Prompt 中。報告自動保留<b>最近 10 份</b>於本機（重新整理不消失），可由報告上方的下拉選單切換、對照前後觀點變化。「分析視角」可切換單一風格（含<b>供應鏈瓶頸獵人</b>與<b>自訂視角</b>——把你欣賞的分析師方法論寫成準則）或<b>三師會診</b>（價值×成長×技術各自表態、主持人裁決）；同一檔重複分析時會自動附上<b>上次建議檢討</b>（對照期間實際走勢、檢討上次判斷對錯）。</div>
     <div id="aiStatus" class="status"></div>
@@ -395,7 +395,7 @@
       <span style="flex:1"></span>
       <button id="wlScanBtn" class="primary">🔍 快篩全部</button>
       <button id="wlAiBtn" class="primary">🤖 AI 快篩總評</button>
-      <button id="wlCopyBtn" class="primary">📋 複製快篩 Prompt</button>
+      <button id="wlCopyBtn" class="ghost">📋 複製快篩 Prompt</button>
     </div>
     <div id="wlChips" class="row" style="gap:8px"></div>
     <div id="wlStatus" class="status"></div>
@@ -558,10 +558,23 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.36.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.37.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+// 金鑰缺漏 → 自動展開設定區、聚焦該欄位並捲入視野（focus 會觸發解鎖 readonly），再拋錯給呼叫端顯示訊息
+function throwKeyError(fieldId, msg) {
+  $('setupBox').open = true;
+  const el = $(fieldId);
+  el.focus({ preventScroll: true });
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  throw new Error(msg + '（已為你展開設定區）');
+}
+// AI 報告開始產生時把輸出面板帶進視野；已在畫面上就不動，避免打斷使用者正在看的內容
+function scrollToPanel(el) {
+  const r = el.getBoundingClientRect();
+  if (r.top < 0 || r.top > innerHeight * 0.7) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
 
 /* ════════════════ 共用工具 ════════════════ */
 const nf  = new Intl.NumberFormat('zh-TW');
@@ -841,7 +854,7 @@ function marginStats(rows) {
 }
 function tdKeyOrThrow() {
   const k = (db.settings.twelveKey || '').trim();
-  if (!k) throw new Error('請先在「API 與參數設定」填入 Twelve Data API Key');
+  if (!k) throwKeyError('tdKey', '美股需要 Twelve Data API Key');
   return k;
 }
 async function tdDaily(symbol) {   // 美股日線（約一年）
@@ -1687,10 +1700,11 @@ $('fetchBtn').addEventListener('click', async () => {
     }
     if (divStats && divStats.yieldPct != null) info.push(`現金殖利率 ${divStats.yieldPct.toFixed(2)}%`);
     if (divStats && divStats.next) info.push(`下次除息 ${divStats.next.exDate}（${divStats.daysToNext} 天後）`);
+    if (market === 'us' && !fhKey()) info.push('⚠️ 未填 Finnhub Key，本次略過基本面／新聞（可於設定補填）');   // 靜默降級改為明示
     $('chartInfo').textContent = info.join('　·　');
     $('chartWrap').style.display = ''; $('chartLegend').style.display = '';
     drawChart();
-    $('aiBtn').disabled = false;
+    $('aiBtn').disabled = false; $('aiBtn').title = '';
   } catch (e) {
     st.className = 'status error'; st.textContent = '❌ ' + e.message;
     // 清掉上一檔留下的殘影，避免「失敗了卻還顯示舊價格／持倉」的誤導
@@ -1698,7 +1712,7 @@ $('fetchBtn').addEventListener('click', async () => {
     $('chartInfo').textContent = '';
     $('chartWrap').style.display = 'none';
     $('chartLegend').style.display = 'none';
-    $('aiBtn').disabled = true;   // 無有效資料 → 不能產生個股分析
+    $('aiBtn').disabled = true; $('aiBtn').title = '請先按「📊 載入走勢圖與數據」載入標的資料';   // 無有效資料 → 不能產生個股分析
   } finally {
     $('fetchBtn').disabled = false;
   }
@@ -2453,11 +2467,12 @@ async function streamXai(key, model, prompt, tools, onDelta) {
 // Grok 執行器：與 runAI 相同的作業動畫（轉圈＋秒數＋階段），但走 xAI 端點、固定 grok-4.3（x_search 官方建議模型）
 async function runGrok(prompt, tools, statusEl, outEl) {
   const key = (db.settings.xaiKey || '').trim();
-  if (!key) throw new Error('請先在「API 與參數設定」填入 xAI API Key');
+  if (!key) throwKeyError('xaiKey', 'Grok 直查需要 xAI API Key');
   const model = 'grok-4.3';
   const out = outEl || $('aiOutput');   // ④ 的面板（快篩總評／KOL 雷達）自帶輸出區，不佔用 ③
   out.style.display = 'block'; out.innerHTML = '';
   if (!outEl) $('aiMeta').style.display = 'none';
+  scrollToPanel(out);   // 輸出面板可能在按鈕下方很遠處（尤其手機）——開始產生時帶進視野
   const t0 = performance.now();
   let chars = 0, phase = `${model} 搜尋 X 貼文中`;
   const tick = () => {
@@ -2504,13 +2519,14 @@ async function streamChat(key, model, prompt, onDelta) {
 }
 async function runAI(prompt, statusEl, opts) {
   const key = $('apiKey').value.trim();
-  if (!key) throw new Error('請輸入 OpenAI API Key（於「API 與參數設定」）');
+  if (!key) throwKeyError('apiKey', '請輸入 OpenAI API Key');
   if ($('rememberKey').checked) localStorage.setItem('twbt_apikey', key);
   else localStorage.removeItem('twbt_apikey');
   const model = selectedModel(), effort = $('effortSel').value, webSearch = !!(opts && opts.webSearch);
   const out = (opts && opts.outEl) || $('aiOutput');   // 可指定輸出區（④ 的快篩總評／KOL 雷達寫進自己的面板，不佔用 ③）
   out.style.display = 'block'; out.innerHTML = '';
   if (!opts || !opts.outEl) $('aiMeta').style.display = 'none';   // 寫 ③ 時才收起上一份的時間戳與按鈕
+  scrollToPanel(out);   // 輸出面板可能在按鈕下方很遠處（尤其手機）——開始產生時帶進視野
 
   // ── 作業中動畫：轉圈 + 經過秒數 + 階段（思考中→撰寫中），讓使用者確知 AI 仍在運作 ──
   const t0 = performance.now();
@@ -2982,7 +2998,7 @@ async function flashBtn(id, label, ok) {
 }
 $('copyStockPrompt').addEventListener('click', async () => {
   const st = $('aiStatus'); st.className = 'status';
-  if (!aiData) { st.className = 'status error'; st.textContent = '請先「📊 抓取一年資料」再複製個股 Prompt'; return; }
+  if (!aiData) { st.className = 'status error'; st.textContent = '請先「📊 載入走勢圖與數據」再複製個股 Prompt'; return; }
   const ok = await copyText(buildStockPrompt());
   flashBtn('copyStockPrompt', '📋 複製個股 Prompt', ok);
   if (ok) st.textContent = '✅ 個股 Prompt 已複製，可貼到 Gemini 等聊天機器人（新聞／美股基本面需該機器人能上網查詢）';
@@ -3103,7 +3119,7 @@ $('aiDownloadBtn').addEventListener('click', () => { if (lastReport) downloadTex
 
 /* ── 極簡 Markdown 轉 HTML ── */
 function mdToHtml(md) {
-  const escFn = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const escFn = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');   // " 也跳脫：防引用 URL 帶引號注入 href 屬性
   const inline = s => s
     .replace(/`([^`]+)`/g, (_, c) => '<code>' + c + '</code>')
     .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')   // [文字](連結)，給新聞來源用
@@ -3291,6 +3307,8 @@ function bindSettings() {
   $('ap_date').value = todayISO();
   $('ab_date').value = todayISO();
   if (!db.positions.length) $('addBox').open = true;
+  // ③ 的操作順序提示：說明個股分析按鈕為何反灰（一開始操作就會被正常狀態訊息取代）
+  $('fetchStatus').textContent = '提示：先選「分析標的」→ 按「📊 載入走勢圖與數據」→ 完成後即可產生個股 AI 分析。';
   renderAll();
   if (reportHist.length) { renderHistSel(); showReport(reportHist[0]); }   // 還原上次報告（重新整理不消失）
   ensureFX(false).then(renderSummary);
