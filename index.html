@@ -40,7 +40,10 @@
   #topNav a { display: inline-block; color: var(--muted); text-decoration: none; font-size: .84rem; padding: 3px 10px; border-radius: 7px; }
   #topNav a:hover { color: var(--text); background: var(--panel2); }
   html { scroll-behavior: smooth; }
-  section, details.box, #kolBox { scroll-margin-top: 54px; }   /* 錨點落點避開 sticky 導覽高度 */
+  section, details.box, #kolBox, #helpQ0 { scroll-margin-top: 54px; }   /* 錨點落點避開 sticky 導覽高度 */
+  /* 範例資料橫幅：JS 以 style.display 切換 flex/none（display 不寫在 CSS，避免 inline '' 回落問題） */
+  #demoBar { align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 16px; padding: 10px 16px;
+    background: rgba(246,185,59,.1); border: 1px solid var(--gold); border-radius: 12px; font-size: .86rem; }
   section, details.box {
     background: var(--panel); border: 1px solid var(--border);
     border-radius: 14px; padding: 20px; margin-top: 20px; display: block;
@@ -187,6 +190,12 @@
   <a href="#helpBox">📖 說明</a>
 </nav>
 <main>
+  <!-- ── 範例資料橫幅（載入範例後顯示；清除範例只移除 demo_ 開頭的項目，不動真實資料） ── -->
+  <div id="demoBar" style="display:none">
+    <span>🎬 <b>範例資料模式</b>——目前的持倉、觀察清單與報告皆為內建虛構示意（價格非即時），供你體驗各區功能。</span>
+    <span style="flex:1"></span>
+    <button id="demoClearBtn" class="ghost">🧹 清除範例，開始輸入我的持倉</button>
+  </div>
   <!-- ── 首次使用引導（有持倉或按過「知道了」就不再顯示） ── -->
   <section id="onboardBox" style="display:none">
     <h2>👋 第一次使用？三步開始</h2>
@@ -195,7 +204,12 @@
       <li><b>新增第一筆持倉</b>——到「② 我的持倉」按「＋ 新增持倉」填首筆買進。</li>
       <li><b>按「🔄 更新所有報價」</b>，再到 ③ 選標的按「🤖 產生個股 AI 分析」。</li>
     </ol>
-    <div class="row"><button id="onboardDismiss" class="ghost">知道了，不再顯示</button></div>
+    <div class="row">
+      <button id="demoLoadBtn" class="primary">🎬 載入範例資料（免金鑰，先體驗看看）</button>
+      <a href="#helpQ0" data-open="helpQ0" class="hint" style="text-decoration:none">📖 詳細使用說明（Q0 快速上手）</a>
+      <span style="flex:1"></span>
+      <button id="onboardDismiss" class="ghost">知道了，不再顯示</button>
+    </div>
   </section>
 
   <!-- ── API 與參數設定 ── -->
@@ -521,7 +535,20 @@
 
   <section id="helpBox">
     <h2>📖 報告說明與名詞解釋</h2>
-    <p class="hint">不熟悉技術分析名詞嗎？這一區說明「報告怎麼來的」並逐一白話解釋每個指標的意思與怎麼看。點下方標題展開。</p>
+    <p class="hint">不熟悉技術分析名詞嗎？這一區說明「怎麼開始使用」「報告怎麼來的」並逐一白話解釋每個指標的意思與怎麼看。點下方標題展開。</p>
+
+    <details id="helpQ0" style="margin-top:12px">
+      <summary style="cursor:pointer;color:var(--accent);font-weight:600">Q0｜快速上手（第一次使用看這裡）</summary>
+      <div style="margin-top:10px;line-height:1.85;font-size:.9rem">
+        <p style="margin:.5em 0"><b style="color:var(--gold)">還沒準備好金鑰？</b>首次開啟時頂部引導卡有「🎬 載入範例資料」——一鍵填入範例持倉（台積電、AAPL、一檔公司債）、觀察清單與一份範例 AI 報告，<b>不需任何金鑰</b>就能把五個區塊都看一遍；體驗完按範例橫幅上的「🧹 清除範例」即可開始輸入自己的資料。</p>
+        <b>1. 準備金鑰（只需一次）</b>：展開「🔑 API 與參數設定」——<b>OpenAI Key</b>（AI 分析必填）；<b>Twelve Data Key</b>（要追蹤美股才需要，免費註冊）；FinMind／Finnhub／xAI 皆選填（依序強化台股上櫃、美股基本面、KOL 直查）。金鑰只存在你這台裝置的瀏覽器。<br>
+        <b>2. 建立持倉</b>：到「② 我的持倉」按「＋ 新增持倉」填首筆買進（債券填面額／票息／到期日）。之後的加碼、賣出、股息：<b>點該持倉列展開</b>即可補登、修改。<br>
+        <b>3. 更新報價</b>：回「① 損益總覽」按「🔄 更新所有報價」（台股免金鑰、美股走 Twelve Data、匯率自動抓）。<br>
+        <b>4. 產生 AI 分析</b>：到「③」選標的按「🤖 產生個股 AI 分析」（會自動載入一年數據與走勢圖）；或按「💼 產生投資組合總評」看整體配置建議。報告自動保留最近 10 份，可用下拉選單回顧。<br>
+        <b>5. 備份</b>：設定區「⬇️ 匯出 JSON」——持倉、設定、報告歷史與偏好全部帶著走。<b>資料只存在瀏覽器</b>，清除網站資料前務必先匯出。<br>
+        <p style="margin:.5em 0" class="hint">進階功能：④ 觀察清單快篩（還沒買的標的排排比）與 📡 KOL 雷達（撈分析師點名股）、⑤ 淨值曲線與 XIRR。看不懂報告裡的名詞？往下看 Q2。</p>
+      </div>
+    </details>
 
     <details style="margin-top:12px">
       <summary style="cursor:pointer;color:var(--accent);font-weight:600">Q1｜這份 AI 報告是怎麼生成的？參考了哪些指標？</summary>
@@ -603,7 +630,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.39.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.40.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -3393,6 +3420,124 @@ function bindSettings() {
     el.addEventListener('pointerdown', unlock);
   });
 }
+/* ════════════════ 範例資料（首次使用體驗；免金鑰） ════════════════ */
+// 讓新使用者在填任何金鑰之前，先看到五個區塊「有資料時長什麼樣子」——尤其是 AI 報告的長相。
+// 所有範例項目 id 以 demo_ 開頭；「清除範例」只移除這些項目，之後才加入的真實資料不受影響。
+// demoData()/demoReport() 保持純靜態（不呼叫任何工具函式），tests/demodata.test.js 直接抽出驗證形狀。
+const DEMO_FLAG = 'twpf_demo';
+function demoData() {
+  return {
+    positions: [
+      { id: 'demo_2330', market: 'tw', symbol: '2330', name: '台積電', lastPrice: 1085, lastDate: '2026-07-07',
+        txs: [
+          { id: 'demo_t1', type: 'buy', date: '2025-11-14', price: 1020, qty: 1000, fee: 1454 },
+          { id: 'demo_t2', type: 'buy', date: '2026-03-10', price: 950, qty: 1000, fee: 1354 },
+          { id: 'demo_t3', type: 'dividend', date: '2026-03-19', amount: 4500 },
+        ] },
+      { id: 'demo_aapl', market: 'us', symbol: 'AAPL', name: 'Apple Inc', lastPrice: 310.66, lastDate: '2026-07-07',
+        txs: [{ id: 'demo_t4', type: 'buy', date: '2026-02-20', price: 235.10, qty: 20, fee: 1 }] },
+      { id: 'demo_bond', market: 'bond', symbol: 'Apple 4.3% 2032（範例）', name: '',
+        bond: { isin: null, currency: 'USD', face: 10000, buyPricePct: 98.5, buyDate: '2025-12-01',
+          fee: 50, accruedPaid: 25, rate: 4.3, freq: 2, maturity: '2032-05-10', mark: 99.2, markDate: '2026-07-01' } },
+    ],
+    watchlist: [
+      { id: 'demo_w1', market: 'tw', symbol: '2454' },
+      { id: 'demo_w2', market: 'us', symbol: 'NVDA' },
+    ],
+  };
+}
+function demoReport() {
+  return {
+    id: 'demo_report', demo: true, ts: '2026-07-07 21:30',
+    title: '台股個股分析 — 2330 台積電（範例報告）', filename: '2330_個股分析_範例.md',
+    // 不帶 symbol/market meta：避免之後真的分析 2330 時，「上次建議檢討」誤把虛構範例當成前次判斷
+    fullText: `# 台股個股分析 — 2330 台積電（範例報告）
+
+**產生時間：** 2026-07-07 21:30　｜　**AI 模型：**（內建範例）　｜　**工具：** 我的投資組合
+
+---
+
+> 🎬 **這是內建範例報告**：內容為虛構示意，讓你在填 API 金鑰之前先看到「AI 分析報告長什麼樣子」。實際報告由 AI 依即時抓取的價量、籌碼、基本面與新聞產生，章節更完整（含大盤對照、配息、上次建議檢討等十章）。
+
+## 1. 趨勢判讀
+
+日線收於 1,085，站上 MA20（1,052）與 MA60（998），短中期均線多頭排列；近月沿 MA20 緩步墊高，量能溫和放大，趨勢結構健康。
+
+## 2. 支撐與壓力
+
+- **支撐**：1,050（MA20 與量價密集區重疊）、1,000（整數關卡＋MA60）
+- **壓力**：1,120（前波高點）、1,150（52 週高）
+
+## 3. 技術指標
+
+RSI 61（偏多未過熱）；MACD 柱狀連 5 日在零軸上方擴大；KD 於 70 附近高檔鈍化——多方動能延續，但短線乖離漸大，追高需節制。
+
+## 4. 籌碼與基本面（示意）
+
+外資近 5 日買超 1.2 萬張、投信同步加碼；月營收年增 +28%，動能延續。本益比位於自身五年區間中上緣，估值不便宜但有成長支撐。
+
+## 5. 你的持倉評估
+
+| 項目 | 數值 |
+|---|---|
+| 加權平均成本 | 986.4 |
+| 現價 | 1,085 |
+| 未實現報酬 | 約 +10% |
+
+成本優勢明確，無急迫調整需求；持股續抱為主。
+
+## 6. 操作計畫表（示意）
+
+| 動作 | 條件／價位 | 說明 |
+|---|---|---|
+| 續抱 | 1,050 之上 | 趨勢未破壞 |
+| 加碼 | 回測 1,000～1,020 有守 | 分批、勿一次到位 |
+| 減碼 | 跌破 1,000（MA60） | 先減 1/3 控風險 |
+| 停損 | 950 | 均線結構轉空 |
+
+## 7. 結論（白話版）
+
+一句話：**趨勢向上、成本有優勢，續抱，回檔到千元關卡再考慮加碼。**
+
+---
+本分析僅供參考，不構成投資建議。（範例報告・數字皆為虛構）
+`,
+  };
+}
+function loadDemo() {
+  if (db.positions.length) return;   // 只在空資料時可載入（按鈕僅出現於首用引導卡，此為保險）
+  const d = demoData();
+  db.positions = d.positions;
+  db.watchlist = d.watchlist;
+  saveDB();
+  localStorage.setItem(DEMO_FLAG, '1');
+  reportHist = reportHist.filter(r => !r.demo);
+  reportHist.unshift(demoReport());
+  saveReports();
+  renderAll();
+  renderHistSel(); showReport(reportHist[0]);
+  $('onboardBox').style.display = 'none';
+  $('setupBox').open = false;
+  $('demoBar').style.display = 'flex';
+  ensureFX(false).then(renderSummary);   // 美元部位換算需要匯率（免金鑰）
+}
+function clearDemo() {
+  if (!confirm('清除範例資料（範例持倉、觀察清單與範例報告）？你自行輸入的資料不受影響。')) return;
+  db.positions = db.positions.filter(p => !String(p.id).startsWith('demo_'));
+  db.watchlist = db.watchlist.filter(w => !String(w.id).startsWith('demo_'));
+  saveDB();
+  reportHist = reportHist.filter(r => !r.demo);
+  saveReports();
+  localStorage.removeItem(DEMO_FLAG);
+  expandedId = null;
+  renderAll();
+  renderHistSel();
+  if (reportHist.length) showReport(reportHist[0]);
+  else { lastReport = null; lastShownId = null; $('aiMeta').style.display = 'none'; $('aiOutput').style.display = 'none'; $('aiOutput').innerHTML = ''; }
+  $('demoBar').style.display = 'none';
+  if (!db.positions.length) { $('onboardBox').style.display = 'block'; $('addBox').open = true; }
+}
+
 // 還原 UI 偏好（模型／推理深度／視角／web search／KOL 欄位）：init 與「匯入 JSON」後共用
 function restorePrefsUI() {
   const savedModel = localStorage.getItem('twbt_model');
@@ -3430,8 +3575,12 @@ function restorePrefsUI() {
     $('setupBox').open = true;
   }
   $('onboardDismiss').addEventListener('click', () => { localStorage.setItem('twbt_onboarded', '1'); $('onboardBox').style.display = 'none'; });
-  // 頂部導覽：點「設定／KOL 雷達」時順便展開對應的摺疊區（純錨點捲得到、但摺疊著會看不到內容）
-  $$('#topNav a[data-open]').forEach(a => a.addEventListener('click', () => { const el = $(a.dataset.open); if (el) el.open = true; }));
+  // 範例資料：載入／清除按鈕；重新整理後依 flag 還原橫幅
+  $('demoLoadBtn').addEventListener('click', loadDemo);
+  $('demoClearBtn').addEventListener('click', clearDemo);
+  if (localStorage.getItem(DEMO_FLAG)) $('demoBar').style.display = 'flex';
+  // 錨點連結（導覽列的設定／KOL、引導卡的 Q0）：點擊時順便展開對應摺疊區（摺疊著捲得到也看不到內容）
+  $$('a[data-open]').forEach(a => a.addEventListener('click', () => { const el = $(a.dataset.open); if (el) el.open = true; }));
   // ③ 的操作提示（一開始操作就會被正常狀態訊息取代）
   $('fetchStatus').textContent = '提示：選好「分析標的」後直接按「🤖 產生個股 AI 分析」即可（會自動載入數據）；想先看走勢圖可按「📊 載入走勢圖與數據」。';
   renderAll();
