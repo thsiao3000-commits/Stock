@@ -558,7 +558,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.37.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.37.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -3156,12 +3156,16 @@ function mdToHtml(md) {
       continue;
     }
     if (inQuote) { html += '</blockquote>'; inQuote = false; }
-    if (/^\|.*\|\s*$/.test(line)) {
+    // 表格容錯：AI（尤其 Grok 的中文報告）常用全形｜畫表、分隔列用全形破折號——先正規化再判斷；
+    // 只在「判定為表格列」時採用正規化結果，一般文句裡的全形｜維持原樣
+    const tline = line.replace(/｜/g, '|');
+    if (/^\|.*\|\s*$/.test(tline)) {
       closeList();
-      const cells = line.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
-      if (!cells.every(c => /^:?-{2,}:?$/.test(c))) tableRows.push(cells);   // 分隔列容忍 |--|（兩個 dash 起）
+      const cells = tline.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+      if (!cells.every(c => /^:?[-–—─]{2,}:?$/.test(c))) tableRows.push(cells);   // 分隔列容忍 |--|（兩個 dash 起；全半形破折號皆可）
       continue;
     }
+    if (!line.trim() && tableRows.length) continue;   // 表格列之間的空行不打斷表格（AI 常在列間插空行）
     flushTable();
     const h = line.match(/^(#{1,4})\s+(.*)/);
     if (h) { closeList(); html += `<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`; continue; }
