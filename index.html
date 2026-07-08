@@ -30,6 +30,17 @@
   header h1 { margin: 0 0 4px; font-size: 1.6rem; }
   header p { margin: 0; color: var(--muted); font-size: .9rem; }
   main { max-width: 1120px; margin: 0 auto; padding: 12px 20px 60px; }
+  /* 頂部 sticky 導覽：長頁面的各區錨點；窄螢幕可橫向捲動（text-align 置中在內容超寬時不會裁切左端） */
+  #topNav {
+    position: sticky; top: 0; z-index: 20;
+    text-align: center; white-space: nowrap; overflow-x: auto;
+    padding: 8px 12px; border-bottom: 1px solid var(--border);
+    background: rgba(15,20,25,.93); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  }
+  #topNav a { display: inline-block; color: var(--muted); text-decoration: none; font-size: .84rem; padding: 3px 10px; border-radius: 7px; }
+  #topNav a:hover { color: var(--text); background: var(--panel2); }
+  html { scroll-behavior: smooth; }
+  section, details.box, #kolBox { scroll-margin-top: 54px; }   /* 錨點落點避開 sticky 導覽高度 */
   section, details.box {
     background: var(--panel); border: 1px solid var(--border);
     border-radius: 14px; padding: 20px; margin-top: 20px; display: block;
@@ -151,7 +162,7 @@
     :root { --bg:#fff; --panel:#fff; --panel2:#f5f5f5; --border:#bbb; --text:#111; --muted:#555; --accent:#0b5cad; --up:#c0392b; --down:#1e8e5a; --gold:#8a6d1a; }
     body, header { background: #fff; }
     button, input, select, textarea, label.field, .seg, .pw, .status, .hint, .legend,
-    #setupBox, #addBox, #chartWrap, #perfChartWrap, #manualWrap { display: none !important; }
+    #setupBox, #addBox, #chartWrap, #perfChartWrap, #manualWrap, #topNav, #onboardBox { display: none !important; }
     section, details.box { border-color: #ccc; }
     .expandPanel, .txTable td.act { background: #fff; box-shadow: none; }
     .aiReport { background: #fff; border: none; padding: 0; overflow: visible; }
@@ -165,7 +176,27 @@
   <h1>💼 我的投資組合 + AI 分析 <span id="appVer" style="font-size:.78rem; color:var(--muted); font-weight:400; vertical-align:middle;"></span></h1>
   <p>台股（TWSE 收盤）・美股（Twelve Data）・海外債券（手動 Mark）— 加權平均成本法</p>
 </header>
+<nav id="topNav">
+  <a href="#setupBox" data-open="setupBox">🔑 設定</a>
+  <a href="#sec1">① 損益</a>
+  <a href="#sec2">② 持倉</a>
+  <a href="#sec3">③ AI 分析</a>
+  <a href="#sec4">④ 快篩</a>
+  <a href="#kolBox" data-open="kolBox">📡 KOL 雷達</a>
+  <a href="#sec5">⑤ 績效</a>
+  <a href="#helpBox">📖 說明</a>
+</nav>
 <main>
+  <!-- ── 首次使用引導（有持倉或按過「知道了」就不再顯示） ── -->
+  <section id="onboardBox" style="display:none">
+    <h2>👋 第一次使用？三步開始</h2>
+    <ol style="margin:0; padding-left:1.4em; line-height:2">
+      <li><b>填 API 金鑰</b>——下方「🔑 API 與參數設定」已為你展開：AI 分析需 OpenAI Key；追蹤美股另需 Twelve Data Key（免費註冊）。台股與債券免金鑰。</li>
+      <li><b>新增第一筆持倉</b>——到「② 我的持倉」按「＋ 新增持倉」填首筆買進。</li>
+      <li><b>按「🔄 更新所有報價」</b>，再到 ③ 選標的按「🤖 產生個股 AI 分析」。</li>
+    </ol>
+    <div class="row"><button id="onboardDismiss" class="ghost">知道了，不再顯示</button></div>
+  </section>
 
   <!-- ── API 與參數設定 ── -->
   <details class="box" id="setupBox">
@@ -235,7 +266,7 @@
   </details>
 
   <!-- ── 損益總覽 ── -->
-  <section>
+  <section id="sec1">
     <h2>① 損益總覽</h2>
     <div class="cards" id="sumCards"></div>
     <div class="tableWrap" id="mktWrap" style="display:none">
@@ -252,7 +283,7 @@
   </section>
 
   <!-- ── 我的持倉 ── -->
-  <section>
+  <section id="sec2">
     <h2>② 我的持倉</h2>
     <details id="addBox">
       <summary style="cursor:pointer; color:var(--gold)">＋ 新增持倉（首筆買進）</summary>
@@ -310,7 +341,7 @@
   </section>
 
   <!-- ── 走勢圖與 AI 分析 ── -->
-  <section>
+  <section id="sec3">
     <h2>③ 走勢圖與 AI 分析</h2>
     <details style="margin-bottom:14px; font-size:.84rem; color:var(--muted)">
       <summary style="cursor:pointer; color:var(--accent)">ℹ️ 這份 AI 分析根據哪些資料？</summary>
@@ -393,7 +424,7 @@
   </section>
 
   <!-- ── 觀察清單快篩 ── -->
-  <section>
+  <section id="sec4">
     <h2>④ 觀察清單快篩</h2>
     <p class="hint">把「還沒買、但在觀察」的標的加進清單（上限 12 檔），一鍵抓一年價量、算指標並排比較，找出值得深入分析的對象。純價量快篩（不含籌碼／基本面／新聞）；台股走 FinMind、美股走 Twelve Data（每分鐘 8 檔限額，超過會自動分批等待）。</p>
     <div class="row">
@@ -425,7 +456,7 @@
     </div>
     <div id="wsOutput" class="aiReport"></div>
 
-    <details style="margin-top:14px">
+    <details id="kolBox" style="margin-top:14px">
       <summary style="cursor:pointer; color:var(--accent); font-weight:600">📡 KOL 選股雷達（把分析師點名的標的撈進觀察清單）</summary>
       <div class="row" style="margin-top:10px">
         <label class="field" style="min-width:240px">KOL 名稱／帳號
@@ -471,7 +502,7 @@
   </section>
 
   <!-- ── 投資組合績效 ── -->
-  <section>
+  <section id="sec5">
     <h2>⑤ 投資組合績效</h2>
     <div class="cards" id="perfCards"></div>
     <div class="row">
@@ -493,7 +524,7 @@
     <p class="hint">不熟悉技術分析名詞嗎？這一區說明「報告怎麼來的」並逐一白話解釋每個指標的意思與怎麼看。點下方標題展開。</p>
 
     <details style="margin-top:12px">
-      <summary style="cursor:pointer;color:var(--accent);font-weight:600">① 這份 AI 報告是怎麼生成的？參考了哪些指標？</summary>
+      <summary style="cursor:pointer;color:var(--accent);font-weight:600">Q1｜這份 AI 報告是怎麼生成的？參考了哪些指標？</summary>
       <div style="margin-top:10px;line-height:1.85;font-size:.9rem">
         <p style="margin:.5em 0"><b style="color:var(--gold)">核心原則：數字一律由「程式」精算，AI 只負責「解讀」</b>，AI 不自己算數字，盡量避免它亂編數據。</p>
         <p style="margin:.5em 0"><b>產生步驟：</b></p>
@@ -509,7 +540,7 @@
     </details>
 
     <details style="margin-top:12px">
-      <summary style="cursor:pointer;color:var(--accent);font-weight:600">② 名詞解釋（看不懂的詞都在這）</summary>
+      <summary style="cursor:pointer;color:var(--accent);font-weight:600">Q2｜名詞解釋（看不懂的詞都在這）</summary>
       <div style="margin-top:10px;line-height:1.9;font-size:.9rem">
 
         <div style="color:var(--gold);font-weight:700;margin:14px 0 6px">技術面 · 看價格走勢與力道</div>
@@ -572,7 +603,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.38.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.39.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -3393,6 +3424,14 @@ function restorePrefsUI() {
   $('ap_date').value = todayISO();
   $('ab_date').value = todayISO();
   if (!db.positions.length) $('addBox').open = true;
+  // 首次使用引導：沒有持倉且沒按過「知道了」→ 顯示三步引導並展開設定區
+  if (!db.positions.length && !localStorage.getItem('twbt_onboarded')) {
+    $('onboardBox').style.display = 'block';
+    $('setupBox').open = true;
+  }
+  $('onboardDismiss').addEventListener('click', () => { localStorage.setItem('twbt_onboarded', '1'); $('onboardBox').style.display = 'none'; });
+  // 頂部導覽：點「設定／KOL 雷達」時順便展開對應的摺疊區（純錨點捲得到、但摺疊著會看不到內容）
+  $$('#topNav a[data-open]').forEach(a => a.addEventListener('click', () => { const el = $(a.dataset.open); if (el) el.open = true; }));
   // ③ 的操作提示（一開始操作就會被正常狀態訊息取代）
   $('fetchStatus').textContent = '提示：選好「分析標的」後直接按「🤖 產生個股 AI 分析」即可（會自動載入數據）；想先看走勢圖可按「📊 載入走勢圖與數據」。';
   renderAll();

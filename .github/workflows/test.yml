@@ -1,0 +1,16 @@
+# 每次 push／PR 自動跑測試：index.html 內嵌 JS 語法檢查＋tests/*.test.js（純 Node、零相依）
+name: tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node tests/run_tests.js

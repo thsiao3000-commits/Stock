@@ -1,6 +1,6 @@
 # 💼 我的投資組合 + AI 分析
 
-**版本：v1.38.1**（版本號見 `index.html` 的 `APP_VERSION`，並對應 git tag；變更紀錄見 [CHANGELOG.md](CHANGELOG.md)）
+**版本：v1.39.0**（版本號見 `index.html` 的 `APP_VERSION`，並對應 git tag；變更紀錄見 [CHANGELOG.md](CHANGELOG.md)）
 
 追蹤**台股、美股、海外公司債**的個人投資組合工具：逐筆記錄交易、以**加權平均成本法**計算已實現／未實現損益（含台股費稅、股息、債券配息與匯率換算），並可一鍵產生 **AI 技術分析**（針對你的持倉個人化）與**投資組合總評**。
 
@@ -12,6 +12,8 @@
 ---
 
 ## ✨ 功能特色（主工具）
+
+- **頂部 sticky 導覽**：🔑設定／①〜⑤各區／📡KOL 雷達／📖說明 一點直達（點「設定」「KOL」會自動展開該摺疊區）；**首次使用**（無持倉）自動顯示三步上手引導並展開設定區
 
 - **三種資產一起管**：
   - **台股** — **上市**走 TWSE 收盤；**上櫃（OTC）**自動改用 FinMind（如 8358 金居），無痛支援兩種市場
@@ -45,8 +47,18 @@
 .
 ├── index.html             # 主工具（單一 HTML 檔；本機雙擊可開，也是 GitHub Pages 入口）
 ├── twse_realtime.py       # 台股盤中即時報價 CLI（TWSE MIS 快照介面）
+├── tests/                 # 測試（純 Node 零相依）：run_tests.js 入口＋各 *.test.js 套件
+├── .github/workflows/     # CI：每次 push 自動跑語法檢查＋測試
 └── README.md
 ```
+
+### 🧪 測試
+
+```bash
+node tests/run_tests.js
+```
+
+先對 `index.html` 內嵌 JS 做語法檢查，再跑 `tests/*.test.js`（Markdown 渲染／XSS 跳脫／全形表格容錯、OpenAI 串流保活與 400 降級重試等 mock 測試）。GitHub Actions 於每次 push 自動執行。
 
 ---
 
