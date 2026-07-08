@@ -572,7 +572,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.38.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.38.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1724,7 +1724,8 @@ async function loadYearData() {
     if (divStats && divStats.next) info.push(`下次除息 ${divStats.next.exDate}（${divStats.daysToNext} 天後）`);
     if (market === 'us' && !fhKey()) info.push('⚠️ 未填 Finnhub Key，本次略過基本面／新聞（可於設定補填）');   // 靜默降級改為明示
     $('chartInfo').textContent = info.join('　·　');
-    $('chartWrap').style.display = ''; $('chartLegend').style.display = '';
+    // chartWrap 是「CSS 規則」隱藏（#chartWrap{display:none}），清空 inline style 會回落到 none——必須明確設 block 才會顯示
+    $('chartWrap').style.display = 'block'; $('chartLegend').style.display = '';
     drawChart();
     return true;
   } catch (e) {
