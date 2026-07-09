@@ -30,15 +30,31 @@
   header h1 { margin: 0 0 4px; font-size: 1.6rem; }
   header p { margin: 0; color: var(--muted); font-size: .9rem; }
   main { max-width: 1120px; margin: 0 auto; padding: 12px 20px 60px; }
-  /* 頂部 sticky 導覽：長頁面的各區錨點；窄螢幕可橫向捲動（text-align 置中在內容超寬時不會裁切左端） */
+  /* 頂部 sticky 導覽：長頁面的各區錨點；chip 造型讓觸控裝置（無 hover）也看得出可點擊。
+     捲動放在內層 #topNavScroll，外層 ::after 漸層才不會跟著內容捲走 */
   #topNav {
     position: sticky; top: 0; z-index: 20;
-    text-align: center; white-space: nowrap; overflow-x: auto;
-    padding: 8px 12px; border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
     background: rgba(15,20,25,.93); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
   }
-  #topNav a { display: inline-block; color: var(--muted); text-decoration: none; font-size: .84rem; padding: 3px 10px; border-radius: 7px; }
-  #topNav a:hover { color: var(--text); background: var(--panel2); }
+  #topNavScroll { text-align: center; white-space: nowrap; overflow-x: auto; padding: 8px 12px; scrollbar-width: none; }
+  #topNavScroll::-webkit-scrollbar { display: none; }
+  #topNav.canScroll::after {   /* 內容溢出且未捲到底時的右緣提示（JS 切換） */
+    content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 32px;
+    pointer-events: none; background: linear-gradient(to left, rgba(15,20,25,.95), transparent);
+  }
+  #topNav a {
+    display: inline-block; color: var(--muted); text-decoration: none;
+    font-size: .84rem; padding: 3px 12px; margin: 0 2px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--panel2);
+    -webkit-tap-highlight-color: transparent;
+  }
+  #topNav a:hover { color: var(--text); border-color: var(--muted); }
+  #topNav a:active { color: var(--text); background: var(--border); transform: scale(.95); }
+  @media (max-width: 480px) {
+    #topNavScroll { padding: 6px 8px; }
+    #topNav a { font-size: .78rem; padding: 2px 9px; margin: 0 1px; }
+  }
   html { scroll-behavior: smooth; }
   section, details.box, #kolBox, #helpQ0 { scroll-margin-top: 54px; }   /* 錨點落點避開 sticky 導覽高度 */
   /* 範例資料橫幅：JS 以 style.display 切換 flex/none（display 不寫在 CSS，避免 inline '' 回落問題） */
@@ -180,14 +196,16 @@
   <p>台股（TWSE 收盤）・美股（Twelve Data）・海外債券（手動 Mark）— 加權平均成本法</p>
 </header>
 <nav id="topNav">
+<div id="topNavScroll">
   <a href="#setupBox" data-open="setupBox">🔑 設定</a>
   <a href="#sec1">① 損益</a>
   <a href="#sec2">② 持倉</a>
   <a href="#sec3">③ AI 分析</a>
   <a href="#sec4">④ 快篩</a>
-  <a href="#kolBox" data-open="kolBox">📡 KOL 雷達</a>
+  <a href="#kolBox" data-open="kolBox">📡 KOL</a>
   <a href="#sec5">⑤ 績效</a>
   <a href="#helpBox">📖 說明</a>
+</div>
 </nav>
 <main>
   <!-- ── 範例資料橫幅（載入範例後顯示；清除範例只移除 demo_ 開頭的項目，不動真實資料） ── -->
@@ -630,7 +648,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.40.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.40.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -3581,6 +3599,12 @@ function restorePrefsUI() {
   if (localStorage.getItem(DEMO_FLAG)) $('demoBar').style.display = 'flex';
   // 錨點連結（導覽列的設定／KOL、引導卡的 Q0）：點擊時順便展開對應摺疊區（摺疊著捲得到也看不到內容）
   $$('a[data-open]').forEach(a => a.addEventListener('click', () => { const el = $(a.dataset.open); if (el) el.open = true; }));
+  // 導覽列右緣漸層：內容溢出且未捲到底才顯示，提示還有項目可橫向捲動
+  const navSc = $('topNavScroll');
+  const updateNavFade = () => $('topNav').classList.toggle('canScroll', navSc.scrollLeft + navSc.clientWidth < navSc.scrollWidth - 2);
+  navSc.addEventListener('scroll', updateNavFade, { passive: true });
+  window.addEventListener('resize', updateNavFade);
+  updateNavFade();
   // ③ 的操作提示（一開始操作就會被正常狀態訊息取代）
   $('fetchStatus').textContent = '提示：選好「分析標的」後直接按「🤖 產生個股 AI 分析」即可（會自動載入數據）；想先看走勢圖可按「📊 載入走勢圖與數據」。';
   renderAll();
