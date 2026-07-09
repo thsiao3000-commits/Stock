@@ -32,6 +32,13 @@
 
 ---
 
+## [v1.41.0] — 2026-07-09
+
+### 新增
+- **KOL 雷達預設清單**：KOL 欄位改用 `datalist` 下拉建議——內建 **Serenity @aleabitoreddit**（台股）與 **Michael Burry @michaeljburry**（美股，「Cassandra Unchained」本尊帳號），清空輸入框即可挑選，仍可自由輸入任何「名稱 @帳號」；三模式說明補上預設清單用法。
+
+---
+
 ## [v1.40.1] — 2026-07-09
 
 ### 改進

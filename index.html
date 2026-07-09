@@ -492,7 +492,11 @@
       <summary style="cursor:pointer; color:var(--accent); font-weight:600">📡 KOL 選股雷達（把分析師點名的標的撈進觀察清單）</summary>
       <div class="row" style="margin-top:10px">
         <label class="field" style="min-width:240px">KOL 名稱／帳號
-          <input id="kolName" placeholder="例：Serenity @aleabitoreddit">
+          <input id="kolName" list="kolPresets" placeholder="例：Serenity @aleabitoreddit">
+          <datalist id="kolPresets">   <!-- 預設 KOL 清單：清空輸入框即可從下拉挑選；格式須含 @handle（Grok 直查抽帳號用） -->
+            <option value="Serenity @aleabitoreddit"></option>
+            <option value="Michael Burry @michaeljburry"></option>
+          </datalist>
         </label>
         <div class="seg" id="kolMarket" style="align-self:flex-end">
           <button data-v="us" class="on">美股</button>
@@ -513,7 +517,7 @@
       </div>
       <details class="hintFold">
         <summary>ℹ️ 三種模式怎麼選：費用、即時性與注意事項</summary>
-        <div class="hint">三種模式：<b>⚡ Grok 直查</b>（需填 xAI Key＋@帳號，x_search 鎖定<b>本人貼文</b>依所選範圍（2／5／10／30／60／90 天）直讀——一手、最即時，一次約 US$0.02–0.05；報告含<b>期間分段總結</b>，強迫覆蓋整個範圍而非只看最近幾天）；<b>🔍 網路搜查</b>（OpenAI web search 靠媒體／部落格二手轉述，<b>滯後數天～數週</b>）；<b>✂️ 貼文擷取</b>（自己貼原文，本地零費用）。表格都會列<b>發文／提及日期與當時價位</b>，時機是否太晚由你自行判斷。點名 ≠ 現在還看多（本人可能已出場）。</div>
+        <div class="hint">三種模式：<b>⚡ Grok 直查</b>（需填 xAI Key＋@帳號，x_search 鎖定<b>本人貼文</b>依所選範圍（2／5／10／30／60／90 天）直讀——一手、最即時，一次約 US$0.02–0.05；報告含<b>期間分段總結</b>，強迫覆蓋整個範圍而非只看最近幾天）；<b>🔍 網路搜查</b>（OpenAI web search 靠媒體／部落格二手轉述，<b>滯後數天～數週</b>）；<b>✂️ 貼文擷取</b>（自己貼原文，本地零費用）。表格都會列<b>發文／提及日期與當時價位</b>，時機是否太晚由你自行判斷。點名 ≠ 現在還看多（本人可能已出場）。<b>清空輸入框</b>可從下拉挑內建 KOL（Serenity 台股、Michael Burry 美股），也可自行輸入任何「名稱 @帳號」。</div>
       </details>
       <label class="field" style="margin-top:10px">或直接貼上 KOL 貼文原文（本地擷取代號——即時、精準、零 AI 費用）
         <textarea id="kolPaste" rows="3" placeholder="貼上含 $SIVE、$ALAB 這類 cashtag 的貼文（台股模式亦可貼含 2330 這類代號的文字）…"></textarea>
@@ -648,7 +652,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.40.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.41.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
