@@ -652,7 +652,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.41.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.42.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -2113,8 +2113,10 @@ segBind('wlMarket');
 function renderWatchlist() {
   const box = $('wlChips');
   if (!box) return;
-  box.innerHTML = (db.watchlist || []).map(w =>
-    `<span class="badge ${w.market}" style="padding:4px 10px">${MKT_NAME[w.market]} <b>${esc(w.symbol)}</b> <button class="ghost" data-wlrm="${w.id}" title="移除" style="border:none;padding:0 2px;color:inherit">✕</button></span>`).join('');
+  const chips = (db.watchlist || []).map(w =>
+    `<span class="badge ${w.market}" style="padding:4px 10px">${MKT_NAME[w.market]} <b>${esc(w.symbol)}</b> <button class="ghost" data-wlrm="${w.id}" title="移除" style="border:none;padding:0 2px;color:inherit">✕</button></span>`);
+  if (chips.length >= 2) chips.push('<button class="ghost" data-wlclear title="清空整份觀察清單" style="padding:2px 10px;font-size:.8rem">🗑 全部清除</button>');   // 單檔時個別 ✕ 就夠
+  box.innerHTML = chips.join('');
 }
 // 加入觀察清單（共用：手動輸入與 KOL 雷達 chips 皆走此路）；回傳 null=成功、否則錯誤訊息
 function wlAdd(market, symRaw) {
@@ -2135,6 +2137,14 @@ $('wlAddBtn').addEventListener('click', () => {
   st.textContent = `✅ 已加入，共 ${db.watchlist.length} 檔`;
 });
 $('wlChips').addEventListener('click', e => {
+  if (e.target.closest('[data-wlclear]')) {   // 全部清除：連快篩表格一併清掉（renderWatchTable 空列表會自動隱藏）
+    if (!confirm(`確定清空觀察清單（${db.watchlist.length} 檔）？快篩表格會一併清除。`)) return;
+    db.watchlist = [];
+    if (watchData) { watchData.rows = []; renderWatchTable(); }
+    saveDB(); renderWatchlist();
+    const st = $('wlStatus'); st.className = 'status'; st.textContent = '✅ 已清空觀察清單';
+    return;
+  }
   const b = e.target.closest('[data-wlrm]');
   if (!b) return;
   db.watchlist = db.watchlist.filter(w => w.id !== b.dataset.wlrm);
