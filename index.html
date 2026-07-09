@@ -652,7 +652,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.42.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.42.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -3613,6 +3613,16 @@ function restorePrefsUI() {
   if (localStorage.getItem(DEMO_FLAG)) $('demoBar').style.display = 'flex';
   // 錨點連結（導覽列的設定／KOL、引導卡的 Q0）：點擊時順便展開對應摺疊區（摺疊著捲得到也看不到內容）
   $$('a[data-open]').forEach(a => a.addEventListener('click', () => { const el = $(a.dataset.open); if (el) el.open = true; }));
+  // 頁內錨點改由 JS 捲動、不寫入網址 hash——否則 refresh 會照 hash 跳回上次點的區塊而非留在頁頂
+  // （document 層級在各錨點自身的 data-open listener 之後才觸發：先展開、再捲動，落點才準）
+  document.addEventListener('click', e => {
+    const a = e.target.closest('a[href^="#"]');
+    if (!a) return;
+    e.preventDefault();
+    const el = document.querySelector(a.getAttribute('href'));
+    if (el) el.scrollIntoView({ behavior: 'smooth' });   // scroll-margin-top 對 scrollIntoView 同樣生效
+  });
+  if (location.hash) { history.replaceState(null, '', location.pathname + location.search); scrollTo(0, 0); }   // 清掉修正前殘留在網址的 hash
   // 導覽列右緣漸層：內容溢出且未捲到底才顯示，提示還有項目可橫向捲動
   const navSc = $('topNavScroll');
   const updateNavFade = () => $('topNav').classList.toggle('canScroll', navSc.scrollLeft + navSc.clientWidth < navSc.scrollWidth - 2);
