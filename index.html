@@ -249,10 +249,11 @@
       <label class="field">OpenAI API Key
         <span class="pw"><input id="apiKey" type="password" name="oai-key-x" placeholder="sk-..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true"><button type="button" class="eye" data-eye="apiKey" title="顯示／隱藏">👁</button></span>
       </label>
-      <label class="field">AI 模型
+      <label class="field">AI 思考模型
         <select id="modelSel">
           <option value="gpt-5.4" selected>gpt-5.4（預設）</option>
           <option value="gpt-5.4-mini">gpt-5.4-mini</option>
+          <option value="gpt-5.5">gpt-5.5</option>
           <option value="__custom__">自訂…</option>
         </select>
       </label>
@@ -265,6 +266,12 @@
           <option value="low">低（快）</option>
           <option value="medium" selected>中</option>
           <option value="high">高（慢而深入）</option>
+        </select>
+      </label>
+      <label class="field">AI 搜尋模型（Grok 直查 X 用）
+        <select id="searchModelSel">
+          <option value="grok-4.3" selected>grok-4.3（預設）</option>
+          <option value="grok-4.5">grok-4.5</option>
         </select>
       </label>
       <label class="field">台股手續費率 %
@@ -652,7 +659,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.42.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.43.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -2609,11 +2616,11 @@ async function streamXai(key, model, prompt, tools, onDelta) {
   if (!full) throw new Error('xAI Responses API 未回傳內容');
   return { text: full + xaiCiteBlock(cites, anns), truncated };
 }
-// Grok 執行器：與 runAI 相同的作業動畫（轉圈＋秒數＋階段），但走 xAI 端點、固定 grok-4.3（x_search 官方建議模型）
+// Grok 執行器：與 runAI 相同的作業動畫（轉圈＋秒數＋階段），但走 xAI 端點、模型依「AI 搜尋模型」設定（預設 grok-4.3，x_search 官方建議模型）
 async function runGrok(prompt, tools, statusEl, outEl) {
   const key = (db.settings.xaiKey || '').trim();
   if (!key) throwKeyError('xaiKey', 'Grok 直查需要 xAI API Key');
-  const model = 'grok-4.3';
+  const model = $('searchModelSel').value || 'grok-4.3';
   const out = outEl || $('aiOutput');   // ④ 的面板（快篩總評／KOL 雷達）自帶輸出區，不佔用 ③
   out.style.display = 'block'; out.innerHTML = '';
   if (!outEl) $('aiMeta').style.display = 'none';
@@ -3425,6 +3432,7 @@ function bindSettings() {
     localStorage.setItem('twbt_model', $('modelSel').value);
   });
   $('effortSel').addEventListener('change', () => localStorage.setItem('twbt_effort', $('effortSel').value));
+  $('searchModelSel').addEventListener('change', () => localStorage.setItem('twbt_searchmodel', $('searchModelSel').value));
   $('personaSel').addEventListener('change', () => {
     localStorage.setItem('twbt_persona', $('personaSel').value);
     $('customPersonaWrap').style.display = $('personaSel').value === '__custom__' ? '' : 'none';
@@ -3570,7 +3578,7 @@ function clearDemo() {
   if (!db.positions.length) { $('onboardBox').style.display = 'block'; $('addBox').open = true; }
 }
 
-// 還原 UI 偏好（模型／推理深度／視角／web search／KOL 欄位）：init 與「匯入 JSON」後共用
+// 還原 UI 偏好（思考／搜尋模型／推理深度／視角／web search／KOL 欄位）：init 與「匯入 JSON」後共用
 function restorePrefsUI() {
   const savedModel = localStorage.getItem('twbt_model');
   if (savedModel && [...$('modelSel').options].some(o => o.value === savedModel)) {
@@ -3579,6 +3587,8 @@ function restorePrefsUI() {
   }
   const savedEffort = localStorage.getItem('twbt_effort');
   if (savedEffort != null && [...$('effortSel').options].some(o => o.value === savedEffort)) $('effortSel').value = savedEffort;
+  const savedSearchModel = localStorage.getItem('twbt_searchmodel');
+  if (savedSearchModel && [...$('searchModelSel').options].some(o => o.value === savedSearchModel)) $('searchModelSel').value = savedSearchModel;
   const savedPersona = localStorage.getItem('twbt_persona');
   if (savedPersona != null && [...$('personaSel').options].some(o => o.value === savedPersona)) $('personaSel').value = savedPersona;
   $('cpName').value = db.settings.cpName || '';
