@@ -451,11 +451,11 @@
     </div>
     <details class="hintFold">
       <summary>ℹ️ 使用提示：省 token 技巧、報告歷史、分析視角、上次建議檢討</summary>
-      <div class="hint">「產生 AI 分析」會呼叫 OpenAI（耗 token）；若想省 token，可改按「複製 Prompt」把同一份提問貼到訂閱制聊天機器人（如 Gemini）。新聞與美股基本面那段需該機器人能上網查詢才會生效；台股的技術面／籌碼／配息等數據已內含在 Prompt 中。報告自動保留<b>最近 10 份</b>於本機（重新整理不消失），可由報告上方的下拉選單切換、對照前後觀點變化。「分析視角」可切換單一風格（含<b>供應鏈瓶頸獵人</b>與<b>自訂視角</b>——把你欣賞的分析師方法論寫成準則）或<b>三師會診</b>（價值×成長×技術各自表態、主持人裁決）；同一檔重複分析時會自動附上<b>上次建議檢討</b>（對照期間實際走勢、檢討上次判斷對錯）。</div>
+      <div class="hint">「產生 AI 分析」會呼叫 OpenAI（耗 token）；若想省 token，可改按「複製 Prompt」把同一份提問貼到訂閱制聊天機器人（如 Gemini）。新聞與美股基本面那段需該機器人能上網查詢才會生效；台股的技術面／籌碼／配息等數據已內含在 Prompt 中。報告自動保留<b>最近 20 份</b>於本機（重新整理不消失），可由報告上方的下拉選單切換、對照前後觀點變化。「分析視角」可切換單一風格（含<b>供應鏈瓶頸獵人</b>與<b>自訂視角</b>——把你欣賞的分析師方法論寫成準則）或<b>三師會診</b>（價值×成長×技術各自表態、主持人裁決）；同一檔重複分析時會自動附上<b>上次建議檢討</b>（對照期間實際走勢、檢討上次判斷對錯）。</div>
     </details>
     <div id="aiStatus" class="status"></div>
     <div id="aiMeta" style="display:none; align-items:center; gap:10px; margin-top:12px; padding:8px 12px; background:var(--panel2); border:1px solid var(--border); border-radius:8px; font-size:.82rem; color:var(--muted); flex-wrap:wrap;">
-      <select id="histSel" title="切換歷史報告（自動保留最近 10 份）" style="max-width:320px; font-size:.82rem; padding:5px 8px;"></select>
+      <select id="histSel" title="切換歷史報告（自動保留最近 20 份）" style="max-width:320px; font-size:.82rem; padding:5px 8px;"></select>
       <span id="aiMetaText"></span>
       <span style="flex:1"></span>
       <button id="aiCopyBtn" class="ghost">📋 複製報告</button>
@@ -575,7 +575,7 @@
         <b>1. 準備金鑰（只需一次）</b>：展開「🔑 API 與參數設定」——<b>OpenAI Key</b>（AI 分析必填）；<b>Twelve Data Key</b>（要追蹤美股才需要，免費註冊）；FinMind／Finnhub／xAI 皆選填（依序強化台股上櫃、美股基本面、KOL 直查）。金鑰只存在你這台裝置的瀏覽器。<br>
         <b>2. 建立持倉</b>：到「② 我的持倉」按「＋ 新增持倉」填首筆買進（債券填面額／票息／到期日）。之後的加碼、賣出、股息：<b>點該持倉列展開</b>即可補登、修改。<br>
         <b>3. 更新報價</b>：回「① 損益總覽」按「🔄 更新所有報價」（台股免金鑰、美股走 Twelve Data、匯率自動抓）。<br>
-        <b>4. 產生 AI 分析</b>：到「③」選標的按「🤖 產生個股 AI 分析」（會自動載入一年數據與走勢圖）；或按「💼 產生投資組合總評」看整體配置建議。報告自動保留最近 10 份，可用下拉選單回顧。<br>
+        <b>4. 產生 AI 分析</b>：到「③」選標的按「🤖 產生個股 AI 分析」（會自動載入一年數據與走勢圖）；或按「💼 產生投資組合總評」看整體配置建議。報告自動保留最近 20 份，可用下拉選單回顧。<br>
         <b>5. 備份</b>：設定區「⬇️ 匯出 JSON」——持倉、設定、報告歷史與偏好全部帶著走。<b>資料只存在瀏覽器</b>，清除網站資料前務必先匯出。<br>
         <p style="margin:.5em 0" class="hint">進階功能：④ 觀察清單快篩（還沒買的標的排排比）與 📡 KOL 雷達（撈分析師點名股）、⑤ 淨值曲線與 XIRR。看不懂報告裡的名詞？往下看 Q2。</p>
       </div>
@@ -661,7 +661,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.44.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.45.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -3176,8 +3176,8 @@ $('copyPfPrompt').addEventListener('click', async () => {
   if (ok) st.textContent = '✅ 投資組合 Prompt 已複製，可貼到其他聊天機器人';
 });
 
-/* ── 報告：歷史（localStorage 最近 10 份，重新整理不消失）/ 時間戳記 / 複製 / 下載 ── */
-const REPORTS_KEY = 'twpf_reports', REPORTS_MAX = 10;
+/* ── 報告：歷史（localStorage 最近 20 份，重新整理不消失）/ 時間戳記 / 複製 / 下載 ── */
+const REPORTS_KEY = 'twpf_reports', REPORTS_MAX = 20;
 let reportHist = [];   // [{id, ts, title, filename, fullText}] 新的在前
 try { const _r = JSON.parse(localStorage.getItem(REPORTS_KEY) || '[]'); if (Array.isArray(_r)) reportHist = _r; } catch (_) {}
 let lastReport = null;   // { fullText, filename }（複製／下載按鈕的目標＝目前顯示中的報告）
@@ -3373,7 +3373,7 @@ function exportData() {
   const data = {
     app: 'twpf', version: APP_VERSION, exportedAt: new Date().toISOString(),
     positions: db.positions, watchlist: db.watchlist, settings,
-    reports: reportHist,   // 報告歷史（最近 10 份）——換裝置不再遺失
+    reports: reportHist,   // 報告歷史（最近 20 份）——換裝置不再遺失
     prefs: {               // UI 偏好（twbt_*；不含任何金鑰）
       model: localStorage.getItem('twbt_model') || '', effort: localStorage.getItem('twbt_effort') || '',
       persona: localStorage.getItem('twbt_persona') || '', websearch: localStorage.getItem('twbt_websearch') || '',
