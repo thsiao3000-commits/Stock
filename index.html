@@ -251,9 +251,11 @@
       </label>
       <label class="field">AI 思考模型
         <select id="modelSel">
-          <option value="gpt-5.4" selected>gpt-5.4（預設）</option>
-          <option value="gpt-5.4-mini">gpt-5.4-mini</option>
+          <option value="gpt-5.6-sol" selected>gpt-5.6-sol（預設）</option>
+          <option value="gpt-5.6-terra">gpt-5.6-terra（較省）</option>
           <option value="gpt-5.5">gpt-5.5</option>
+          <option value="gpt-5.4">gpt-5.4</option>
+          <option value="gpt-5.4-mini">gpt-5.4-mini</option>
           <option value="__custom__">自訂…</option>
         </select>
       </label>
@@ -659,7 +661,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.43.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.44.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -2500,7 +2502,7 @@ $('kolExtractBtn').addEventListener('click', () => {
 /* ════════════════ OpenAI（串流） ════════════════ */
 function selectedModel() {
   const v = $('modelSel').value;
-  return v === '__custom__' ? ($('customModel').value.trim() || 'gpt-5.4') : v;
+  return v === '__custom__' ? ($('customModel').value.trim() || 'gpt-5.6-sol') : v;
 }
 async function readSSE(res, onJson) {
   const rd = res.body.getReader(), dec = new TextDecoder();
