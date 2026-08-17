@@ -274,6 +274,7 @@
         <select id="searchModelSel">
           <option value="grok-4.3" selected>grok-4.3（預設）</option>
           <option value="grok-4.5">grok-4.5</option>
+          <option value="grok-4.6">grok-4.6</option>
         </select>
       </label>
       <label class="field">台股手續費率 %
@@ -661,7 +662,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.45.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.46.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
