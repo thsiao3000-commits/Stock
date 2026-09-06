@@ -251,9 +251,9 @@
       </label>
       <label class="field">AI 思考模型
         <select id="modelSel">
+          <option value="gpt-6-astra">gpt-6-astra</option>
           <option value="gpt-5.6-sol" selected>gpt-5.6-sol（預設）</option>
           <option value="gpt-5.6-terra">gpt-5.6-terra（較省）</option>
-          <option value="gpt-6-astra">gpt-6-astra</option>
           <option value="__custom__">自訂…</option>
         </select>
       </label>
@@ -660,7 +660,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.47.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.47.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
