@@ -252,7 +252,7 @@
       <label class="field">AI 思考模型
         <select id="modelSel">
           <option value="gpt-6-astra">gpt-6-astra</option>
-          <option value="gpt-5.6-sol" selected>gpt-5.6-sol（預設）</option>
+          <option value="gpt-6-sol" selected>gpt-6-sol（預設）</option>
           <option value="gpt-5.6-terra">gpt-5.6-terra（較省）</option>
           <option value="__custom__">自訂…</option>
         </select>
@@ -272,7 +272,7 @@
         <select id="searchModelSel">
           <option value="grok-4.3" selected>grok-4.3（預設）</option>
           <option value="grok-4.5">grok-4.5</option>
-          <option value="grok-4.6">grok-4.6</option>
+          <option value="grok-4.7">grok-4.7</option>
         </select>
       </label>
       <label class="field">台股手續費率 %
@@ -660,7 +660,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.47.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.48.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -2501,7 +2501,7 @@ $('kolExtractBtn').addEventListener('click', () => {
 /* ════════════════ OpenAI（串流） ════════════════ */
 function selectedModel() {
   const v = $('modelSel').value;
-  return v === '__custom__' ? ($('customModel').value.trim() || 'gpt-5.6-sol') : v;
+  return v === '__custom__' ? ($('customModel').value.trim() || 'gpt-6-sol') : v;
 }
 async function readSSE(res, onJson) {
   const rd = res.body.getReader(), dec = new TextDecoder();
