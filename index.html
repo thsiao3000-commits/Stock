@@ -252,7 +252,7 @@
       <label class="field">AI 思考模型
         <select id="modelSel">
           <option value="gpt-6-astra">gpt-6-astra</option>
-          <option value="gpt-6-sol" selected>gpt-6-sol（預設）</option>
+          <option value="gpt-6.1-sol" selected>gpt-6.1-sol（預設）</option>
           <option value="gpt-5.6-terra">gpt-5.6-terra（較省）</option>
           <option value="__custom__">自訂…</option>
         </select>
@@ -271,7 +271,6 @@
       <label class="field">AI 搜尋模型（Grok 直查 X 用）
         <select id="searchModelSel">
           <option value="grok-4.3" selected>grok-4.3（預設）</option>
-          <option value="grok-4.5">grok-4.5</option>
           <option value="grok-4.7">grok-4.7</option>
         </select>
       </label>
@@ -660,7 +659,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.49.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.50.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -2505,11 +2504,10 @@ $('kolExtractBtn').addEventListener('click', () => {
 const PRICING_URL = 'https://thsiao3000-commits.github.io/BenchAI-Support/pricing.json';
 const PRICING_FALLBACK = { schema_version: 1, updated_at: '2026-09-30', models: {   // 只留本工具會呼叫的 OpenAI／xAI 模型
   'gpt-6-astra':   { input: 10.00, output: 50.00, long_context: { threshold: 272000, input: 20.00, output: 75.00 } },
-  'gpt-6-sol':     { input: 2.00,  output: 10.00, long_context: { threshold: 272000, input: 4.00,  output: 15.00 } },
+  'gpt-6.1-sol':   { input: 2.00,  output: 10.00, long_context: { threshold: 272000, input: 4.00,  output: 15.00 } },
   'gpt-5.6-terra': { input: 2.00,  output: 12.00, long_context: { threshold: 272000, input: 4.00,  output: 18.00 } },
   'gpt-6-luna':    { input: 0.10,  output: 0.50,  long_context: { threshold: 272000, input: 0.20,  output: 0.75 } },
   'grok-4.7':      { input: 2.00,  output: 6.00,  long_context: { threshold: 200000, input: 4.00,  output: 12.00 } },
-  'grok-4.5':      { input: 2.00,  output: 6.00,  long_context: { threshold: 200000, input: 4.00,  output: 12.00 } },
   'grok-4.3':      { input: 1.25,  output: 2.50,  long_context: { threshold: 200000, input: 2.50,  output: 5.00 } },
 } };
 let pricingPromise = null;
@@ -2563,7 +2561,7 @@ const usageTail = t => t ? '　·　' + t : '';   // 接在 ✅ 完成訊息後�
 /* ════════════════ OpenAI（串流） ════════════════ */
 function selectedModel() {
   const v = $('modelSel').value;
-  return v === '__custom__' ? ($('customModel').value.trim() || 'gpt-6-sol') : v;
+  return v === '__custom__' ? ($('customModel').value.trim() || 'gpt-6.1-sol') : v;
 }
 async function readSSE(res, onJson) {
   const rd = res.body.getReader(), dec = new TextDecoder();
