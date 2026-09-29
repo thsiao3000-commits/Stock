@@ -450,7 +450,7 @@
     </div>
     <details class="hintFold">
       <summary>ℹ️ 使用提示：省 token 技巧、報告歷史、分析視角、上次建議檢討</summary>
-      <div class="hint">「產生 AI 分析」會呼叫 OpenAI（耗 token）；若想省 token，可改按「複製 Prompt」把同一份提問貼到訂閱制聊天機器人（如 Gemini）。新聞與美股基本面那段需該機器人能上網查詢才會生效；台股的技術面／籌碼／配息等數據已內含在 Prompt 中。報告自動保留<b>最近 20 份</b>於本機（重新整理不消失），可由報告上方的下拉選單切換、對照前後觀點變化。「分析視角」可切換單一風格（含<b>供應鏈瓶頸獵人</b>與<b>自訂視角</b>——把你欣賞的分析師方法論寫成準則）或<b>三師會診</b>（價值×成長×技術各自表態、主持人裁決）；同一檔重複分析時會自動附上<b>上次建議檢討</b>（對照期間實際走勢、檢討上次判斷對錯）。</div>
+      <div class="hint">「產生 AI 分析」會呼叫 OpenAI（耗 token）；若想省 token，可改按「複製 Prompt」把同一份提問貼到訂閱制聊天機器人（如 Gemini）。新聞與美股基本面那段需該機器人能上網查詢才會生效；台股的技術面／籌碼／配息等數據已內含在 Prompt 中。報告自動保留<b>最近 20 份</b>於本機（重新整理不消失），可由報告上方的下拉選單切換、對照前後觀點變化。「分析視角」可切換單一風格（含<b>供應鏈瓶頸獵人</b>與<b>自訂視角</b>——把你欣賞的分析師方法論寫成準則）或<b>三師會診</b>（價值×成長×技術各自表態、主持人裁決）；同一檔重複分析時會自動附上<b>上次建議檢討</b>（對照期間實際走勢、檢討上次判斷對錯）。每次 AI 呼叫完成後，狀態列與報告開頭會標示本次 <b>tokens 用量與估算費用</b>（費率取自線上價格表，離線改用內建表；不含 web search／x_search 工具費，價格表查無的模型只顯示 tokens）。</div>
     </details>
     <div id="aiStatus" class="status"></div>
     <div id="aiMeta" style="display:none; align-items:center; gap:10px; margin-top:12px; padding:8px 12px; background:var(--panel2); border:1px solid var(--border); border-radius:8px; font-size:.82rem; color:var(--muted); flex-wrap:wrap;">
@@ -660,7 +660,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.48.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.49.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -2309,10 +2309,10 @@ $('wlAiBtn').addEventListener('click', async () => {
   if (!watchData || !watchData.rows.some(r => !r.err)) { st.className = 'status error'; st.textContent = '請先「🔍 快篩全部」取得數據'; return; }
   $('wlAiBtn').disabled = true; $('wlScanBtn').disabled = true;
   try {
-    const { text, model, truncated } = await runAI(buildWatchPrompt(), st, { outEl: $('wsOutput') });
+    const { text, model, truncated, usageText } = await runAI(buildWatchPrompt(), st, { outEl: $('wsOutput') });
     const pv = personaOf(selectedPersona());   // 快篩不用三師會診 → 只有單一/自訂視角才標註
-    setPanelReport('ws', `觀察清單快篩總評${pv ? `（${pv.name}）` : ''}`, model, text, '觀察清單快篩');
-    st.textContent = truncated ? `⚠️ 報告被截斷（${truncated}），建議調低推理深度重試。` : `✅ 快篩總評完成（報告顯示於下方面板，已存入 ③ 的報告歷史——可與 ③ 的個股分析同時對照）`;
+    setPanelReport('ws', `觀察清單快篩總評${pv ? `（${pv.name}）` : ''}`, model, text, '觀察清單快篩', usageText);
+    st.textContent = (truncated ? `⚠️ 報告被截斷（${truncated}），建議調低推理深度重試。` : `✅ 快篩總評完成（報告顯示於下方面板，已存入 ③ 的報告歷史——可與 ③ 的個股分析同時對照）`) + usageTail(usageText);
   } catch (e) { st.className = 'status error'; st.textContent = '❌ ' + e.message; }
   finally { $('wlAiBtn').disabled = false; $('wlScanBtn').disabled = false; }
 });
@@ -2457,13 +2457,13 @@ $('kolSearchBtn').addEventListener('click', async () => {
   $('kolSearchBtn').disabled = true; $('kolGrokBtn').disabled = true;
   try {
     // 雷達必開 web search（本功能的本質就是搜尋），不受 ③ 的勾選影響
-    const { text, model } = await runAI(buildKolPrompt(name, market, days), st, { webSearch: true, outEl: $('kolOutput') });
-    setPanelReport('kol', `KOL 選股雷達 — ${name}（近 ${days} 天）`, model, text, 'KOL選股雷達');
+    const { text, model, usageText } = await runAI(buildKolPrompt(name, market, days), st, { webSearch: true, outEl: $('kolOutput') });
+    setPanelReport('kol', `KOL 選股雷達 — ${name}（近 ${days} 天）`, model, text, 'KOL選股雷達', usageText);
     kolFound = parseTickerLine(text).map(s => ({ symbol: s, market }));
     renderKolChips();
-    st.textContent = kolFound.length
+    st.textContent = (kolFound.length
       ? `✅ 雷達完成：找到 ${kolFound.length} 檔（完整表格見下方報告；日期與當時價位請自行核對來源）`
-      : '✅ 雷達完成，但未解析到代號清單 — 請看下方報告表格手動加入（或 AI 查無資料）';
+      : '✅ 雷達完成，但未解析到代號清單 — 請看下方報告表格手動加入（或 AI 查無資料）') + usageTail(usageText);
   } catch (e) { st.className = 'status error'; st.textContent = '❌ ' + e.message; }
   finally { $('kolSearchBtn').disabled = false; $('kolGrokBtn').disabled = false; }
 });
@@ -2478,13 +2478,13 @@ $('kolGrokBtn').addEventListener('click', async () => {
   $('kolGrokBtn').disabled = true; $('kolSearchBtn').disabled = true;
   try {
     const tools = [{ type: 'x_search', allowed_x_handles: [handle], from_date: kolFromDate(days), to_date: todayISO() }];
-    const { text, model } = await runGrok(buildGrokKolPrompt(name, handle, market, days), tools, st, $('kolOutput'));
-    setPanelReport('kol', `KOL 選股雷達（Grok 直查 @${handle}，近 ${days} 天）`, model, text, 'KOL選股雷達_Grok');
+    const { text, model, usageText } = await runGrok(buildGrokKolPrompt(name, handle, market, days), tools, st, $('kolOutput'));
+    setPanelReport('kol', `KOL 選股雷達（Grok 直查 @${handle}，近 ${days} 天）`, model, text, 'KOL選股雷達_Grok', usageText);
     kolFound = parseTickerLine(text).map(s => ({ symbol: s, market }));
     renderKolChips();
-    st.textContent = kolFound.length
+    st.textContent = (kolFound.length
       ? `✅ Grok 直查完成：@${handle} 近 ${days} 天主要點名 ${kolFound.length} 檔（完整表格與貼文連結見下方報告，不會蓋掉 ③ 的分析）`
-      : `✅ Grok 直查完成：未解析到代號清單——可能期間內無主要點名，詳見下方報告`;
+      : `✅ Grok 直查完成：未解析到代號清單——可能期間內無主要點名，詳見下方報告`) + usageTail(usageText);
   } catch (e) { st.className = 'status error'; st.textContent = '❌ ' + e.message; }
   finally { $('kolGrokBtn').disabled = false; $('kolSearchBtn').disabled = false; }
 });
@@ -2497,6 +2497,67 @@ $('kolExtractBtn').addEventListener('click', () => {
   renderKolChips();
   st.textContent = `✅ 擷取到 ${syms.length} 檔，點「＋」逐檔或「＋ 全部加入」`;
 });
+
+/* ════════════════ 模型定價：tokens → 美元 ════════════════ */
+// 價格表取自 BenchAI-Support pricing.json（GitHub Pages；cache-control max-age=600，推送後最多 10 分鐘生效），
+// 抓不到（離線／被擋）就退回下方內嵌後備表。單位：美元／每百萬 tokens；key 直接用 API 模型 ID，查不到就不顯示費用。
+// 可選欄位：promo＝優惠價（until 之前含當天）、long_context＝輸入 tokens 超過 threshold 時整筆改用的費率。
+const PRICING_URL = 'https://thsiao3000-commits.github.io/BenchAI-Support/pricing.json';
+const PRICING_FALLBACK = { schema_version: 1, updated_at: '2026-09-25', models: {   // 只留本工具會呼叫的 OpenAI／xAI 模型
+  'gpt-6-astra':   { input: 10.00, output: 50.00, long_context: { threshold: 272000, input: 20.00, output: 75.00 } },
+  'gpt-6-sol':     { input: 2.00,  output: 10.00, long_context: { threshold: 272000, input: 4.00,  output: 15.00 } },
+  'gpt-5.6-terra': { input: 2.00,  output: 12.00, long_context: { threshold: 272000, input: 4.00,  output: 18.00 } },
+  'gpt-6-luna':    { input: 0.10,  output: 0.50,  long_context: { threshold: 272000, input: 0.20,  output: 0.75 } },
+  'grok-4.7':      { input: 2.00,  output: 6.00,  long_context: { threshold: 200000, input: 4.00,  output: 12.00 } },
+  'grok-4.3':      { input: 1.25,  output: 2.50,  long_context: { threshold: 200000, input: 2.50,  output: 5.00 } },
+} };
+let pricingPromise = null;
+function loadPricing() {   // 只抓一次（開頁預抓）；失敗退回內嵌表，永不 reject
+  if (!pricingPromise) pricingPromise = fetch(PRICING_URL, { cache: 'no-cache' })
+    .then(r => { if (!r.ok) throw new Error('pricing fetch failed: ' + r.status); return r.json(); })
+    .then(t => (t && t.models) ? t : PRICING_FALLBACK)
+    .catch(() => PRICING_FALLBACK);
+  return pricingPromise;
+}
+// 生效費率（美元／1M tokens）：promo 在期限內優先，long_context 超過門檻再覆蓋；查無模型回 null
+function effectiveRates(table, modelId, inputTokens = 0, today = new Date()) {
+  const m = table && table.models && table.models[modelId];
+  if (!m) return null;
+  const p = n => String(n).padStart(2, '0');
+  const ymd = `${today.getFullYear()}-${p(today.getMonth() + 1)}-${p(today.getDate())}`;   // yyyy-MM-dd 可直接字串比較
+  let rates = { input: m.input, output: m.output };
+  if (m.promo && ymd <= m.promo.until) rates = { input: m.promo.input, output: m.promo.output };
+  if (m.long_context && inputTokens > m.long_context.threshold) rates = { input: m.long_context.input, output: m.long_context.output };
+  return rates;
+}
+function estimateCostUSD(table, modelId, inputTokens, outputTokens) {
+  const r = effectiveRates(table, modelId, inputTokens);
+  if (!r) return null;
+  return (inputTokens * r.input + outputTokens * r.output) / 1e6;
+}
+// usage 格式統一：Responses API（OpenAI／xAI：input_tokens／output_tokens）與 chat/completions（prompt_tokens／completion_tokens）
+// → { input, output, reasoning }。total 若大於 input＋output（推理 tokens 另計的情況），差額視為輸出一併計費。
+function usageOf(u) {
+  if (!u) return null;
+  const input = u.input_tokens ?? u.prompt_tokens, output = u.output_tokens ?? u.completion_tokens;
+  if (!Number.isFinite(input) || !Number.isFinite(output)) return null;
+  const total = Number.isFinite(u.total_tokens) ? u.total_tokens : input + output;
+  return {
+    input, output: Math.max(output, total - input),
+    reasoning: u.output_tokens_details?.reasoning_tokens ?? u.completion_tokens_details?.reasoning_tokens ?? 0,
+  };
+}
+// 狀態列／報告開頭的一行字：「tokens 輸入 12,345／輸出 3,456（含推理 1,200）　·　約 US$0.108」；查無費率標「費率未知」
+const fmtTok = n => Number(n).toLocaleString('en-US');
+const fmtUSD = c => 'US$' + (c < 0.01 ? c.toFixed(4) : c.toFixed(3));
+function usageLabel(usage, cost, toolNote) {
+  if (!usage) return '';
+  let s = `tokens 輸入 ${fmtTok(usage.input)}／輸出 ${fmtTok(usage.output)}`;
+  if (usage.reasoning) s += `（含推理 ${fmtTok(usage.reasoning)}）`;
+  s += cost == null ? '　·　費率未知' : `　·　約 ${fmtUSD(cost)}${toolNote ? `（不含 ${toolNote} 工具費）` : ''}`;
+  return s;
+}
+const usageTail = t => t ? '　·　' + t : '';   // 接在 ✅ 完成訊息後面
 
 /* ════════════════ OpenAI（串流） ════════════════ */
 function selectedModel() {
@@ -2557,10 +2618,11 @@ async function streamResponses(key, model, prompt, effort, onDelta, webSearch, o
     const err = new Error(e.error?.message || ('OpenAI HTTP ' + res.status));
     err.status = res.status; throw err;
   }
-  let full = '', failMsg = null, truncated = null;
+  let full = '', failMsg = null, truncated = null, usage = null;
   const anns = [];   // web search 引用（url_citation annotations）——過去只拼 delta、引用整批遺失，全靠模型自願把網址寫進正文
   await readSSE(res, j => {
     const t = j.type || '';
+    if (j.response && j.response.usage) usage = j.response.usage;   // response.completed／incomplete 帶 usage（tokens 計費依據）
     if (t.endsWith('output_text.delta') && typeof j.delta === 'string') { full += j.delta; onDelta(full); }
     else if (t.endsWith('output_text.annotation.added') && j.annotation && j.annotation.url) anns.push(j.annotation);
     else if (t.endsWith('reasoning_summary_text.delta') && typeof j.delta === 'string') { onThink && onThink(j.delta); }   // 思考摘要（兼保活）
@@ -2570,7 +2632,7 @@ async function streamResponses(key, model, prompt, effort, onDelta, webSearch, o
   });
   if (failMsg) throw new Error(failMsg);
   if (!full) { const err = new Error('Responses API 未回傳內容'); err.status = 400; throw err; }
-  return { text: full + citeBlock(anns), truncated };
+  return { text: full + citeBlock(anns), truncated, usage };
 }
 // web search 引用 → 報告尾端「引用來源」清單（依 URL 去重；標題去掉 []，避免打壞 Markdown 連結）
 function citeBlock(anns) {
@@ -2603,10 +2665,11 @@ async function streamXai(key, model, prompt, tools, onDelta) {
     // xAI 錯誤格式兩種都見過：{error:{message}} 與 {error:"字串"}（實測後者）
     throw new Error(e.error?.message || (typeof e.error === 'string' ? e.error : '') || ('xAI HTTP ' + res.status));
   }
-  let full = '', failMsg = null, truncated = null, cites = [];
+  let full = '', failMsg = null, truncated = null, cites = [], usage = null;
   const anns = [];
   await readSSE(res, j => {
     const t = j.type || '';
+    if (j.response && j.response.usage) usage = j.response.usage;   // 與 OpenAI 同格式（input_tokens／output_tokens）
     if (t.endsWith('output_text.delta') && typeof j.delta === 'string') { full += j.delta; onDelta(full); }
     else if (t.endsWith('output_text.annotation.added') && j.annotation && j.annotation.url) anns.push(j.annotation);
     else if (t === 'response.completed' && Array.isArray(j.response?.citations)) cites = j.response.citations;
@@ -2615,7 +2678,7 @@ async function streamXai(key, model, prompt, tools, onDelta) {
   });
   if (failMsg) throw new Error(failMsg);
   if (!full) throw new Error('xAI Responses API 未回傳內容');
-  return { text: full + xaiCiteBlock(cites, anns), truncated };
+  return { text: full + xaiCiteBlock(cites, anns), truncated, usage };
 }
 // Grok 執行器：與 runAI 相同的作業動畫（轉圈＋秒數＋階段），但走 xAI 端點、模型依「AI 搜尋模型」設定（預設 grok-4.3，x_search 官方建議模型）
 async function runGrok(prompt, tools, statusEl, outEl) {
@@ -2647,7 +2710,9 @@ async function runGrok(prompt, tools, statusEl, outEl) {
   try {
     const r = await streamXai(key, model, prompt, tools, paint);
     paint(r.text, true);
-    return { text: r.text, model, truncated: r.truncated };
+    const usage = usageOf(r.usage);   // tokens 用量＋估算費用（x_search 工具費另計，不在此估算內）
+    const cost = usage ? estimateCostUSD(await loadPricing(), model, usage.input, usage.output) : null;
+    return { text: r.text, model, truncated: r.truncated, usage, cost, usageText: usageLabel(usage, cost, tools && tools.length ? 'x_search' : '') };
   } finally {
     clearInterval(timer);
   }
@@ -2656,19 +2721,20 @@ async function streamChat(key, model, prompt, onDelta) {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-    body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], stream: true }),
+    body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], stream: true, stream_options: { include_usage: true } }),   // include_usage：最後一個 chunk 帶 usage
   });
   if (!res.ok) {
     const e = await res.json().catch(() => ({}));
     throw new Error(e.error?.message || ('OpenAI HTTP ' + res.status));
   }
-  let full = '', truncated = null;
+  let full = '', truncated = null, usage = null;
   await readSSE(res, j => {
+    if (j.usage) usage = j.usage;   // include_usage → 最後一個 chunk（choices 為空）帶 usage
     const ch = j.choices?.[0];
     if (ch?.delta?.content) { full += ch.delta.content; onDelta(full); }
     if (ch?.finish_reason === 'length') truncated = 'max_tokens';
   });
-  return { text: full, truncated };
+  return { text: full, truncated, usage };
 }
 async function runAI(prompt, statusEl, opts) {
   const key = $('apiKey').value.trim();
@@ -2701,7 +2767,8 @@ async function runAI(prompt, statusEl, opts) {
     lastPaint = now;
     out.innerHTML = mdToHtml(txt);
   };
-  const onSearch = () => { if (chars === 0) phase = `${model} 搜尋新聞中`; };   // 撰寫前若在搜尋，顯示之
+  let searched = false;   // 是否真的呼叫了 web search（費用標示要註明工具費另計）
+  const onSearch = () => { searched = true; if (chars === 0) phase = `${model} 搜尋新聞中`; };   // 撰寫前若在搜尋，顯示之
   const onThink = d => { thinkChars += d.length; if (chars === 0) phase = `${model} 思考中`; };   // 收到思考摘要 → 從搜尋切回思考
   try {
     let r;
@@ -2714,7 +2781,9 @@ async function runAI(prompt, statusEl, opts) {
       } else throw e;
     }
     paint(r.text, true);
-    return { text: r.text, model, truncated: r.truncated };
+    const usage = usageOf(r.usage);   // tokens 用量＋估算費用（web search 工具費另計，不在此估算內）
+    const cost = usage ? estimateCostUSD(await loadPricing(), model, usage.input, usage.output) : null;
+    return { text: r.text, model, truncated: r.truncated, usage, cost, usageText: usageLabel(usage, cost, searched ? 'web search' : '') };
   } finally {
     clearInterval(timer);   // 停動畫；最終的 ✅／❌ 訊息由呼叫端覆蓋
   }
@@ -3113,15 +3182,15 @@ $('aiBtn').addEventListener('click', async () => {
       st.textContent = '先自動載入標的數據…';
       if (!await loadYearData()) { st.className = 'status error'; st.textContent = '❌ 數據載入失敗（原因見上方「載入」狀態列）'; return; }
     }
-    const { text, model, truncated } = await runAI(buildStockPrompt(), st, { webSearch: $('webSearchChk').checked });
+    const { text, model, truncated, usageText } = await runAI(buildStockPrompt(), st, { webSearch: $('webSearchChk').checked });
     const pv = personaLabel(selectedPersona());
     const title = `${aiData.market === 'tw' ? '台股' : '美股'}個股分析 — ${aiData.symbol}${aiData.name ? ' ' + aiData.name : ''}${pv ? `（${pv}）` : ''}`;
     const lastD = aiData.days[aiData.days.length - 1];
     setReport(title, model, text, `${aiData.symbol}_個股分析`,
-      { symbol: aiData.symbol, market: aiData.market, close: lastD.close, dataDate: lastD.date });
-    st.textContent = truncated
+      { symbol: aiData.symbol, market: aiData.market, close: lastD.close, dataDate: lastD.date }, usageText);
+    st.textContent = (truncated
       ? `⚠️ 報告達長度上限被截斷（${truncated}），僅顯示部分內容；建議把「AI 推理深度」調低後再產生一次。`
-      : `✅ 個股分析完成（模型：${model}）`;
+      : `✅ 個股分析完成（模型：${model}）`) + usageTail(usageText);
   } catch (e) {
     st.className = 'status error'; st.textContent = '❌ ' + e.message;
   } finally {
@@ -3139,12 +3208,12 @@ $('pfBtn').addEventListener('click', async () => {
     await ensureFX(false);
     // 含債券時啟用 web search（查發行人信用評等與美債殖利率）；仍尊重使用者的 web search 開關
     const wantSearch = $('webSearchChk').checked && db.positions.some(p => p.market === 'bond');
-    const { text, model, truncated } = await runAI(buildPortfolioPrompt(), st, { webSearch: wantSearch });
+    const { text, model, truncated, usageText } = await runAI(buildPortfolioPrompt(), st, { webSearch: wantSearch });
     const pvp = personaLabel(selectedPersona());
-    setReport(`投資組合總評${pvp ? `（${pvp}）` : ''}`, model, text, '投資組合總評');
-    st.textContent = truncated
+    setReport(`投資組合總評${pvp ? `（${pvp}）` : ''}`, model, text, '投資組合總評', null, usageText);
+    st.textContent = (truncated
       ? `⚠️ 報告達長度上限被截斷（${truncated}），僅顯示部分內容；建議把「AI 推理深度」調低後再產生一次。`
-      : `✅ 投資組合總評完成（模型：${model}）`;
+      : `✅ 投資組合總評完成（模型：${model}）`) + usageTail(usageText);
   } catch (e) {
     st.className = 'status error'; st.textContent = '❌ ' + e.message;
   } finally {
@@ -3209,10 +3278,14 @@ function showReport(r) {
 // ④ 面板報告（ws＝快篩總評、kol＝KOL 雷達）：存入歷史（可由 ③ 下拉切換），但顯示在各自面板內——
 // 不搶 ③ 的畫面，讓快篩總評、雷達點名清單與 ③ 的個股分析可以同時對照著看
 const panelLast = { ws: null, kol: null };
-function setPanelReport(prefix, title, model, markdown, filenameBase) {
+// 報告開頭：時間戳＋模型＋（API 有回報時）tokens 用量與估算費用＋工具版本——畫面顯示、複製、下載、歷史四者一致
+function reportHeader(title, model, ts, usageText) {
+  return `# ${title}\n\n**產生時間：** ${ts.full}　｜　**AI 模型：** ${model}` +
+    (usageText ? `　｜　**用量：** ${usageText}` : '') + `　｜　**工具：** 我的投資組合 ${APP_VERSION}\n\n---\n\n`;
+}
+function setPanelReport(prefix, title, model, markdown, filenameBase, usageText) {
   const ts = nowStamp();
-  const header = `# ${title}\n\n**產生時間：** ${ts.full}　｜　**AI 模型：** ${model}　｜　**工具：** 我的投資組合 ${APP_VERSION}\n\n---\n\n`;
-  const entry = { id: uid(), ts: ts.full, title, filename: `${filenameBase}_${ts.date}.md`, fullText: header + (markdown || '').trim() + '\n' };
+  const entry = { id: uid(), ts: ts.full, title, filename: `${filenameBase}_${ts.date}.md`, fullText: reportHeader(title, model, ts, usageText) + (markdown || '').trim() + '\n' };
   reportHist.unshift(entry);
   if (reportHist.length > REPORTS_MAX) reportHist.length = REPORTS_MAX;
   saveReports();
@@ -3242,12 +3315,10 @@ for (const pfx of ['ws', 'kol']) {
   });
   $(pfx + 'DlBtn').addEventListener('click', () => { const entry = panelLast[pfx]; if (entry) downloadText(entry.filename, entry.fullText); });
 }
-function setReport(title, model, markdown, filenameBase, meta) {
+function setReport(title, model, markdown, filenameBase, meta, usageText) {
   const ts = nowStamp();
-  // 時間戳與模型寫進報告開頭，讓畫面顯示、複製、下載三者內容一致
-  const header = `# ${title}\n\n**產生時間：** ${ts.full}　｜　**AI 模型：** ${model}　｜　**工具：** 我的投資組合 ${APP_VERSION}\n\n---\n\n`;
   // meta（個股報告帶 symbol/market/close/dataDate）供「上次建議檢討」比對；組合總評不帶
-  const entry = { id: uid(), ts: ts.full, title, filename: `${filenameBase}_${ts.date}.md`, fullText: header + (markdown || '').trim() + '\n', ...(meta || {}) };
+  const entry = { id: uid(), ts: ts.full, title, filename: `${filenameBase}_${ts.date}.md`, fullText: reportHeader(title, model, ts, usageText) + (markdown || '').trim() + '\n', ...(meta || {}) };
   reportHist.unshift(entry);
   if (reportHist.length > REPORTS_MAX) reportHist.length = REPORTS_MAX;
   saveReports();
@@ -3603,6 +3674,7 @@ function restorePrefsUI() {
 (function init() {
   loadDB();
   bindSettings();
+  loadPricing();   // 預抓模型價格表（抓不到退回內嵌表）——AI 呼叫完成時據此標示 tokens 用量與估算費用
   $('appVer').textContent = APP_VERSION;
   const _yr = new Date().getFullYear();
   $('appVerFoot').textContent = `© 2026${_yr > 2026 ? '–' + _yr : ''} Tony Hsiao　·　我的投資組合 + AI 分析 ${APP_VERSION}`;

@@ -43,7 +43,7 @@ const NORMAL_EVENTS = [
   { type: 'response.reasoning_summary_text.delta', delta: '與籌碼面' },
   { type: 'response.output_text.delta', delta: '## 報告' },
   { type: 'response.output_text.delta', delta: '內容' },
-  { type: 'response.completed' },
+  { type: 'response.completed', response: { usage: { input_tokens: 1200, output_tokens: 300, total_tokens: 1500 } } },
 ];
 
 let pass = 0, fail = 0;
@@ -59,6 +59,7 @@ function check(name, cond) { cond ? (pass++, console.log('  ✓', name)) : (fail
   check('onThink 收到 2 段思考摘要', thinks.join('') === '評估技術面與籌碼面');
   check('正文組裝正確', r.text === '## 報告內容');
   check('未截斷', r.truncated === null);
+  check('usage 擷取自 response.completed（v1.49.0 tokens／費用標示）', r.usage && r.usage.input_tokens === 1200 && r.usage.output_tokens === 300);
 
   // ── B. 組織未驗證（400 verified）→ 只拿掉 summary、保留 effort，原路重試成功 ──
   console.log('B. 組織未驗證 → 拿掉 summary 重試');
@@ -100,10 +101,11 @@ function check(name, cond) { cond ? (pass++, console.log('  ✓', name)) : (fail
   console.log('F. incomplete 截斷回報');
   calls = []; responses = [okStream([
     { type: 'response.output_text.delta', delta: '部分' },
-    { type: 'response.incomplete', response: { incomplete_details: { reason: 'max_output_tokens' } } },
+    { type: 'response.incomplete', response: { incomplete_details: { reason: 'max_output_tokens' }, usage: { input_tokens: 50, output_tokens: 64000, total_tokens: 64050 } } },
   ])];
   r = await streamResponses('k', 'gpt-5.4', 'p', 'medium', () => {}, false, null, null);
   check('truncated=max_output_tokens', r.truncated === 'max_output_tokens');
+  check('截斷時仍擷取 usage（response.incomplete）', r.usage && r.usage.output_tokens === 64000);
 
   console.log(fail === 0 ? `ALL ${pass} TESTS PASSED` : `${fail} TEST(S) FAILED`);
   process.exit(fail === 0 ? 0 : 1);

@@ -32,6 +32,18 @@
 
 ---
 
+## [v1.49.0] — 2026-09-30
+
+### 新增
+- **AI 呼叫完成後標示 tokens 用量與估算費用**：個股分析、投資組合總評、觀察清單快篩總評、KOL 雷達（OpenAI web search 與 Grok 直查 X）五種 AI 呼叫完成後，狀態列（接在 ✅ 訊息後）與報告開頭（**用量：**）都會標示本次「輸入／輸出 tokens（含推理）」與估算美元費用，並隨報告一起寫入歷史、複製與下載內容。
+- **線上價格表＋內嵌後備**：費率取自 [BenchAI-Support pricing.json](https://thsiao3000-commits.github.io/BenchAI-Support/pricing.json)（美元／每百萬 tokens；支援 `promo` 優惠價（until 含當天）與 `long_context` 長上下文費率（輸入超過 threshold 整筆改用）），開頁預抓一次；抓不到（離線／被擋／格式不對）自動退回內嵌的 OpenAI／xAI 模型後備表。價格表查無的模型（如 grok-4.5、自訂模型）只顯示 tokens、標示「費率未知」；API 沒回 usage 時不顯示。
+- **估算範圍**：只算 tokens，不含 OpenAI web search／xAI x_search 的工具呼叫費（有用到工具時會註明「不含 … 工具費」）。chat/completions 相容路徑改帶 `stream_options.include_usage` 以取得用量；xAI 若把推理 tokens 另計於 total，差額併入輸出計費。
+
+### 測試
+- 新增 `tests/pricing.test.js`（費率選擇：一般／promo／long_context 門檻／查無模型；費用估算含文章範例 0.108；三種 usage 格式正規化；標籤文字；線上表／404／格式錯誤退回後備表）；`tests/streamresponses.test.js` 增加 completed／incomplete 事件的 usage 擷取檢查。
+
+---
+
 ## [v1.48.0] — 2026-09-23
 
 ### 變更
