@@ -178,6 +178,12 @@
   .fuChips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
   .fuChips button { font-size: .78rem; padding: 4px 11px; border-radius: 99px; color: var(--muted); background: none; cursor: pointer; }
   .fuChips button:hover { border-color: var(--accent); color: var(--text); }
+  .fuAsk.dragover { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(74,163,255,.25); }
+  .fuFiles { display: none; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .fuFiles span { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; padding: 3px 6px 3px 10px; border-radius: 99px; border: 1px solid var(--border); background: var(--panel); color: var(--text); max-width: 100%; }
+  .fuFiles span small { color: var(--muted); }
+  .fuFiles span button { border: none; background: none; color: var(--muted); cursor: pointer; padding: 0 4px; line-height: 1; font-size: .85rem; }
+  .fuFiles span button:hover { color: var(--up); }
   #wlWrap th[data-wlsort] { cursor: pointer; user-select: none; }
   #wlWrap th[data-wlsort]:hover { color: var(--text); }
   footer { text-align: center; color: var(--muted); font-size: .78rem; padding: 0 20px 40px; }
@@ -456,7 +462,7 @@
     </div>
     <details class="hintFold">
       <summary>ℹ️ 使用提示：省 token 技巧、報告歷史、分析視角、上次建議檢討、追問 AI</summary>
-      <div class="hint">「產生 AI 分析」會呼叫 OpenAI（耗 token）；若想省 token，可改按「複製 Prompt」把同一份提問貼到訂閱制聊天機器人（如 Gemini）。新聞與美股基本面那段需該機器人能上網查詢才會生效；台股的技術面／籌碼／配息等數據已內含在 Prompt 中。報告自動保留<b>最近 20 份</b>於本機（重新整理不消失），可由報告上方的下拉選單切換、對照前後觀點變化。「分析視角」可切換單一風格（含<b>供應鏈瓶頸獵人</b>與<b>自訂視角</b>——把你欣賞的分析師方法論寫成準則）或<b>三師會診</b>（價值×成長×技術各自表態、主持人裁決）；同一檔重複分析時會自動附上<b>上次建議檢討</b>（對照期間實際走勢、檢討上次判斷對錯）。每次 AI 呼叫完成後，狀態列與報告開頭會標示本次 <b>tokens 用量與估算費用</b>（費率取自線上價格表，離線改用內建表；不含 web search／x_search 工具費，價格表查無的模型只顯示 tokens）。報告下方可<b>💬 追問 AI</b>：就這份報告繼續問（AI 會拿到報告全文與產生時的原始數據，回答有據可查），回答接在報告末尾、一併存入歷史；多輪追問會累積成同一份報告的問答串。</div>
+      <div class="hint">「產生 AI 分析」會呼叫 OpenAI（耗 token）；若想省 token，可改按「複製 Prompt」把同一份提問貼到訂閱制聊天機器人（如 Gemini）。新聞與美股基本面那段需該機器人能上網查詢才會生效；台股的技術面／籌碼／配息等數據已內含在 Prompt 中。報告自動保留<b>最近 20 份</b>於本機（重新整理不消失），可由報告上方的下拉選單切換、對照前後觀點變化。「分析視角」可切換單一風格（含<b>供應鏈瓶頸獵人</b>與<b>自訂視角</b>——把你欣賞的分析師方法論寫成準則）或<b>三師會診</b>（價值×成長×技術各自表態、主持人裁決）；同一檔重複分析時會自動附上<b>上次建議檢討</b>（對照期間實際走勢、檢討上次判斷對錯）。每次 AI 呼叫完成後，狀態列與報告開頭會標示本次 <b>tokens 用量與估算費用</b>（費率取自線上價格表，離線改用內建表；不含 web search／x_search 工具費，價格表查無的模型只顯示 tokens）。報告下方可<b>💬 追問 AI</b>：就這份報告繼續問（AI 會拿到報告全文與產生時的原始數據，回答有據可查），回答接在報告末尾、一併存入歷史；多輪追問會累積成同一份報告的問答串。追問可<b>📎 附加檔案</b>——圖片／PDF（如法說會簡報截圖、券商對帳單、研究報告）隨請求直接送給 AI 閱讀，文字檔（txt／md／csv／json）內容內嵌進 Prompt；附件不存入歷史、只記檔名。</div>
     </details>
     <div id="aiStatus" class="status"></div>
     <div id="aiMeta" style="display:none; align-items:center; gap:10px; margin-top:12px; padding:8px 12px; background:var(--panel2); border:1px solid var(--border); border-radius:8px; font-size:.82rem; color:var(--muted); flex-wrap:wrap;">
@@ -475,13 +481,16 @@
       </div>
       <div id="fuStatus" class="status"></div>
       <div class="fuAsk">
-        <label class="field">💬 追問 AI（針對上方這份報告；AI 會拿到報告全文與產生時的原始數據）
-          <textarea id="fuInput" rows="2" placeholder="例：若跌破最近的支撐位該怎麼處理？／第 2 點的支撐位是怎麼算的？／用更白話說結論"></textarea>
+        <label class="field">💬 追問 AI（針對上方這份報告；AI 會拿到報告全文與產生時的原始數據，另可附加圖片／PDF／文字檔）
+          <textarea id="fuInput" rows="2" placeholder="例：若跌破最近的支撐位該怎麼處理？／第 2 點的支撐位是怎麼算的？／附上法說會簡報截圖：這對報告的結論有什麼影響？"></textarea>
         </label>
+        <div id="fuFiles" class="fuFiles"></div>
         <div class="row">
           <button id="fuBtn" class="primary">💬 追問 AI</button>
+          <button id="fuAttachBtn" class="ghost" title="附加圖片／PDF／文字檔（也可直接貼上或拖進此框）">📎 附加檔案</button>
+          <input id="fuFile" type="file" multiple accept="image/*,.pdf,application/pdf,.txt,.md,.markdown,.csv,.tsv,.json,.log,text/plain,text/csv,text/markdown,application/json" style="display:none">
           <button id="fuCopyBtn" class="ghost">📋 複製追問 Prompt</button>
-          <span class="hint">Ctrl／⌘＋Enter 送出；回答會接在報告末尾，連同報告一併存入歷史、可複製與下載</span>
+          <span class="hint">Ctrl／⌘＋Enter 送出；可附加圖片／PDF／文字檔（最多 5 個、單檔 10 MB，也可貼上或拖進來）；回答接在報告末尾，連同報告一併存入歷史、可複製與下載</span>
         </div>
         <div id="fuChips" class="fuChips"></div>
       </div>
@@ -685,7 +694,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.51.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.52.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -2612,8 +2621,29 @@ async function readSSE(res, onJson) {
   }
   if (buf.trim()) handle(buf);   // 收尾：處理最後沒有 \n\n 結尾的殘留 frame
 }
-async function streamResponses(key, model, prompt, effort, onDelta, webSearch, onSearch, onThink) {
-  const body = { model, input: prompt, stream: true, max_output_tokens: 64000 };
+// ── 多模態輸入（追問 AI 的附件）：圖片／PDF 以 base64 data URL 直接夾在請求裡（文字檔已內嵌於 prompt）──
+// Responses API：無附件維持純字串 input；有附件改為 content parts（input_text ＋ input_image／input_file）
+function inputParts(prompt, atts) {
+  if (!atts || !atts.length) return prompt;
+  return [{ role: 'user', content: [
+    { type: 'input_text', text: prompt },
+    ...atts.map(a => a.kind === 'image'
+      ? { type: 'input_image', image_url: a.dataUrl, detail: 'auto' }
+      : { type: 'input_file', filename: a.name, file_data: a.dataUrl }),
+  ] }];
+}
+// chat/completions 相容介面的對應格式（text ＋ image_url／file）
+function chatContent(prompt, atts) {
+  if (!atts || !atts.length) return prompt;
+  return [
+    { type: 'text', text: prompt },
+    ...atts.map(a => a.kind === 'image'
+      ? { type: 'image_url', image_url: { url: a.dataUrl } }
+      : { type: 'file', file: { filename: a.name, file_data: a.dataUrl } }),
+  ];
+}
+async function streamResponses(key, model, prompt, effort, onDelta, webSearch, onSearch, onThink, atts) {
+  const body = { model, input: inputParts(prompt, atts), stream: true, max_output_tokens: 64000 };
   // reasoning summary 兼作串流「保活」：Safari（NSURLSession）對 ~60 秒沒收到任何 bytes 的連線
   // 會直接砍線（Load failed）。長推理階段若沒有 summary 事件持續流動，正文還沒開始就會被切斷。
   body.reasoning = effort ? { effort, summary: 'auto' } : { summary: 'auto' };
@@ -2745,11 +2775,11 @@ async function runGrok(prompt, tools, statusEl, outEl) {
     clearInterval(timer);
   }
 }
-async function streamChat(key, model, prompt, onDelta) {
+async function streamChat(key, model, prompt, onDelta, atts) {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-    body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], stream: true, stream_options: { include_usage: true } }),   // include_usage：最後一個 chunk 帶 usage
+    body: JSON.stringify({ model, messages: [{ role: 'user', content: chatContent(prompt, atts) }], stream: true, stream_options: { include_usage: true } }),   // include_usage：最後一個 chunk 帶 usage
   });
   if (!res.ok) {
     const e = await res.json().catch(() => ({}));
@@ -2770,6 +2800,7 @@ async function runAI(prompt, statusEl, opts) {
   if ($('rememberKey').checked) localStorage.setItem('twbt_apikey', key);
   else localStorage.removeItem('twbt_apikey');
   const model = selectedModel(), effort = $('effortSel').value, webSearch = !!(opts && opts.webSearch);
+  const atts = (opts && opts.attachments) || [];   // 追問 AI 的附件（圖片／PDF；文字檔已內嵌 prompt）
   const out = (opts && opts.outEl) || $('aiOutput');   // 可指定輸出區（④ 的快篩總評／KOL 雷達寫進自己的面板，不佔用 ③）
   out.style.display = 'block'; out.innerHTML = '';
   if (!opts || !opts.outEl) { $('aiMeta').style.display = 'none'; $('fuBox').style.display = 'none'; }   // 寫 ③ 時才收起上一份的時間戳、按鈕與追問區
@@ -2801,11 +2832,11 @@ async function runAI(prompt, statusEl, opts) {
   try {
     let r;
     try {
-      r = await streamResponses(key, model, prompt, effort, paint, webSearch, onSearch, onThink);
+      r = await streamResponses(key, model, prompt, effort, paint, webSearch, onSearch, onThink, atts);
     } catch (e) {
       if ([400, 404, 422].includes(e.status)) {
         phase = `${model} 改用相容介面`;   // 退回 chat/completions（不支援 web_search）
-        r = await streamChat(key, model, prompt, paint);
+        r = await streamChat(key, model, prompt, paint, atts);
       } else throw e;
     }
     paint(r.text, true);
@@ -3387,7 +3418,15 @@ $('aiDownloadBtn').addEventListener('click', () => { if (lastReport) downloadTex
 const FU_RE = /^## 💬 追問 (\d+)/gm;
 function fuCount(fullText) { return ((fullText || '').match(FU_RE) || []).length; }
 // 追問 Prompt：指示＋產生報告時的原始數據（若有保存）＋報告全文（含先前追問）＋本次問題
-function buildFollowupPrompt(entry, question) {
+function buildFollowupPrompt(entry, question, files) {
+  files = files || [];
+  const kindName = { image: '圖片', pdf: 'PDF', text: '文字檔' };
+  const attBlock = !files.length ? '' :
+    `\n【使用者附加的檔案（共 ${files.length} 個）】\n` +
+    files.map(f => `- ${f.name}（${kindName[f.kind] || '檔案'}，${fuSizeLabel(f.size)}）`).join('\n') +
+    (files.some(f => f.kind !== 'text') ? '\n圖片與 PDF 已以附件形式一併提供，請實際閱讀其內容（圖表、表格、數字）後再回答。' : '') +
+    files.filter(f => f.kind === 'text').map(f => `\n--- 附件 ${f.name} 內容開始 ---\n${f.text}\n--- 附件 ${f.name} 內容結束 ---`).join('') + '\n';
+  const attInstr = files.length ? '\n- 使用者附加了檔案（見下方【使用者附加的檔案】）：請先讀取其內容，對照報告與原始數據回答；附件與報告數據矛盾時請明確指出。' : '';
   const src = entry.srcPrompt
     ? `【產生這份報告時提供給 AI 的原始數據與指示（只供你核對數字與脈絡，不必重新執行其中的撰寫指示）】\n${entry.srcPrompt}`
     : '【原始數據】此報告未保存產生時的原始數據，請僅依下方報告內容回答；報告未提及的數字請勿臆測。';
@@ -3395,23 +3434,54 @@ function buildFollowupPrompt(entry, question) {
 - 聚焦問題本身，不要重寫或整段複述報告；引用報告或原始數據中的具體數字作為依據，前後說法要一致。
 - 若報告與數據不足以回答，請直說缺什麼，不要編造；問題若涉及報告產生之後的新消息或最新價格，可用 web search 查證並標註來源與日期（查無則註明）。
 - 維持報告原本的分析視角；若你認為報告有誤或該修正，請明確指出哪裡、為何。
-- 篇幅視問題而定、精簡為主，最後一行註明：本回覆僅供參考，不構成投資建議。
+- 篇幅視問題而定、精簡為主，最後一行註明：本回覆僅供參考，不構成投資建議。${attInstr}
 
 ${src}
 
 【報告全文（含先前追問與回答）】
 ${entry.fullText}
-
+${attBlock}
 【本次追問】
 ${question}`;
 }
 // 一輪追問接到報告末尾的 Markdown：標題帶問題（過長截斷、另列全文），引言列時間戳／模型／用量，與報告開頭格式呼應
-function followupSection(n, question, answer, model, ts, usageText) {
+function followupSection(n, question, answer, model, ts, usageText, fileNames) {
   const q = String(question || '').replace(/\s+/g, ' ').trim();
   const short = q.length > 60 ? q.slice(0, 60) + '…' : q;
+  const att = fileNames && fileNames.length ? `　｜　📎 附件：${fileNames.join('、')}` : '';
   return `\n\n---\n\n## 💬 追問 ${n}：${short}\n\n` +
     (short !== q ? `**問題全文：** ${q}\n\n` : '') +
-    `> 🕒 ${ts}　｜　AI 模型：${model}${usageText ? `　｜　用量：${usageText}` : ''}\n\n${String(answer || '').trim()}\n`;
+    `> 🕒 ${ts}　｜　AI 模型：${model}${usageText ? `　｜　用量：${usageText}` : ''}${att}\n\n${String(answer || '').trim()}\n`;
+}
+/* ── 追問附件：圖片／PDF 轉 base64 data URL 夾進請求、文字檔讀成字串內嵌 Prompt；不存歷史、只記檔名 ── */
+const FU_FILE_MAX = 10 * 1024 * 1024, FU_TOTAL_MAX = 20 * 1024 * 1024, FU_FILES_MAX = 5, FU_TEXT_MAX = 300 * 1024;
+const FU_TEXT_EXT = /\.(txt|md|markdown|csv|tsv|json|log)$/i;
+function fuFileKind(file) {   // 依 MIME（優先）或副檔名判斷；不支援回 null
+  const t = (file.type || '').toLowerCase(), n = file.name || '';
+  if (t.startsWith('image/')) return 'image';
+  if (t === 'application/pdf' || /\.pdf$/i.test(n)) return 'pdf';
+  if (t.startsWith('text/') || t === 'application/json' || FU_TEXT_EXT.test(n)) return 'text';
+  return null;
+}
+function fuSizeLabel(b) { return b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB'; }
+// 檢查單一檔案能否加入（回錯誤訊息；可加入回 null）
+function fuFileError(file, existing) {
+  const kind = fuFileKind(file);
+  if (!kind) return `${file.name}：只支援圖片、PDF 與文字檔（txt／md／csv／json）`;
+  if (existing.length >= FU_FILES_MAX) return `最多附加 ${FU_FILES_MAX} 個檔案`;
+  if (existing.some(f => f.name === file.name && f.size === file.size)) return `${file.name}：已附加過`;
+  if (kind === 'text' && file.size > FU_TEXT_MAX) return `${file.name}：文字檔上限 ${fuSizeLabel(FU_TEXT_MAX)}`;
+  if (file.size > FU_FILE_MAX) return `${file.name}：單檔上限 ${fuSizeLabel(FU_FILE_MAX)}`;
+  if (existing.reduce((sum, f) => sum + f.size, 0) + file.size > FU_TOTAL_MAX) return `附件總量上限 ${fuSizeLabel(FU_TOTAL_MAX)}`;
+  return null;
+}
+function readFuFile(file) {   // → { name, kind, size, dataUrl | text }
+  return new Promise((resolve, reject) => {
+    const kind = fuFileKind(file), r = new FileReader();
+    r.onerror = () => reject(new Error(`讀取 ${file.name} 失敗`));
+    if (kind === 'text') { r.onload = () => resolve({ name: file.name, kind, size: file.size, text: String(r.result) }); r.readAsText(file); }
+    else { r.onload = () => resolve({ name: file.name, kind, size: file.size, dataUrl: String(r.result) }); r.readAsDataURL(file); }
+  });
 }
 // 快速追問（點選填入輸入框、可修改後送出）：依報告類型給不同建議
 const FU_CHIPS = {
@@ -3420,6 +3490,33 @@ const FU_CHIPS = {
   other: ['用白話總結這份報告的重點', '這份報告最大的盲點或反方論點是什麼？', '哪一檔最值得先深入研究？為什麼？'],
 };
 function fuKind(entry) { return entry.symbol ? 'stock' : /投資組合/.test(entry.title || '') ? 'portfolio' : 'other'; }
+let fuFiles = [];   // 待送出的附件 [{ name, kind, size, dataUrl?|text? }]；送出成功後清空，切換報告時保留
+const fuIcon = k => k === 'image' ? '🖼️' : k === 'pdf' ? '📄' : '📝';
+function renderFuFiles() {
+  $('fuFiles').innerHTML = fuFiles.map((f, i) =>
+    `<span title="${esc(f.name)}">${fuIcon(f.kind)} ${esc(f.name)} <small>${fuSizeLabel(f.size)}</small><button type="button" data-rm="${i}" title="移除">✕</button></span>`).join('');
+  $('fuFiles').style.display = fuFiles.length ? 'flex' : 'none';
+}
+async function addFuFiles(list) {
+  const st = $('fuStatus'), errs = [];
+  for (const file of Array.from(list || [])) {
+    const err = fuFileError(file, fuFiles);
+    if (err) { errs.push(err); continue; }
+    try { fuFiles.push(await readFuFile(file)); } catch (e) { errs.push(e.message); }
+  }
+  renderFuFiles();
+  st.className = errs.length ? 'status error' : 'status';
+  st.textContent = errs.length ? '⚠️ ' + errs.join('；')
+    : (fuFiles.length ? `📎 已附加 ${fuFiles.length} 個檔案（隨追問送給 AI 閱讀；不存入歷史，只記檔名）` : '');
+}
+$('fuAttachBtn').addEventListener('click', () => $('fuFile').click());
+$('fuFile').addEventListener('change', () => { addFuFiles($('fuFile').files); $('fuFile').value = ''; });
+$('fuFiles').addEventListener('click', e => { const b = e.target.closest('button[data-rm]'); if (!b) return; fuFiles.splice(+b.dataset.rm, 1); renderFuFiles(); });
+$('fuInput').addEventListener('paste', e => { const fl = e.clipboardData && e.clipboardData.files; if (fl && fl.length) { e.preventDefault(); addFuFiles(fl); } });   // 直接貼上截圖
+const fuAskBox = document.querySelector('#fuBox .fuAsk');   // 拖放到整個提問框
+['dragenter', 'dragover'].forEach(ev => fuAskBox.addEventListener(ev, e => { e.preventDefault(); fuAskBox.classList.add('dragover'); }));
+['dragleave', 'drop'].forEach(ev => fuAskBox.addEventListener(ev, e => { e.preventDefault(); fuAskBox.classList.remove('dragover'); }));
+fuAskBox.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files.length) addFuFiles(e.dataTransfer.files); });
 function fuEntry() { return reportHist.find(r => r.id === lastShownId) || null; }   // 目前顯示中的報告（可能已被歷史擠掉 → null）
 function setAiBusy(b) { for (const id of ['aiBtn', 'pfBtn', 'fuBtn']) $(id).disabled = b; }   // ③ 的三顆 AI 按鈕同進退
 // showReport 時呼叫：範例報告不給追問（虛構數據）；其餘依類型換快速追問、收起上一輪的即時輸出與狀態
@@ -3444,13 +3541,15 @@ async function askFollowup() {
   if (!entry) { st.className = 'status error'; st.textContent = '找不到目前顯示中的報告（可能已被歷史擠掉），請重新產生報告後再追問'; return; }
   setAiBusy(true);
   const n = fuCount(entry.fullText) + 1;
-  $('fuLiveQ').textContent = `💬 追問 ${n}：${q}`;
+  const files = fuFiles.slice(), binaries = files.filter(f => f.kind !== 'text');   // 送出當下的附件快照；文字檔內嵌 prompt、圖片／PDF 夾在請求
+  $('fuLiveQ').textContent = `💬 追問 ${n}：${q}` + (files.length ? `　📎 ${files.length} 個附件` : '');
   $('fuLive').style.display = 'block';   // 即時回答區：緊接在報告下方，完成後併入報告原地呈現
   try {
-    const { text, model, truncated, usageText } = await runAI(buildFollowupPrompt(entry, q), st, { webSearch: $('webSearchChk').checked, outEl: $('fuOutput') });
-    entry.fullText += followupSection(n, q, text, model, nowStamp().full, usageText);
+    const { text, model, truncated, usageText } = await runAI(buildFollowupPrompt(entry, q, files), st, { webSearch: $('webSearchChk').checked, outEl: $('fuOutput'), attachments: binaries });
+    entry.fullText += followupSection(n, q, text, model, nowStamp().full, usageText, files.map(f => f.name));
     saveReports();
     $('fuInput').value = '';
+    fuFiles = []; renderFuFiles();
     showReport(entry);   // 重繪報告（含新追問）、同步 lastReport 供複製／下載；renderFuBox 會收起即時輸出區
     st.textContent = (truncated
       ? `⚠️ 回答達長度上限被截斷（${truncated}），已接在報告末尾；建議把「AI 推理深度」調低後再問一次。`
@@ -3469,9 +3568,10 @@ $('fuCopyBtn').addEventListener('click', async () => {
   const q = $('fuInput').value.trim(), entry = fuEntry();
   if (!q) { st.className = 'status error'; st.textContent = '請先輸入要追問的問題'; $('fuInput').focus(); return; }
   if (!entry) { st.className = 'status error'; st.textContent = '找不到目前顯示中的報告'; return; }
-  const ok = await copyText(buildFollowupPrompt(entry, q));
+  const ok = await copyText(buildFollowupPrompt(entry, q, fuFiles));
   flashBtn('fuCopyBtn', '📋 複製追問 Prompt', ok);
-  if (ok) st.textContent = '✅ 追問 Prompt 已複製（含報告全文與原始數據），可貼到 Gemini 等聊天機器人';
+  if (ok) st.textContent = '✅ 追問 Prompt 已複製（含報告全文、原始數據與文字附件），可貼到 Gemini 等聊天機器人' +
+    (fuFiles.some(f => f.kind !== 'text') ? '；圖片／PDF 無法隨文字複製，請在該機器人另行上傳' : '');
 });
 
 /* ── 極簡 Markdown 轉 HTML ── */
