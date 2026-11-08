@@ -79,7 +79,7 @@ const TABLE = { schema_version: 1, updated_at: '2026-09-25', models: {
   global.fetch = async () => { throw new Error('offline'); };
   let t = await M1.loadPricing();
   check('fetch 失敗 → 退回內嵌後備表', t === M1.PRICING_FALLBACK);
-  for (const id of ['gpt-6-astra', 'gpt-6.1-sol', 'gpt-5.6-terra', 'grok-4.3', 'grok-4.7'])
+  for (const id of ['gpt-6-astra', 'gpt-6.1-sol', 'gpt-6.1-terra', 'grok-4.3', 'grok-4.7'])
     check(`後備表含下拉選單模型 ${id}`, !!t.models[id]);
   const M2 = fresh();
   global.fetch = async (url, opts) => ({ ok: true, json: async () => ({ schema_version: 1, updated_at: '2099-01-01', models: { 'x': { input: 1, output: 2 } } }) });
