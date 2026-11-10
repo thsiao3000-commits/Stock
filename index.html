@@ -151,6 +151,19 @@
     .pw .eye { min-height: 36px; }
   }
   #aiReportBox:has(#aiOutput:not(:empty)) #aiEmpty { display: none; }
+  /* 股息行事曆與提醒 */
+  .calRow { display: flex; align-items: center; gap: 14px; padding: 10px 0; border-top: 1px solid var(--border); }
+  .calRow:first-child { border-top: none; padding-top: 0; }
+  .calRow.hit { background: rgba(var(--gold-rgb),.1); margin: 0 -8px; padding-left: 8px; padding-right: 8px; }
+  .calDate { flex: none; width: 52px; font-family: var(--font-mono); font-size: .84rem; color: var(--muted); }
+  .calMain { flex: 1; min-width: 0; font-size: .9rem; }
+  .calMain small { display: block; color: var(--muted); font-size: .78rem; }
+  .calAmt { flex: none; font-family: var(--font-mono); font-size: .86rem; white-space: nowrap; }
+  .calDel { padding: 2px 8px; font-size: .8rem; color: var(--muted); }
+  .alertBox { align-items: flex-end; padding: 10px 12px; border: 1px solid var(--border); border-radius: 4px; background: var(--panel2); }
+  .alertChip { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 1px 4px 1px 8px; border: 1px solid var(--border); border-radius: 99px; color: var(--text); white-space: nowrap; }
+  .alertChip button { border: none; padding: 0 4px; min-height: 0; font-size: .8rem; color: var(--muted); }
+  #planAlertRow { align-items: center; margin: 0 0 12px; }
   /* 資產配置環圈圖 */
   .alloc { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 24px; }
   .donut { width: 128px; height: 128px; flex: none; }
@@ -374,6 +387,16 @@
     <h2>資產配置</h2>
     <div id="allocBody"></div>
   </section>
+  <!-- ── 股息行事曆與提醒 ── -->
+  <section id="calBox">
+    <h2>股息行事曆與提醒</h2>
+    <div id="calList"></div>
+    <div class="row">
+      <button id="calRefreshBtn" class="ghost">更新除息日</button>
+      <span id="calStatus" class="hint"></span>
+    </div>
+    <div class="hint" style="margin-top:8px; line-height:1.7">除息日／發放日取自 FinMind（台股，以目前持有股數估算金額），債券配息日由到期日回推；日期與金額以公司公告為準，美股除息未納入。到價提醒只在更新報價時檢查（頁面關著不會通知）。</div>
+  </section>
   </div>
   </div>
   </div>
@@ -524,13 +547,15 @@
   <div class="col">
   <section id="aiReportBox">
     <p class="hint" id="aiEmpty" style="margin:0">尚未產生報告。選好標的後按「產生個股 AI 分析」或「產生投資組合總評」，報告會顯示在這裡；歷史報告可用下拉選單回顧。</p>
-    <div id="aiMeta" style="display:none; align-items:center; gap:10px; padding:8px 12px; background:var(--panel2); border:1px solid var(--border); border-radius:4px; font-size:.82rem; color:var(--muted); flex-wrap:wrap;">
+    <div id="aiMeta" style="display:none; align-items:center; gap:10px; margin-bottom:12px; padding:8px 12px; background:var(--panel2); border:1px solid var(--border); border-radius:4px; font-size:.82rem; color:var(--muted); flex-wrap:wrap;">
       <select id="histSel" title="切換歷史報告（自動保留最近 20 份）" style="max-width:320px; font-size:.82rem; padding:5px 8px;"></select>
       <span id="aiMetaText"></span>
       <span style="flex:1"></span>
+      <button id="planAlertBtn" class="ghost" style="display:none" title="從報告的操作計畫表抓出價位，設為到價提醒">將價位設為提醒</button>
       <button id="aiCopyBtn" class="ghost">複製報告</button>
       <button id="aiDownloadBtn" class="ghost">下載報告（.md）</button>
     </div>
+    <div id="planAlertRow" class="fuChips" style="display:none"></div>
     <div id="aiOutput" class="aiReport"></div>
     <!-- 追問 AI：就上方顯示中的報告再問 AI；回答接在報告末尾、一併存入歷史／複製／下載（範例報告不提供） -->
     <div id="fuBox" style="display:none">
@@ -890,7 +915,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v2.1.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v2.2.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -962,13 +987,15 @@ function storedTheme(saved) {   // saved：localStorage 裡的 db（沒有＝新
   return THEMES.includes(t) ? t : 'dark';
 }
 function resolveTheme(pref, systemDark) { return pref === 'dark' || pref === 'light' ? pref : (systemDark ? 'dark' : 'light'); }
-let db = { positions: [], watchlist: [], settings: { twelveKey: '', finmindToken: '', finnhubKey: '', xaiKey: '', anthropicKey: '', theme: 'light', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '', cpName: '', cpDesc: '' } };
+let db = { positions: [], watchlist: [], alerts: [], divCache: {}, settings: { twelveKey: '', finmindToken: '', finnhubKey: '', xaiKey: '', anthropicKey: '', theme: 'light', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '', cpName: '', cpDesc: '' } };
 function loadDB() {
   try {
     const j = JSON.parse(localStorage.getItem(DB_KEY) || 'null');
     if (j && Array.isArray(j.positions)) { const theme = storedTheme(j); db = j; db.settings = Object.assign({ theme, twelveKey: '', finmindToken: '', finnhubKey: '', xaiKey: '', anthropicKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '', cpName: '', cpDesc: '' }, j.settings || {}); }
   } catch (_) {}
   if (!Array.isArray(db.watchlist)) db.watchlist = [];   // 舊資料無觀察清單 → 補空陣列
+  if (!Array.isArray(db.alerts)) db.alerts = [];         // 到價提醒（v2.2.0 起）
+  if (!db.divCache || typeof db.divCache !== 'object') db.divCache = {};   // 台股除息日快取
 }
 function saveDB() { localStorage.setItem(DB_KEY, JSON.stringify(db)); }
 const sysDark = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
@@ -1494,6 +1521,83 @@ function fmtCompact(v) {   // NT$2.69M／NT$325K／NT$980
   const a = Math.abs(v || 0);
   return 'NT$' + (a >= 1e6 ? (v / 1e6).toFixed(2) + 'M' : a >= 1e3 ? Math.round(v / 1e3) + 'K' : Math.round(v || 0));
 }
+// ── 股息行事曆與提醒 ──
+const BOND_STALE_DAYS = 30;   // 債券市價超過這麼多天沒更新就提醒
+const CAL_HORIZON_DAYS = 365, CAL_MAX_DATED = 10;
+function isoDayDiff(a, b) { return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400000); }
+function isoAddDays(d, n) { return new Date(Date.parse(d + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10); }
+const alertVerb = dir => dir === 'above' ? '漲破' : '跌破';
+function alertMet(a, price) { return price != null && (a.dir === 'above' ? price >= a.price : price <= a.price); }
+// 到價檢查（只在更新報價後呼叫）：條件成立就記下觸發日；回傳這次「新」觸發的提醒
+function checkAlerts(alerts, priceOf, today) {
+  const fresh = [];
+  for (const a of (alerts || [])) {
+    if (a.hit) continue;
+    if (alertMet(a, priceOf(a.market, a.symbol))) { a.hit = today; fresh.push(a); }
+  }
+  return fresh;
+}
+// 行事曆列：stocks [{market,symbol,qty,lastPrice}]、bonds [{symbol,ccy,couponAmt,face,rate,freq,dates,lastMark,matured}]、
+// divCache { 代號: { events: [{exDate,payDate,cash}] } }（台股，FinMind）、alerts、today
+// → [{ kind:'div'|'pay'|'coupon'|'alert'|'sys', date, label, title, desc, amount, ccy, hit, id }]
+function calendarEvents({ stocks, bonds, divCache, alerts, today }) {
+  const end = isoAddDays(today, CAL_HORIZON_DAYS), dated = [];
+  const num = v => new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 4 }).format(v);
+  for (const st of (stocks || [])) {
+    if (st.market !== 'tw' || !(st.qty > 0)) continue;
+    for (const e of ((divCache || {})[st.symbol] || {}).events || []) {
+      if (!(e.cash > 0)) continue;
+      const base = `${num(st.qty)} 股 × NT$${num(e.cash)}`;
+      if (e.exDate && e.exDate >= today && e.exDate <= end)
+        dated.push({ kind: 'div', date: e.exDate, title: `${st.symbol} 除息`, desc: base + (e.payDate ? `，${e.payDate.slice(5)} 發放` : ''), amount: st.qty * e.cash, ccy: 'TWD' });
+      else if (e.payDate && e.payDate >= today && e.payDate <= end)
+        dated.push({ kind: 'pay', date: e.payDate, title: `${st.symbol} 股息發放`, desc: base + `（${e.exDate ? e.exDate.slice(5) + ' 已除息' : '已除息'}）`, amount: st.qty * e.cash, ccy: 'TWD' });
+    }
+  }
+  const sys = [];
+  for (const b of (bonds || [])) {
+    if (b.matured) continue;
+    (b.dates || []).filter(d => d > today && d <= end).slice(0, 2).forEach(d =>
+      dated.push({ kind: 'coupon', date: d, title: `${b.symbol} 債券配息`, desc: `面額 ${num(b.face)} × ${b.rate}% ÷ ${b.freq}`, amount: b.couponAmt, ccy: b.ccy }));
+    const since = b.lastMark ? isoDayDiff(b.lastMark, today) : null;
+    if (since == null || since > BOND_STALE_DAYS)
+      sys.push({ kind: 'sys', date: '', label: '提醒', title: `${b.symbol} 市價超過 ${BOND_STALE_DAYS} 天未更新`, desc: b.lastMark ? `上次更新 ${b.lastMark}` : '尚未更新過市價（以買進價計）' });
+  }
+  dated.sort((a, b) => a.date.localeCompare(b.date));
+  const priceOf = (m, sym) => { const x = (stocks || []).find(k => k.market === m && k.symbol === sym); return x ? x.lastPrice : null; };
+  const al = (alerts || []).map(a => {
+    const last = priceOf(a.market, a.symbol);
+    return { kind: 'alert', date: '', label: a.hit ? '已到價' : '到價', id: a.id, hit: a.hit || null,
+      title: `${a.symbol} ${alertVerb(a.dir)} ${num(a.price)}`, desc: (a.note || '') + (a.hit ? `${a.note ? '；' : ''}${a.hit} 觸發` : ''), last };
+  });
+  return [...al.filter(a => a.hit),
+    ...dated.slice(0, CAL_MAX_DATED).map(r => ({ ...r, label: r.date.slice(5) })),
+    ...al.filter(a => !a.hit), ...sys];
+}
+// 從 AI 報告的「操作計畫表」抓價位：找動作欄（加碼／減碼／停損…）那一列，取隔壁條件欄裡的數字
+function extractPlanLevels(md, lastPrice) {
+  const out = [], seen = new Set();
+  const ACT = /(停損|停利|減碼|加碼|續抱|出場|買進|進場|觀望)/;
+  for (const line of String(md || '').split('\n')) {
+    if (!/^\s*\|/.test(line) || /^\s*\|[\s:|-]+\|\s*$/.test(line)) continue;
+    const cells = line.split('|').slice(1, -1).map(c => c.replace(/\*\*/g, '').trim());
+    const ai = cells.findIndex(c => c.length <= 12 && ACT.test(c));
+    if (ai < 0 || ai + 1 >= cells.length) continue;
+    const action = cells[ai].match(ACT)[1];
+    const cond = cells[ai + 1];
+    const clean = cond.replace(/MA\s*\d+|EMA\s*\d+|\d+(\.\d+)?\s*[%％]|\d+\s*(?:日|天|週|周|個月|月|年|檔|成|倍|股|張|次|分之|\/\s*\d)|(?:第|近|約|前)\s*\d+/gi, ' ');
+    const nums = (clean.match(/\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?/g) || []).map(x => parseFloat(x.replace(/,/g, ''))).filter(v => v > 0);
+    for (const price of nums.slice(0, 2)) {
+      let dir = /跌破|失守|以下|低於|停損/.test(cond) ? 'below' : /突破|站上|站穩|以上|漲破|高於/.test(cond) ? 'above' : null;
+      if (!dir) dir = lastPrice > 0 ? (price < lastPrice ? 'below' : 'above') : (/停損|減碼|出場|加碼|買進|進場/.test(action) ? 'below' : 'above');
+      const key = dir + price;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ price, dir, action, note: `來自 AI 操作計畫表：${action}條件` });
+    }
+  }
+  return out;
+}
 /* ════════════════ 規劃工具結束 ════════════════ */
 
 /* ════════════════ 損益引擎（加權平均成本法） ════════════════ */
@@ -1656,7 +1760,7 @@ let expandedId = null;
 let editTxId = null;   // 正在編輯的交易 id（null＝新增模式）
 let flashId = null;    // 剛新增成功的持倉 id（用於高亮提示）
 let quoteNote = null;  // {id, msg} 個股報價更新結果（renderAll 後於明細面板顯示）
-function renderAll() { renderSummary(); renderTable(); renderAISelect(); renderPerf(); renderWatchlist(); }
+function renderAll() { renderSummary(); renderTable(); renderAISelect(); renderPerf(); renderWatchlist(); renderCalendar(); }
 
 // 表格捲動陰影：表格寬度超出容器、右側（或左側）還有欄位時，於邊緣顯示漸層提示
 function shadowOne(s) {
@@ -1736,6 +1840,69 @@ function renderAlloc() {
       `<div><i style="background:var(--badge-${g.market})"></i><span>${MKT_NAME[g.market]}</span><b>${g.pct.toFixed(1)}%</b></div>`).join('') +
     (a.warn ? `<div class="allocWarn">單一持股 ${esc(a.top.symbol)} 占 ${a.top.pct.toFixed(1)}%，集中度偏高</div>` : '') +
     `</div></div>`;
+}
+
+/* ── 股息行事曆與提醒 ── */
+function calInputs() {
+  const stocks = [], bonds = [];
+  for (const p of db.positions) {
+    if (p.market === 'bond') {
+      const c = computeBond(p), b = p.bond;
+      bonds.push({ symbol: p.symbol, ccy: posCcy(p), couponAmt: c.couponAmt, face: b.face, rate: b.rate, freq: b.freq,
+        dates: couponDates(b), lastMark: b.markDate || null, matured: c.matured });
+    } else stocks.push({ market: p.market, symbol: p.symbol, qty: computeStock(p).qty, lastPrice: p.lastPrice ?? null });
+  }
+  return { stocks, bonds, divCache: db.divCache, alerts: db.alerts, today: todayISO() };
+}
+function renderCalendar() {
+  const rows = calendarEvents(calInputs());
+  $('calList').innerHTML = rows.length ? rows.map(r => {
+    const right = r.kind === 'alert'
+      ? `<span class="calAmt">${r.last != null ? '現價 ' + nf.format(r.last) : '尚無報價'}</span>` +
+        `<button class="ghost calDel" data-delalert="${r.id}" title="刪除此提醒">✕</button>`
+      : r.amount != null ? `<span class="calAmt pos">${fmtMoney(r.amount, r.ccy)}</span>` : '';
+    return `<div class="calRow${r.hit ? ' hit' : ''}"><span class="calDate">${r.label}</span>` +
+      `<span class="calMain"><b>${esc(r.title)}</b>${r.desc ? `<small>${esc(r.desc)}</small>` : ''}</span>${right}</div>`;
+  }).join('') : '<div class="hint">目前沒有即將到來的除息、配息或提醒。台股除息日需先按「更新除息日」；到價提醒可在持倉明細或 AI 報告設定。</div>';
+}
+$('calList').addEventListener('click', e => {
+  const b = e.target.closest('[data-delalert]');
+  if (!b) return;
+  db.alerts = db.alerts.filter(a => a.id !== b.dataset.delalert);
+  saveDB(); renderAll();
+});
+// 台股除息日：FinMind 每檔 1 請求；force=false 時當天抓過的不重抓。抓不到（限流等）保留舊資料
+async function refreshDivCal(force) {
+  const tw = db.positions.filter(p => p.market === 'tw' && computeStock(p).qty > 0);
+  const st = $('calStatus'), today = todayISO();
+  let n = 0;
+  for (const p of tw) {
+    const c = db.divCache[p.symbol];
+    if (!force && c && c.ts === today) continue;
+    if (st) st.textContent = `抓取除息資料 ${p.symbol}…`;
+    const divs = await fmDividends(p.symbol, isoD(addMonths(new Date(), -12)));
+    if (divs.length) { db.divCache[p.symbol] = { ts: today, events: divs.filter(d => (d.exDate && d.exDate >= today) || (d.payDate && d.payDate >= today)).map(d => ({ exDate: d.exDate, payDate: d.payDate, cash: d.cash })) }; n++; }
+  }
+  for (const k of Object.keys(db.divCache)) if (!tw.some(p => p.symbol === k)) delete db.divCache[k];   // 已不持有的清掉
+  saveDB(); renderCalendar();
+  if (st) st.textContent = tw.length ? (force || n ? `已更新 ${n}/${tw.length} 檔台股的除息資料（${new Date().toLocaleTimeString('zh-TW')}）` : '') : '沒有台股持倉';
+}
+$('calRefreshBtn').addEventListener('click', async () => {
+  $('calRefreshBtn').disabled = true;
+  try { await refreshDivCal(true); } finally { $('calRefreshBtn').disabled = false; }
+});
+// 到價檢查：只在更新報價後進行。回傳要接在狀態列後面的文字
+function runAlertCheck() {
+  const fresh = checkAlerts(db.alerts, (m, sym) => { const p = db.positions.find(x => x.market === m && x.symbol === sym); return p ? p.lastPrice ?? null : null; }, todayISO());
+  if (!fresh.length) return '';
+  saveDB(); renderCalendar();
+  return '　🔔 到價提醒：' + fresh.map(a => `${a.symbol} ${alertVerb(a.dir)} ${nf.format(a.price)}`).join('、') + '（見「總覽」的行事曆）';
+}
+function addAlert(market, symbol, dir, price, note) {
+  if (!(price > 0) || db.alerts.some(a => a.market === market && a.symbol === symbol && a.dir === dir && a.price === price)) return false;
+  db.alerts.push({ id: uid(), market, symbol, dir, price, note: note || '', created: todayISO(), hit: null });
+  saveDB(); renderCalendar();
+  return true;
 }
 
 function renderTable() {
@@ -1857,7 +2024,15 @@ function expandHTML(p, c) {
     <div class="row" style="margin-top:0">
       <span class="hint">現價：<b style="color:var(--text)">${priceTxt}</b>${p.lastDate ? `（${p.lastDate}）` : '（未更新）'}</span>
       <button id="ex_quoteBtn" class="primary">更新此檔報價</button>
+      <button id="ex_alertBtn" class="ghost">設定到價提醒</button>
       <span id="ex_qStatus" class="hint" style="margin-top:0"></span>
+    </div>
+    <div id="ex_alertBox" class="row alertBox" style="display:none">
+      <label class="field">方向 <select id="ex_alertDir"><option value="below">跌破</option><option value="above">漲破</option></select></label>
+      <label class="field">價位 <input id="ex_alertPrice" type="number" step="any" min="0" style="width:110px"></label>
+      <button id="ex_alertAdd" class="primary">加入提醒</button>
+      <span class="hint">更新報價時檢查；到價會顯示在「總覽」的行事曆。${(db.alerts || []).filter(a => a.market === p.market && a.symbol === p.symbol).map(a =>
+        ` <span class="alertChip">${alertVerb(a.dir)} ${nf.format(a.price)}${a.hit ? '（已到價）' : ''} <button class="ghost" data-delalert="${a.id}" title="刪除">✕</button></span>`).join('')}</span>
     </div>
     <div class="tableWrap txTable">
       <div class="tableScroll"><table><thead><tr><th class="l">日期</th><th class="l">類別</th><th>價格</th><th>股數</th><th>費用</th><th>現金流</th><th class="act"></th></tr></thead>
@@ -1903,6 +2078,20 @@ function bindExpand(p) {
     $('ex_isin').addEventListener('change', e => { p.bond.isin = e.target.value.trim().toUpperCase() || null; saveDB(); });
     return;
   }
+  // 股票：到價提醒
+  const openAlert = () => { $('ex_alertBox').style.display = 'flex'; };
+  $('ex_alertBtn').onclick = () => { const b = $('ex_alertBox'); b.style.display = b.style.display === 'none' ? 'flex' : 'none'; };
+  if (alertBoxOpenFor === p.id) openAlert();
+  $('ex_alertAdd').onclick = () => {
+    const price = parseFloat($('ex_alertPrice').value);
+    if (!(price > 0)) return;
+    alertBoxOpenFor = p.id;
+    addAlert(p.market, p.symbol, $('ex_alertDir').value, price, '自訂'); renderTable();
+  };
+  $$('#posExpand [data-delalert]').forEach(btn => btn.onclick = () => {
+    db.alerts = db.alerts.filter(a => a.id !== btn.dataset.delalert);
+    alertBoxOpenFor = p.id; saveDB(); renderAll();
+  });
   // 股票：更新此檔報價
   const qb = $('ex_quoteBtn');
   if (qb) qb.onclick = () => refreshOneQuote(p);
@@ -2006,7 +2195,8 @@ $('posBody').addEventListener('click', e => {
   expandedId = expandedId === tr.dataset.id ? null : tr.dataset.id;
   renderTable();
 });
-function togglePos(id) { expandedId = expandedId === id ? null : id; renderTable(); }
+let alertBoxOpenFor = null;   // 加入／刪除提醒後重繪面板時，保持提醒列展開
+function togglePos(id) { alertBoxOpenFor = null; expandedId = expandedId === id ? null : id; renderTable(); }
 $('posCards').addEventListener('click', e => { const c = e.target.closest('.pcard'); if (c) togglePos(c.dataset.id); });
 $('posCards').addEventListener('keydown', e => {
   if (e.key !== 'Enter' && e.key !== ' ') return;
@@ -2140,9 +2330,11 @@ async function refreshQuotes() {
       st.textContent = '更新匯率…';
       await ensureFX(true);
     }
+    const alertNote = runAlertCheck();
     saveDB(); renderAll();
     st.textContent = (errs.length ? '⚠️ 部分失敗：' + errs.join('；') + '。' : '✅ ') +
-      '報價已更新（' + new Date().toLocaleTimeString('zh-TW') + '）';
+      '報價已更新（' + new Date().toLocaleTimeString('zh-TW') + '）' + alertNote;
+    refreshDivCal(false).catch(() => {});   // 順便更新台股除息日（當天抓過的不重抓；失敗不影響報價）
   } catch (e) {
     st.className = 'status error'; st.textContent = '❌ ' + e.message;
   } finally {
@@ -2174,7 +2366,7 @@ async function refreshOneQuote(p) {
       if (st) st.innerHTML = `<span class="spinner"></span>更新匯率…`;
       await ensureFX(true);
     }
-    quoteNote = { id: p.id, msg: `✅ 已更新（${new Date().toLocaleTimeString('zh-TW')}）` };
+    quoteNote = { id: p.id, msg: `✅ 已更新（${new Date().toLocaleTimeString('zh-TW')}）` + runAlertCheck() };
     saveDB(); renderAll();
     checkSplits(p);   // 背景檢查分割（美股、每天一次）；有發現會在明細頂部提示
   } catch (e) {
@@ -4000,8 +4192,28 @@ function showReport(r) {
   $('aiMetaText').textContent = `產生於 ${r.ts}` + (nq ? `　·　含 ${nq} 則追問` : '');
   $('aiMeta').style.display = 'flex';
   $('histSel').value = r.id;
+  // 個股報告（有 symbol／market）才提供「將價位設為提醒」
+  $('planAlertBtn').style.display = r.symbol && r.market && !r.demo ? '' : 'none';
+  $('planAlertRow').style.display = 'none';
   renderFuBox(r);
 }
+$('planAlertBtn').addEventListener('click', () => {
+  const r = reportHist.find(x => x.id === lastShownId), row = $('planAlertRow');
+  if (!r || !r.symbol) return;
+  if (row.style.display !== 'none') { row.style.display = 'none'; return; }
+  const pos = db.positions.find(p => p.market === r.market && p.symbol === r.symbol);
+  const levels = extractPlanLevels(r.fullText, (pos && pos.lastPrice) || r.close || null);
+  row.style.display = 'flex';
+  row.innerHTML = levels.length
+    ? `<span class="hint">點選要加入的提醒（${esc(r.symbol)}）：</span>` + levels.map((l, i) =>
+        `<button class="ghost" data-lv="${i}">${alertVerb(l.dir)} ${nf.format(l.price)}（${l.action}）＋</button>`).join('')
+    : '<span class="hint">這份報告的操作計畫表裡找不到具體價位。</span>';
+  row.querySelectorAll('[data-lv]').forEach(b => b.onclick = () => {
+    const l = levels[+b.dataset.lv];
+    const ok = addAlert(r.market, r.symbol, l.dir, l.price, l.note);
+    b.textContent = ok ? `✓ 已加入 ${alertVerb(l.dir)} ${nf.format(l.price)}` : '已在提醒清單'; b.disabled = true;
+  });
+});
 //「觀察清單」面板報告（ws＝快篩總評、kol＝KOL 雷達）：存入歷史（可由「AI 分析」下拉切換），但顯示在各自面板內——
 // 不搶「AI 分析」的畫面，讓快篩總評、雷達點名清單與「AI 分析」的個股分析可以同時對照著看
 const panelLast = { ws: null, kol: null };
@@ -4332,7 +4544,7 @@ function exportData() {
   if (!inclKeys) { settings.twelveKey = ''; settings.finmindToken = ''; settings.finnhubKey = ''; settings.xaiKey = ''; settings.anthropicKey = ''; }
   const data = {
     app: 'twpf', version: APP_VERSION, exportedAt: new Date().toISOString(),
-    positions: db.positions, watchlist: db.watchlist, settings,
+    positions: db.positions, watchlist: db.watchlist, alerts: db.alerts, settings,
     reports: reportHist,   // 報告歷史（最近 20 份）——換裝置不再遺失
     llmUsage,              // AI 花費統計（月份 → 模型；最近 12 個月）
     prefs: {               // UI 偏好（twbt_*；不含任何金鑰）
@@ -4359,6 +4571,7 @@ function importData(file) {
     if (!confirm(`匯入將「覆蓋」目前的 ${db.positions.length} 筆持倉與設定，改為備份檔的 ${data.positions.length} 筆。確定要繼續？`)) return;
     db.positions = data.positions.filter(p => p && p.id && p.market);
     db.watchlist = Array.isArray(data.watchlist) ? data.watchlist.filter(w => w && w.id && w.symbol && w.market) : [];
+    db.alerts = Array.isArray(data.alerts) ? data.alerts.filter(a => a && a.id && a.symbol && a.price > 0 && (a.dir === 'above' || a.dir === 'below')) : [];   // 舊備份無此欄位 → 空
     db.settings = Object.assign({ twelveKey: '', finmindToken: '', finnhubKey: '', xaiKey: '', anthropicKey: '', theme: db.settings.theme, twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '', cpName: '', cpDesc: '' }, data.settings || {});   // 舊備份無 theme → 沿用目前的
     if (!THEMES.includes(db.settings.theme)) db.settings.theme = 'dark';
     applyTheme();
@@ -4518,6 +4731,9 @@ function loadDemo() {
   const d = demoData();
   db.positions = d.positions;
   db.watchlist = d.watchlist;
+  // 範例的除息日與到價提醒（日期相對今天，讓行事曆有東西看；清除範例時一併移除）
+  db.divCache['2330'] = { ts: 'demo', events: [{ exDate: isoAddDays(todayISO(), 36), payDate: isoAddDays(todayISO(), 64), cash: 5 }] };
+  db.alerts.push({ id: 'demo_alert1', market: 'tw', symbol: '2330', dir: 'below', price: 1000, note: '範例：來自 AI 操作計畫表的減碼條件', created: todayISO(), hit: null });
   saveDB();
   localStorage.setItem(DEMO_FLAG, '1');
   reportHist = reportHist.filter(r => !r.demo);
@@ -4533,6 +4749,8 @@ function clearDemo() {
   if (!confirm('清除範例資料（範例持倉、觀察清單與範例報告）？你自行輸入的資料不受影響。')) return;
   db.positions = db.positions.filter(p => !String(p.id).startsWith('demo_'));
   db.watchlist = db.watchlist.filter(w => !String(w.id).startsWith('demo_'));
+  db.alerts = db.alerts.filter(a => !String(a.id).startsWith('demo_'));
+  for (const k of Object.keys(db.divCache)) if (db.divCache[k].ts === 'demo') delete db.divCache[k];
   saveDB();
   reportHist = reportHist.filter(r => !r.demo);
   saveReports();
