@@ -3,7 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>💼 我的投資組合 + AI 分析</title>
+<title>我的投資組合 + AI 分析</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700&display=swap">
 <script id="themeBoot">
 // 佈景主題先行套用（避免載入瞬間閃一下錯的配色）；規則與下方 storedTheme()/resolveTheme() 相同
 (function () {
@@ -51,10 +54,15 @@
     --shadow: rgba(60,50,30,.18);
     color-scheme: light;
   }
+  :root {   /* 字型：連不上 Google Fonts（離線雙擊開啟）時退回系統字型 */
+    --font-sans: "Noto Sans TC", -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
+    --font-serif: "Noto Serif TC", "Songti TC", "PMingLiU", serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, "Noto Sans TC", "PingFang TC", monospace;
+  }
   * { box-sizing: border-box; }
   body {
     margin: 0; background: var(--bg); color: var(--text);
-    font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+    font-family: var(--font-sans);
     line-height: 1.6;
   }
   header {
@@ -62,6 +70,10 @@
     background: linear-gradient(180deg, var(--head), var(--bg));
   }
   header h1 { margin: 0 0 4px; font-size: 1.6rem; }
+  h1, h2 { font-family: var(--font-serif); font-weight: 700; }
+  /* 數字、金額、表格儲存格一律等寬字（AI 報告內的表格是文字，維持內文字型） */
+  td, .card .v, .kv b, #appVer, input[type="number"], input[type="date"], .mono { font-family: var(--font-mono); }
+  .aiReport td { font-family: inherit; }
   header p { margin: 0; color: var(--muted); font-size: .9rem; }
   main { max-width: 1120px; margin: 0 auto; padding: 12px 20px 60px; }
   /* 頂部 sticky 導覽：長頁面的各區錨點；chip 造型讓觸控裝置（無 hover）也看得出可點擊。
@@ -93,10 +105,10 @@
   section, details.box, #kolBox, #helpQ0 { scroll-margin-top: 54px; }   /* 錨點落點避開 sticky 導覽高度 */
   /* 範例資料橫幅：JS 以 style.display 切換 flex/none（display 不寫在 CSS，避免 inline '' 回落問題） */
   #demoBar { align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 16px; padding: 10px 16px;
-    background: rgba(var(--gold-rgb),.1); border: 1px solid var(--gold); border-radius: 12px; font-size: .86rem; }
+    background: rgba(var(--gold-rgb),.1); border: 1px solid var(--gold); border-radius: 4px; font-size: .86rem; }
   section, details.box {
     background: var(--panel); border: 1px solid var(--border);
-    border-radius: 14px; padding: 20px; margin-top: 20px; display: block;
+    border-radius: 6px; padding: 20px; margin-top: 20px; display: block;
   }
   section h2 { margin: 0 0 14px; font-size: 1.1rem; color: var(--accent); }
   details.box > summary { cursor: pointer; color: var(--accent); font-weight: 600; }
@@ -104,14 +116,14 @@
   label.field { display: flex; flex-direction: column; gap: 5px; font-size: .85rem; color: var(--muted); }
   input, select, button, textarea {
     font: inherit; color: var(--text); background: var(--panel2);
-    border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+    border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px;
   }
   input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   textarea { resize: vertical; min-height: 44px; }
   input[type="checkbox"] { width: auto; accent-color: var(--accent); }
   .pw { position: relative; display: block; }
-  .pw input { width: 100%; padding-right: 40px; }
-  .pw .eye { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem; padding: 4px 7px; line-height: 1; }
+  .pw input { width: 100%; padding-right: 48px; }
+  .pw .eye { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--muted); cursor: pointer; font-size: .75rem; padding: 4px 7px; line-height: 1; }
   .pw .eye:hover { color: var(--text); }
   .row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-top: 14px; }
   .hint { font-size: .8rem; color: var(--muted); }
@@ -135,20 +147,20 @@
   @keyframes twspin { to { transform: rotate(360deg); } }
   .working-dots::after { content: ''; animation: twdots 1.2s steps(4, end) infinite; }
   @keyframes twdots { 0% { content: ''; } 25% { content: '·'; } 50% { content: '··'; } 75% { content: '···'; } 100% { content: ''; } }
-  .seg { display: inline-flex; background: var(--panel2); border: 1px solid var(--border); border-radius: 9px; padding: 3px; gap: 3px; }
-  .seg button { flex: none; border: none; background: none; color: var(--muted); cursor: pointer; padding: 6px 14px; border-radius: 6px; font-size: .88rem; }
+  .seg { display: inline-flex; background: var(--panel2); border: 1px solid var(--border); border-radius: 4px; padding: 3px; gap: 3px; }
+  .seg button { flex: none; border: none; background: none; color: var(--muted); cursor: pointer; padding: 6px 14px; border-radius: 4px; font-size: .88rem; }
   .seg button.on { background: var(--border); color: var(--text); }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
-  .card { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .card { background: var(--panel2); border: 1px solid var(--border); border-radius: 4px; padding: 12px 14px; }
   .card .k { font-size: .78rem; color: var(--muted); }
   .card .v { font-size: 1.12rem; font-weight: 700; margin-top: 2px; }
   .card .s { font-size: .75rem; color: var(--muted); margin-top: 2px; }
   .pos { color: var(--up); }
   .neg { color: var(--down); }
-  .tableWrap { position: relative; margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; }
-  .tableScroll { overflow-x: auto; border-radius: 8px; }
+  .tableWrap { position: relative; margin-top: 12px; border: 1px solid var(--border); border-radius: 4px; }
+  .tableScroll { overflow-x: auto; border-radius: 4px; }
   /* 捲動陰影提示：表格還有欄位可往右（或往左）捲時，邊緣出現漸層，避免「總損益」等右側欄位被默默藏揉 */
-  .tableWrap::before, .tableWrap::after { content: ''; position: absolute; top: 1px; bottom: 1px; width: 36px; pointer-events: none; opacity: 0; transition: opacity .15s; z-index: 3; border-radius: 8px; }
+  .tableWrap::before, .tableWrap::after { content: ''; position: absolute; top: 1px; bottom: 1px; width: 36px; pointer-events: none; opacity: 0; transition: opacity .15s; z-index: 3; border-radius: 4px; }
   .tableWrap::before { left: 1px; background: linear-gradient(90deg, rgba(var(--bg-rgb),.7), transparent); }
   .tableWrap::after  { right: 1px; background: linear-gradient(270deg, rgba(var(--bg-rgb),.7), transparent); }
   .tableWrap.more-l::before { opacity: 1; }
@@ -169,9 +181,9 @@
   .badge.bond { color: var(--badge-bond); border-color: var(--badge-bond-bd); }
   /* 持倉明細面板：移到表格外，永遠以可視寬度呈現，編輯／刪除 icon 不再被橫向捲動藏到最右邊 */
   #posExpand { margin-top: 12px; }
-  .expandPanel { background: var(--panel3); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .expandPanel { background: var(--panel3); border: 1px solid var(--border); border-radius: 4px; padding: 16px; }
   .splitHint { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; padding: 10px 14px;
-    border: 1px solid var(--gold); border-radius: 8px; background: rgba(var(--gold-rgb),.08); font-size: .9rem; }
+    border: 1px solid var(--gold); border-radius: 4px; background: rgba(var(--gold-rgb),.08); font-size: .9rem; }
   .splitHint > span:first-child { flex: 1 1 260px; }
   .splitHintBtns { display: flex; gap: 8px; }
   .epHead { display: flex; align-items: center; gap: 10px; font-size: .95rem; margin-bottom: 10px; }
@@ -193,24 +205,24 @@
   #tooltip {
     position: absolute; pointer-events: none; display: none;
     background: rgba(var(--bg-rgb),.95); border: 1px solid var(--border);
-    border-radius: 8px; padding: 6px 10px; font-size: .78rem; white-space: nowrap; z-index: 5;
+    border-radius: 4px; padding: 6px 10px; font-size: .78rem; white-space: nowrap; z-index: 5;
   }
   .legend { display: flex; gap: 18px; font-size: .8rem; color: var(--muted); margin-top: 6px; flex-wrap: wrap; }
   .legend i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
   .aiReport {
     margin-top: 16px; background: var(--panel2); border: 1px solid var(--border);
-    border-radius: 10px; padding: 16px 20px; display: none; overflow-x: auto;
+    border-radius: 4px; padding: 16px 20px; display: none; overflow-x: auto;
   }
   .aiReport h1, .aiReport h2, .aiReport h3, .aiReport h4 { color: var(--accent); margin: 14px 0 6px; }
   .aiReport h1 { font-size: 1.2rem; } .aiReport h2 { font-size: 1.1rem; } .aiReport h3 { font-size: 1rem; }
   .aiReport table { margin: 8px 0; } .aiReport th, .aiReport td { text-align: left; position: static; }
-  .aiReport code { background: var(--code); padding: 1px 6px; border-radius: 5px; font-size: .85em; }
-  .aiReport pre { background: var(--code); padding: 12px; border-radius: 8px; overflow-x: auto; }
+  .aiReport code { background: var(--code); padding: 1px 6px; border-radius: 4px; font-size: .85em; }
+  .aiReport pre { background: var(--code); padding: 12px; border-radius: 4px; overflow-x: auto; }
   .aiReport ul, .aiReport ol { padding-left: 22px; }
   .aiReport a { color: var(--accent); word-break: break-all; }
   .aiReport blockquote { border-left: 3px solid var(--accent); margin: 8px 0; padding: 2px 12px; color: var(--muted); }
   /* 追問 AI：報告下方的提問框（輸入＋快速追問 chips）；即時回答區沿用 .aiReport 外觀 */
-  .fuAsk { margin-top: 12px; background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .fuAsk { margin-top: 12px; background: var(--panel2); border: 1px solid var(--border); border-radius: 4px; padding: 12px 14px; }
   .fuAsk textarea { width: 100%; box-sizing: border-box; resize: vertical; }
   .fuAsk .row { margin-top: 8px; gap: 10px; }
   .fuChips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
@@ -245,39 +257,39 @@
 </head>
 <body>
 <header>
-  <h1>💼 我的投資組合 + AI 分析 <span id="appVer" style="font-size:.78rem; color:var(--muted); font-weight:400; vertical-align:middle;"></span></h1>
+  <h1>我的投資組合 + AI 分析 <span id="appVer" style="font-size:.78rem; color:var(--muted); font-weight:400; vertical-align:middle;"></span></h1>
   <p>台股（TWSE 收盤）・美股（Twelve Data）・海外債券（手動 Mark）— 加權平均成本法</p>
 </header>
 <nav id="topNav">
 <div id="topNavScroll">
-  <a href="#setupBox" data-open="setupBox">🔑 設定</a>
-  <a href="#sec1">① 損益</a>
-  <a href="#sec2">② 持倉</a>
-  <a href="#sec3">③ AI 分析</a>
-  <a href="#sec4">④ 快篩</a>
-  <a href="#kolBox" data-open="kolBox">📡 KOL</a>
-  <a href="#sec5">⑤ 績效</a>
-  <a href="#helpBox">📖 說明</a>
+  <a href="#setupBox" data-open="setupBox">設定</a>
+  <a href="#sec1">損益</a>
+  <a href="#sec2">持倉</a>
+  <a href="#sec3">AI 分析</a>
+  <a href="#sec4">快篩</a>
+  <a href="#kolBox" data-open="kolBox">KOL</a>
+  <a href="#sec5">績效</a>
+  <a href="#helpBox">說明</a>
 </div>
 </nav>
 <main>
   <!-- ── 範例資料橫幅（載入範例後顯示；清除範例只移除 demo_ 開頭的項目，不動真實資料） ── -->
   <div id="demoBar" style="display:none">
-    <span>🎬 <b>範例資料模式</b>——目前的持倉、觀察清單與報告皆為內建虛構示意（價格非即時），供你體驗各區功能。</span>
+    <span><b>範例資料模式</b>——目前的持倉、觀察清單與報告皆為內建虛構示意（價格非即時），供你體驗各區功能。</span>
     <span style="flex:1"></span>
-    <button id="demoClearBtn" class="ghost">🧹 清除範例，開始輸入我的持倉</button>
+    <button id="demoClearBtn" class="ghost">清除範例，開始輸入我的持倉</button>
   </div>
   <!-- ── 首次使用引導（有持倉或按過「知道了」就不再顯示） ── -->
   <section id="onboardBox" style="display:none">
-    <h2>👋 第一次使用？三步開始</h2>
+    <h2>第一次使用？三步開始</h2>
     <ol style="margin:0; padding-left:1.4em; line-height:2">
-      <li><b>填 API 金鑰</b>——下方「🔑 API 與參數設定」已為你展開：AI 分析需 OpenAI Key（或 Claude Key，擇一即可）；追蹤美股另需 Twelve Data Key（免費註冊）。台股與債券免金鑰。</li>
-      <li><b>新增第一筆持倉</b>——到「② 我的持倉」按「＋ 新增持倉」填首筆買進。</li>
-      <li><b>按「🔄 更新所有報價」</b>，再到 ③ 選標的按「🤖 產生個股 AI 分析」。</li>
+      <li><b>填 API 金鑰</b>——下方「API 與參數設定」已為你展開：AI 分析需 OpenAI Key（或 Claude Key，擇一即可）；追蹤美股另需 Twelve Data Key（免費註冊）。台股與債券免金鑰。</li>
+      <li><b>新增第一筆持倉</b>——到「我的持倉」按「＋ 新增持倉」填首筆買進。</li>
+      <li><b>按「更新所有報價」</b>，再到「AI 分析」選標的按「產生個股 AI 分析」。</li>
     </ol>
     <div class="row">
-      <button id="demoLoadBtn" class="primary">🎬 載入範例資料（免金鑰，先體驗看看）</button>
-      <a href="#helpQ0" data-open="helpQ0" class="hint" style="text-decoration:none">📖 詳細使用說明（Q0 快速上手）</a>
+      <button id="demoLoadBtn" class="primary">載入範例資料（免金鑰，先體驗看看）</button>
+      <a href="#helpQ0" data-open="helpQ0" class="hint" style="text-decoration:none">詳細使用說明（Q0 快速上手）</a>
       <span style="flex:1"></span>
       <button id="onboardDismiss" class="ghost">知道了，不再顯示</button>
     </div>
@@ -285,25 +297,25 @@
 
   <!-- ── API 與參數設定 ── -->
   <details class="box" id="setupBox">
-    <summary>🔑 API 與參數設定</summary>
+    <summary>API 與參數設定</summary>
     <div class="grid">
       <label class="field">Twelve Data API Key（美股報價用）
-        <span class="pw"><input id="tdKey" type="password" name="td-key-x" placeholder="免費註冊 twelvedata.com 取得" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true"><button type="button" class="eye" data-eye="tdKey" title="顯示／隱藏">👁</button></span>
+        <span class="pw"><input id="tdKey" type="password" name="td-key-x" placeholder="免費註冊 twelvedata.com 取得" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true"><button type="button" class="eye" data-eye="tdKey" title="顯示／隱藏">顯示</button></span>
       </label>
       <label class="field">FinMind Token（台股上櫃用，選填）
-        <span class="pw"><input id="fmToken" type="password" name="fm-token-x" placeholder="免填即可用；如被限流再到 finmindtrade.com 免費取得" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true"><button type="button" class="eye" data-eye="fmToken" title="顯示／隱藏">👁</button></span>
+        <span class="pw"><input id="fmToken" type="password" name="fm-token-x" placeholder="免填即可用；如被限流再到 finmindtrade.com 免費取得" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true"><button type="button" class="eye" data-eye="fmToken" title="顯示／隱藏">顯示</button></span>
       </label>
       <label class="field">Finnhub API Key（美股基本面用，選填）
-        <span class="pw"><input id="finnhubKey" type="password" name="fh-key-x" placeholder="免費註冊 finnhub.io 取得；填了美股才有估值／評等" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true"><button type="button" class="eye" data-eye="finnhubKey" title="顯示／隱藏">👁</button></span>
+        <span class="pw"><input id="finnhubKey" type="password" name="fh-key-x" placeholder="免費註冊 finnhub.io 取得；填了美股才有估值／評等" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true"><button type="button" class="eye" data-eye="finnhubKey" title="顯示／隱藏">顯示</button></span>
       </label>
       <label class="field">xAI API Key（Grok 直查 X 貼文用，選填）
-        <span class="pw"><input id="xaiKey" type="password" name="xai-key-x" placeholder="console.x.ai 取得；KOL 雷達可直讀 X 貼文" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true"><button type="button" class="eye" data-eye="xaiKey" title="顯示／隱藏">👁</button></span>
+        <span class="pw"><input id="xaiKey" type="password" name="xai-key-x" placeholder="console.x.ai 取得；KOL 雷達可直讀 X 貼文" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true"><button type="button" class="eye" data-eye="xaiKey" title="顯示／隱藏">顯示</button></span>
       </label>
       <label class="field">OpenAI API Key
-        <span class="pw"><input id="apiKey" type="password" name="oai-key-x" placeholder="sk-..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true"><button type="button" class="eye" data-eye="apiKey" title="顯示／隱藏">👁</button></span>
+        <span class="pw"><input id="apiKey" type="password" name="oai-key-x" placeholder="sk-..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true"><button type="button" class="eye" data-eye="apiKey" title="顯示／隱藏">顯示</button></span>
       </label>
       <label class="field">Claude API Key（選 Claude 模型時用，選填）
-        <span class="pw"><input id="anthropicKey" type="password" name="ant-key-x" placeholder="sk-ant-...（platform.claude.com 取得）" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true"><button type="button" class="eye" data-eye="anthropicKey" title="顯示／隱藏">👁</button></span>
+        <span class="pw"><input id="anthropicKey" type="password" name="ant-key-x" placeholder="sk-ant-...（platform.claude.com 取得）" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true"><button type="button" class="eye" data-eye="anthropicKey" title="顯示／隱藏">顯示</button></span>
       </label>
       <label class="field">AI 思考模型
         <select id="modelSel">
@@ -351,19 +363,19 @@
         <select id="themeSel"><option value="auto">跟隨系統</option><option value="dark">深色</option><option value="light">淺色</option></select>
       </label>
     </div>
-    <label class="field" style="margin-top:12px">🎯 投資目標與風險偏好（選填；會寫進個股與組合的 AI Prompt，讓「加碼／減碼／停損」等建議貼合你的目標，而非通用答案）
+    <label class="field" style="margin-top:12px">投資目標與風險偏好（選填；會寫進個股與組合的 AI Prompt，讓「加碼／減碼／停損」等建議貼合你的目標，而非通用答案）
       <textarea id="aiProfile" rows="2" placeholder="例：偏長期存股、能忍受 -20% 回撤；美股以成長股為主、台股重視殖利率；每月約可再投入 5 萬元"></textarea>
     </label>
     <div class="row">
       <label><input id="rememberKey" type="checkbox"> 記住 OpenAI API Key（不勾＝關閉頁面即忘、每次重填）</label>
-      <label><input id="webSearchChk" type="checkbox" checked> 🌐 AI 分析時用 web search（個股新聞；組合含債券時查發行人信用與美債殖利率）</label>
+      <label><input id="webSearchChk" type="checkbox" checked> AI 分析時用 web search（個股新聞；組合含債券時查發行人信用與美債殖利率）</label>
     </div>
     <div class="hint" style="margin-top:2px">web search 由所選 AI 模型的供應商（OpenAI 或 Claude）即時搜尋並附來源；會多一筆搜尋費用（每次搜尋 US$0.01，另加搜尋內容的 tokens；已計入用量標示與花費統計）、也稍慢。不需要時可取消勾選。</div>
-    <div class="hint" style="margin-top:2px">🔐 金鑰儲存方式：Twelve Data／FinMind／Finnhub／xAI／Claude 金鑰輸入後即<b>自動儲存</b>；OpenAI Key 則由上方勾選決定。所有金鑰都<b>只存在你這台裝置的瀏覽器（localStorage）</b>，本工具純前端、不會把金鑰上傳到任何伺服器；「匯出 JSON」預設也不含金鑰（可勾選包含）。</div>
+    <div class="hint" style="margin-top:2px">金鑰儲存方式：Twelve Data／FinMind／Finnhub／xAI／Claude 金鑰輸入後即<b>自動儲存</b>；OpenAI Key 則由上方勾選決定。所有金鑰都<b>只存在你這台裝置的瀏覽器（localStorage）</b>，本工具純前端、不會把金鑰上傳到任何伺服器；「匯出 JSON」預設也不含金鑰（可勾選包含）。</div>
     <div class="row" style="margin-top:6px">
       <span class="hint">資料備份：</span>
-      <button id="exportBtn" class="ghost">⬇️ 匯出 JSON</button>
-      <button id="importBtn" class="ghost">⬆️ 匯入 JSON</button>
+      <button id="exportBtn" class="ghost">匯出 JSON</button>
+      <button id="importBtn" class="ghost">匯入 JSON</button>
       <input id="importFile" type="file" accept="application/json,.json" style="display:none">
       <label class="hint" style="display:flex; align-items:center; gap:5px"><input id="exportKeys" type="checkbox"> 匯出時包含 API 金鑰</label>
       <span id="ioStatus" class="hint"></span>
@@ -373,13 +385,13 @@
 
   <!-- ── AI 花費統計（每次 AI 呼叫完成後累計；依月份／模型彙總，只存本機） ── -->
   <details class="box" id="costBox">
-    <summary>💰 AI 花費統計 <span id="costSummary" class="hint" style="font-weight:400"></span></summary>
+    <summary>AI 花費統計 <span id="costSummary" class="hint" style="font-weight:400"></span></summary>
     <div class="row" style="margin-top:10px">
       <label class="hint" style="display:flex; align-items:center; gap:6px">月份
         <select id="costMonthSel" style="font-size:.82rem; padding:5px 8px;"></select>
       </label>
       <span style="flex:1"></span>
-      <button id="costClearBtn" class="ghost">🗑️ 清除統計</button>
+      <button id="costClearBtn" class="ghost">清除統計</button>
     </div>
     <div class="tableScroll" style="margin-top:8px">
       <table id="costTable"></table>
@@ -389,7 +401,7 @@
 
   <!-- ── 損益總覽 ── -->
   <section id="sec1">
-    <h2>① 損益總覽</h2>
+    <h2>損益總覽</h2>
     <div class="cards" id="sumCards"></div>
     <div class="tableWrap" id="mktWrap" style="display:none">
       <div class="tableScroll"><table id="mktTable">
@@ -398,7 +410,7 @@
       </table></div>
     </div>
     <div class="row">
-      <button id="quoteBtn" class="primary">🔄 更新所有報價</button>
+      <button id="quoteBtn" class="primary">更新所有報價</button>
       <span class="hint">台股每檔間隔 0.5 秒；美股每 7 支一批、批間隔 60 秒（避開 Twelve Data 每分鐘限額）；同時更新匯率。金額一律以「換算新台幣」加總。</span>
     </div>
     <div id="qStatus" class="status"></div>
@@ -406,7 +418,7 @@
 
   <!-- ── 我的持倉 ── -->
   <section id="sec2">
-    <h2>② 我的持倉</h2>
+    <h2>我的持倉</h2>
     <details id="addBox">
       <summary style="cursor:pointer; color:var(--gold)">＋ 新增持倉（首筆買進）</summary>
       <div class="row" style="margin-top:12px">
@@ -464,9 +476,9 @@
 
   <!-- ── 走勢圖與 AI 分析 ── -->
   <section id="sec3">
-    <h2>③ 走勢圖與 AI 分析</h2>
+    <h2>走勢圖與 AI 分析</h2>
     <details style="margin-bottom:14px; font-size:.84rem; color:var(--muted)">
-      <summary style="cursor:pointer; color:var(--accent)">ℹ️ 這份 AI 分析根據哪些資料？</summary>
+      <summary style="cursor:pointer; color:var(--accent)">這份 AI 分析根據哪些資料？</summary>
       <div style="margin-top:8px; line-height:1.75">
         <b style="color:var(--text)">程式精算的指標（AI 只解讀、不計算）：</b>技術面 MA／RSI／MACD／KD／布林通道／ATR／OBV／量比／量能（含 5／20 日前對照、均線黃金死亡交叉、乖離率與量價密集區，供 AI 判斷指標走向與支撐壓力）；台股另含產業別、配息（殖利率、除息／發放日）、三大法人買賣超、外資持股、融資融券、月營收年增、本益比(trailing)／PBR；美股（填 Finnhub 金鑰）含估值 PER／PBR、獲利能力、營收成長、分析師評等與近期新聞。<br>
         <b style="color:var(--text)">原始價量：</b>近 52 週週線＋近 60 日日線 OHLCV、同期大盤對照（上市配加權指數／上櫃配櫃買指數／美股配 SPY）。<br>
@@ -498,7 +510,7 @@
         </div>
         <input id="aiSymbol" placeholder="代號" style="width:110px">
       </div>
-      <button id="fetchBtn" class="primary">📊 載入走勢圖與數據</button>
+      <button id="fetchBtn" class="primary">載入走勢圖與數據</button>
     </div>
     <div id="customPersonaWrap" style="display:none; margin-top:10px">
       <div class="grid" style="grid-template-columns: minmax(230px, 320px)">
@@ -525,22 +537,22 @@
       <span><span style="color:var(--up)">▲</span> 買進　<span style="color:var(--down)">▼</span> 賣出</span>
     </div>
     <div class="row">
-      <button id="aiBtn" class="primary">🤖 產生個股 AI 分析</button>
-      <button id="pfBtn" class="primary">💼 產生投資組合總評</button>
-      <button id="copyStockPrompt" class="ghost">📋 複製個股 Prompt</button>
-      <button id="copyPfPrompt" class="ghost">📋 複製組合 Prompt</button>
+      <button id="aiBtn" class="primary">產生個股 AI 分析</button>
+      <button id="pfBtn" class="primary">產生投資組合總評</button>
+      <button id="copyStockPrompt" class="ghost">複製個股 Prompt</button>
+      <button id="copyPfPrompt" class="ghost">複製組合 Prompt</button>
     </div>
     <details class="hintFold">
-      <summary>ℹ️ 使用提示：省 token 技巧、報告歷史、分析視角、上次建議檢討、追問 AI</summary>
-      <div class="hint">「產生 AI 分析」會呼叫所選的 AI 模型（OpenAI 或 Claude，耗 token）；若想省 token，可改按「複製 Prompt」把同一份提問貼到訂閱制聊天機器人（如 Gemini）。新聞與美股基本面那段需該機器人能上網查詢才會生效；台股的技術面／籌碼／配息等數據已內含在 Prompt 中。報告自動保留<b>最近 20 份</b>於本機（重新整理不消失），可由報告上方的下拉選單切換、對照前後觀點變化。「分析視角」可切換單一風格（含<b>供應鏈瓶頸獵人</b>與<b>自訂視角</b>——把你欣賞的分析師方法論寫成準則）或<b>三師會診</b>（價值×成長×技術各自表態、主持人裁決）；同一檔重複分析時會自動附上<b>上次建議檢討</b>（對照期間實際走勢、檢討上次判斷對錯）。每次 AI 呼叫完成後，狀態列與報告開頭會標示本次 <b>tokens 用量與估算費用</b>（費率取自線上價格表，離線改用內建表；web search 與 x_search 的工具費會一併算入並註明搜尋次數／抓取則數；價格表查無的模型只顯示 tokens）；各月累計見頁面上方的<b>💰 AI 花費統計</b>。報告下方可<b>💬 追問 AI</b>：就這份報告繼續問（AI 會拿到報告全文與產生時的原始數據，回答有據可查），回答接在報告末尾、一併存入歷史；多輪追問會累積成同一份報告的問答串。追問可<b>📎 附加檔案</b>——圖片／PDF（如法說會簡報截圖、券商對帳單、研究報告）隨請求直接送給 AI 閱讀，文字檔（txt／md／csv／json）內容內嵌進 Prompt；附件不存入歷史、只記檔名。</div>
+      <summary>使用提示：省 token 技巧、報告歷史、分析視角、上次建議檢討、追問 AI</summary>
+      <div class="hint">「產生 AI 分析」會呼叫所選的 AI 模型（OpenAI 或 Claude，耗 token）；若想省 token，可改按「複製 Prompt」把同一份提問貼到訂閱制聊天機器人（如 Gemini）。新聞與美股基本面那段需該機器人能上網查詢才會生效；台股的技術面／籌碼／配息等數據已內含在 Prompt 中。報告自動保留<b>最近 20 份</b>於本機（重新整理不消失），可由報告上方的下拉選單切換、對照前後觀點變化。「分析視角」可切換單一風格（含<b>供應鏈瓶頸獵人</b>與<b>自訂視角</b>——把你欣賞的分析師方法論寫成準則）或<b>三師會診</b>（價值×成長×技術各自表態、主持人裁決）；同一檔重複分析時會自動附上<b>上次建議檢討</b>（對照期間實際走勢、檢討上次判斷對錯）。每次 AI 呼叫完成後，狀態列與報告開頭會標示本次 <b>tokens 用量與估算費用</b>（費率取自線上價格表，離線改用內建表；web search 與 x_search 的工具費會一併算入並註明搜尋次數／抓取則數；價格表查無的模型只顯示 tokens）；各月累計見頁面上方的<b>AI 花費統計</b>。報告下方可<b>追問 AI</b>：就這份報告繼續問（AI 會拿到報告全文與產生時的原始數據，回答有據可查），回答接在報告末尾、一併存入歷史；多輪追問會累積成同一份報告的問答串。追問可<b>附加檔案</b>——圖片／PDF（如法說會簡報截圖、券商對帳單、研究報告）隨請求直接送給 AI 閱讀，文字檔（txt／md／csv／json）內容內嵌進 Prompt；附件不存入歷史、只記檔名。</div>
     </details>
     <div id="aiStatus" class="status"></div>
-    <div id="aiMeta" style="display:none; align-items:center; gap:10px; margin-top:12px; padding:8px 12px; background:var(--panel2); border:1px solid var(--border); border-radius:8px; font-size:.82rem; color:var(--muted); flex-wrap:wrap;">
+    <div id="aiMeta" style="display:none; align-items:center; gap:10px; margin-top:12px; padding:8px 12px; background:var(--panel2); border:1px solid var(--border); border-radius:4px; font-size:.82rem; color:var(--muted); flex-wrap:wrap;">
       <select id="histSel" title="切換歷史報告（自動保留最近 20 份）" style="max-width:320px; font-size:.82rem; padding:5px 8px;"></select>
       <span id="aiMetaText"></span>
       <span style="flex:1"></span>
-      <button id="aiCopyBtn" class="ghost">📋 複製報告</button>
-      <button id="aiDownloadBtn" class="ghost">⬇️ 下載報告（.md）</button>
+      <button id="aiCopyBtn" class="ghost">複製報告</button>
+      <button id="aiDownloadBtn" class="ghost">下載報告（.md）</button>
     </div>
     <div id="aiOutput" class="aiReport"></div>
     <!-- 追問 AI：就上方顯示中的報告再問 AI；回答接在報告末尾、一併存入歷史／複製／下載（範例報告不提供） -->
@@ -551,15 +563,15 @@
       </div>
       <div id="fuStatus" class="status"></div>
       <div class="fuAsk">
-        <label class="field">💬 追問 AI（針對上方這份報告；AI 會拿到報告全文與產生時的原始數據，另可附加圖片／PDF／文字檔）
+        <label class="field">追問 AI（針對上方這份報告；AI 會拿到報告全文與產生時的原始數據，另可附加圖片／PDF／文字檔）
           <textarea id="fuInput" rows="2" placeholder="例：若跌破最近的支撐位該怎麼處理？／第 2 點的支撐位是怎麼算的？／附上法說會簡報截圖：這對報告的結論有什麼影響？"></textarea>
         </label>
         <div id="fuFiles" class="fuFiles"></div>
         <div class="row">
-          <button id="fuBtn" class="primary">💬 追問 AI</button>
-          <button id="fuAttachBtn" class="ghost" title="附加圖片／PDF／文字檔（也可直接貼上或拖進此框）">📎 附加檔案</button>
+          <button id="fuBtn" class="primary">追問 AI</button>
+          <button id="fuAttachBtn" class="ghost" title="附加圖片／PDF／文字檔（也可直接貼上或拖進此框）">附加檔案</button>
           <input id="fuFile" type="file" multiple accept="image/*,.pdf,application/pdf,.txt,.md,.markdown,.csv,.tsv,.json,.log,text/plain,text/csv,text/markdown,application/json" style="display:none">
-          <button id="fuCopyBtn" class="ghost">📋 複製追問 Prompt</button>
+          <button id="fuCopyBtn" class="ghost">複製追問 Prompt</button>
           <span class="hint">Ctrl／⌘＋Enter 送出；可附加圖片／PDF／文字檔（最多 5 個、單檔 10 MB，也可貼上或拖進來）；回答接在報告末尾，連同報告一併存入歷史、可複製與下載</span>
         </div>
         <div id="fuChips" class="fuChips"></div>
@@ -569,7 +581,7 @@
 
   <!-- ── 觀察清單快篩 ── -->
   <section id="sec4">
-    <h2>④ 觀察清單快篩</h2>
+    <h2>觀察清單快篩</h2>
     <p class="hint">把「還沒買、但在觀察」的標的加進清單（上限 12 檔），一鍵抓一年價量、算指標並排比較，找出值得深入分析的對象。純價量快篩（不含籌碼／基本面／新聞）；台股走 FinMind、美股走 Twelve Data（每分鐘 8 檔限額，超過會自動分批等待）。</p>
     <div class="row">
       <div class="seg" id="wlMarket">
@@ -579,9 +591,9 @@
       <input id="wlSymbol" placeholder="代號：2330 / NVDA" style="width:150px">
       <button id="wlAddBtn" class="ghost">＋ 加入</button>
       <span style="flex:1"></span>
-      <button id="wlScanBtn" class="primary">🔍 快篩全部</button>
-      <button id="wlAiBtn" class="primary">🤖 AI 快篩總評</button>
-      <button id="wlCopyBtn" class="ghost">📋 複製快篩 Prompt</button>
+      <button id="wlScanBtn" class="primary">快篩全部</button>
+      <button id="wlAiBtn" class="primary">AI 快篩總評</button>
+      <button id="wlCopyBtn" class="ghost">複製快篩 Prompt</button>
     </div>
     <div id="wlChips" class="row" style="gap:8px"></div>
     <div id="wlStatus" class="status"></div>
@@ -591,17 +603,17 @@
         <tbody id="wlBody"></tbody>
       </table></div>
     </div>
-    <div class="hint" style="margin-top:8px">「AI 快篩總評」會把整張表交給 AI 排序評分（報告顯示於<b>下方專屬面板</b>並存入 ③ 的報告歷史——與 ③ 的個股分析<b>可同時對照</b>、互不覆蓋）；「深入」按鈕會把該檔帶入 ③ 直接抓資料，抓完即可產生完整個股分析。</div>
-    <div id="wsMeta" style="display:none; align-items:center; gap:10px; margin-top:12px; padding:8px 12px; background:var(--panel2); border:1px solid var(--border); border-radius:8px; font-size:.82rem; color:var(--muted);">
+    <div class="hint" style="margin-top:8px">「AI 快篩總評」會把整張表交給 AI 排序評分（報告顯示於<b>下方專屬面板</b>並存入「AI 分析」的報告歷史——與「AI 分析」的個股分析<b>可同時對照</b>、互不覆蓋）；「深入」按鈕會把該檔帶入「AI 分析」直接抓資料，抓完即可產生完整個股分析。</div>
+    <div id="wsMeta" style="display:none; align-items:center; gap:10px; margin-top:12px; padding:8px 12px; background:var(--panel2); border:1px solid var(--border); border-radius:4px; font-size:.82rem; color:var(--muted);">
       <span id="wsMetaText"></span>
       <span style="flex:1"></span>
-      <button id="wsCopyBtn" class="ghost">📋 複製報告</button>
-      <button id="wsDlBtn" class="ghost">⬇️ 下載報告（.md）</button>
+      <button id="wsCopyBtn" class="ghost">複製報告</button>
+      <button id="wsDlBtn" class="ghost">下載報告（.md）</button>
     </div>
     <div id="wsOutput" class="aiReport"></div>
 
     <details id="kolBox" style="margin-top:14px">
-      <summary style="cursor:pointer; color:var(--accent); font-weight:600">📡 KOL 選股雷達（把分析師點名的標的撈進觀察清單）</summary>
+      <summary style="cursor:pointer; color:var(--accent); font-weight:600">KOL 選股雷達（把分析師點名的標的撈進觀察清單）</summary>
       <div class="row" style="margin-top:10px">
         <label class="field" style="min-width:240px">KOL 名稱／帳號
           <input id="kolName" list="kolPresets" placeholder="例：Serenity @aleabitoreddit">
@@ -624,26 +636,26 @@
             <option value="90">近 90 天</option>
           </select>
         </label>
-        <button id="kolGrokBtn" class="primary" style="align-self:flex-end">⚡ Grok 直查 X</button>
-        <button id="kolSearchBtn" class="primary" style="align-self:flex-end">🔍 網路搜查</button>
+        <button id="kolGrokBtn" class="primary" style="align-self:flex-end">Grok 直查 X</button>
+        <button id="kolSearchBtn" class="primary" style="align-self:flex-end">網路搜查</button>
       </div>
       <details class="hintFold">
-        <summary>ℹ️ 三種模式怎麼選：費用、即時性與注意事項</summary>
-        <div class="hint">三種模式：<b>⚡ Grok 直查</b>（需填 xAI Key＋@帳號，x_search 鎖定<b>本人貼文</b>依所選範圍（2／5／10／30／60／90 天）直讀——一手、最即時；費用＝tokens＋x_search 工具費（<b>每抓 1,000 則貼文 US$5</b>，範圍越長、發文越密越貴，例如抓 50 則的工具費約 US$0.25，完成後狀態列顯示實際估算）；報告含<b>期間分段總結</b>，強迫覆蓋整個範圍而非只看最近幾天）；<b>🔍 網路搜查</b>（OpenAI web search 靠媒體／部落格二手轉述，<b>滯後數天～數週</b>）；<b>✂️ 貼文擷取</b>（自己貼原文，本地零費用）。表格都會列<b>發文／提及日期與當時價位</b>，時機是否太晚由你自行判斷。點名 ≠ 現在還看多（本人可能已出場）。<b>清空輸入框</b>可從下拉挑內建 KOL（Serenity 台股、Michael Burry 美股），也可自行輸入任何「名稱 @帳號」。</div>
+        <summary>三種模式怎麼選：費用、即時性與注意事項</summary>
+        <div class="hint">三種模式：<b>Grok 直查</b>（需填 xAI Key＋@帳號，x_search 鎖定<b>本人貼文</b>依所選範圍（2／5／10／30／60／90 天）直讀——一手、最即時；費用＝tokens＋x_search 工具費（<b>每抓 1,000 則貼文 US$5</b>，範圍越長、發文越密越貴，例如抓 50 則的工具費約 US$0.25，完成後狀態列顯示實際估算）；報告含<b>期間分段總結</b>，強迫覆蓋整個範圍而非只看最近幾天）；<b>網路搜查</b>（OpenAI web search 靠媒體／部落格二手轉述，<b>滯後數天～數週</b>）；<b>貼文擷取</b>（自己貼原文，本地零費用）。表格都會列<b>發文／提及日期與當時價位</b>，時機是否太晚由你自行判斷。點名 ≠ 現在還看多（本人可能已出場）。<b>清空輸入框</b>可從下拉挑內建 KOL（Serenity 台股、Michael Burry 美股），也可自行輸入任何「名稱 @帳號」。</div>
       </details>
       <label class="field" style="margin-top:10px">或直接貼上 KOL 貼文原文（本地擷取代號——即時、精準、零 AI 費用）
         <textarea id="kolPaste" rows="3" placeholder="貼上含 $SIVE、$ALAB 這類 cashtag 的貼文（台股模式亦可貼含 2330 這類代號的文字）…"></textarea>
       </label>
       <div class="row">
-        <button id="kolExtractBtn" class="ghost">✂️ 擷取代號</button>
+        <button id="kolExtractBtn" class="ghost">擷取代號</button>
       </div>
       <div id="kolStatus" class="status"></div>
       <div id="kolChips" class="row" style="gap:8px"></div>
-      <div id="kolMeta" style="display:none; align-items:center; gap:10px; margin-top:12px; padding:8px 12px; background:var(--panel2); border:1px solid var(--border); border-radius:8px; font-size:.82rem; color:var(--muted);">
+      <div id="kolMeta" style="display:none; align-items:center; gap:10px; margin-top:12px; padding:8px 12px; background:var(--panel2); border:1px solid var(--border); border-radius:4px; font-size:.82rem; color:var(--muted);">
         <span id="kolMetaText"></span>
         <span style="flex:1"></span>
-        <button id="kolCopyBtn" class="ghost">📋 複製報告</button>
-        <button id="kolDlBtn" class="ghost">⬇️ 下載報告（.md）</button>
+        <button id="kolCopyBtn" class="ghost">複製報告</button>
+        <button id="kolDlBtn" class="ghost">下載報告（.md）</button>
       </div>
       <div id="kolOutput" class="aiReport"></div>
     </details>
@@ -651,10 +663,10 @@
 
   <!-- ── 投資組合績效 ── -->
   <section id="sec5">
-    <h2>⑤ 投資組合績效</h2>
+    <h2>投資組合績效</h2>
     <div class="cards" id="perfCards"></div>
     <div class="row">
-      <button id="curveBtn" class="primary">📈 建立近一年淨值曲線</button>
+      <button id="curveBtn" class="primary">建立近一年淨值曲線</button>
       <span class="hint">抓取各股票部位歷史股價、依交易紀錄重建每日淨值並與加權指數對照（債券不納入；外幣以目前匯率換算）。</span>
     </div>
     <div id="curveStatus" class="status"></div>
@@ -668,19 +680,19 @@
   </section>
 
   <section id="helpBox">
-    <h2>📖 報告說明與名詞解釋</h2>
+    <h2>報告說明與名詞解釋</h2>
     <p class="hint">不熟悉技術分析名詞嗎？這一區說明「怎麼開始使用」「報告怎麼來的」並逐一白話解釋每個指標的意思與怎麼看。點下方標題展開。</p>
 
     <details id="helpQ0" style="margin-top:12px">
       <summary style="cursor:pointer;color:var(--accent);font-weight:600">Q0｜快速上手（第一次使用看這裡）</summary>
       <div style="margin-top:10px;line-height:1.85;font-size:.9rem">
-        <p style="margin:.5em 0"><b style="color:var(--gold)">還沒準備好金鑰？</b>首次開啟時頂部引導卡有「🎬 載入範例資料」——一鍵填入範例持倉（台積電、AAPL、一檔公司債）、觀察清單與一份範例 AI 報告，<b>不需任何金鑰</b>就能把五個區塊都看一遍；體驗完按範例橫幅上的「🧹 清除範例」即可開始輸入自己的資料。</p>
-        <b>1. 準備金鑰（只需一次）</b>：展開「🔑 API 與參數設定」——<b>OpenAI Key</b> 或 <b>Claude Key</b>（AI 分析必填其一，依「AI 思考模型」選的是哪一家）；<b>Twelve Data Key</b>（要追蹤美股才需要，免費註冊）；FinMind／Finnhub／xAI 皆選填（依序強化台股上櫃、美股基本面、KOL 直查）。金鑰只存在你這台裝置的瀏覽器。<br>
-        <b>2. 建立持倉</b>：到「② 我的持倉」按「＋ 新增持倉」填首筆買進（債券填面額／票息／到期日）。之後的加碼、賣出、股息、股票分割／合併：<b>點該持倉列展開</b>即可補登、修改（美股股息可填預扣稅 %；美股分割會在更新報價或載入走勢圖時自動偵測並提示套用）。<br>
-        <b>3. 更新報價</b>：回「① 損益總覽」按「🔄 更新所有報價」（台股免金鑰、美股走 Twelve Data、匯率自動抓）。<br>
-        <b>4. 產生 AI 分析</b>：到「③」選標的按「🤖 產生個股 AI 分析」（會自動載入一年數據與走勢圖）；或按「💼 產生投資組合總評」看整體配置建議。報告自動保留最近 20 份，可用下拉選單回顧；看完報告有疑問，直接在報告下方「💬 追問 AI」繼續問，回答會接在報告末尾。<br>
-        <b>5. 備份</b>：設定區「⬇️ 匯出 JSON」——持倉、設定、報告歷史與偏好全部帶著走。<b>資料只存在瀏覽器</b>，清除網站資料前務必先匯出。<br>
-        <p style="margin:.5em 0" class="hint">進階功能：④ 觀察清單快篩（還沒買的標的排排比）與 📡 KOL 雷達（撈分析師點名股）、⑤ 淨值曲線與 XIRR。看不懂報告裡的名詞？往下看 Q2。</p>
+        <p style="margin:.5em 0"><b style="color:var(--gold)">還沒準備好金鑰？</b>首次開啟時頂部引導卡有「載入範例資料」——一鍵填入範例持倉（台積電、AAPL、一檔公司債）、觀察清單與一份範例 AI 報告，<b>不需任何金鑰</b>就能把五個區塊都看一遍；體驗完按範例橫幅上的「清除範例」即可開始輸入自己的資料。</p>
+        <b>1. 準備金鑰（只需一次）</b>：展開「API 與參數設定」——<b>OpenAI Key</b> 或 <b>Claude Key</b>（AI 分析必填其一，依「AI 思考模型」選的是哪一家）；<b>Twelve Data Key</b>（要追蹤美股才需要，免費註冊）；FinMind／Finnhub／xAI 皆選填（依序強化台股上櫃、美股基本面、KOL 直查）。金鑰只存在你這台裝置的瀏覽器。<br>
+        <b>2. 建立持倉</b>：到「我的持倉」按「＋ 新增持倉」填首筆買進（債券填面額／票息／到期日）。之後的加碼、賣出、股息、股票分割／合併：<b>點該持倉列展開</b>即可補登、修改（美股股息可填預扣稅 %；美股分割會在更新報價或載入走勢圖時自動偵測並提示套用）。<br>
+        <b>3. 更新報價</b>：回「損益總覽」按「更新所有報價」（台股免金鑰、美股走 Twelve Data、匯率自動抓）。<br>
+        <b>4. 產生 AI 分析</b>：到「AI 分析」選標的按「產生個股 AI 分析」（會自動載入一年數據與走勢圖）；或按「產生投資組合總評」看整體配置建議。報告自動保留最近 20 份，可用下拉選單回顧；看完報告有疑問，直接在報告下方「追問 AI」繼續問，回答會接在報告末尾。<br>
+        <b>5. 備份</b>：設定區「匯出 JSON」——持倉、設定、報告歷史與偏好全部帶著走。<b>資料只存在瀏覽器</b>，清除網站資料前務必先匯出。<br>
+        <p style="margin:.5em 0" class="hint">進階功能：觀察清單快篩（還沒買的標的排排比）與 KOL 雷達（撈分析師點名股）、淨值曲線與 XIRR。看不懂報告裡的名詞？往下看 Q2。</p>
       </div>
     </details>
 
@@ -695,7 +707,7 @@
           <li><b>組提示（Prompt）</b>：把算好的數字＋你的持倉成本，組成一份結構化提示交給 AI。</li>
           <li><b>AI 解讀</b>：AI 依固定章節（趨勢／支撐壓力／技術指標／相對大盤／籌碼與基本面／配息／你的持倉評估／風險／操作計畫表／**結論**）撰寫；最新新聞與美股估值由 AI 即時上網查並附來源。</li>
         </ol>
-        <p style="margin:.5em 0"><b>報告會參考的指標：</b>技術面（MA／RSI／MACD／KD／布林通道／ATR／OBV／量比／均量／52週高低）、大盤對照、配息殖利率；台股另加三大法人、外資持股、融資融券、月營收年增、本益比／股價淨值比。每個名詞的白話解釋見下方 ②。</p>
+        <p style="margin:.5em 0"><b>報告會參考的指標：</b>技術面（MA／RSI／MACD／KD／布林通道／ATR／OBV／量比／均量／52週高低）、大盤對照、配息殖利率；台股另加三大法人、外資持股、融資融券、月營收年增、本益比／股價淨值比。每個名詞的白話解釋見下方 Q2。</p>
         <p style="margin:.5em 0;color:var(--gold)">⚠️ 報告僅供參考、不構成投資建議；AI 仍可能出錯，重要決策請自行查證。</p>
       </div>
     </details>
@@ -764,7 +776,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.59.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.60.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1625,7 +1637,7 @@ function expandHTML(p, c) {
           <input id="ex_isin" value="${esc(b.isin || '')}" placeholder="XS2861550817" maxlength="20" style="width:170px">
         </label>
         <span style="flex:1"></span>
-        <button id="ex_delPos" class="danger">🗑 刪除整筆持倉（含所有交易）</button>
+        <button id="ex_delPos" class="danger">刪除整筆持倉（含所有交易）</button>
       </div>`;
   }
   const txs = sortTxs(p.txs);
@@ -1654,7 +1666,7 @@ function expandHTML(p, c) {
   return `${hints}
     <div class="row" style="margin-top:0">
       <span class="hint">現價：<b style="color:var(--text)">${priceTxt}</b>${p.lastDate ? `（${p.lastDate}）` : '（未更新）'}</span>
-      <button id="ex_quoteBtn" class="primary">🔄 更新此檔報價</button>
+      <button id="ex_quoteBtn" class="primary">更新此檔報價</button>
       <span id="ex_qStatus" class="hint" style="margin-top:0"></span>
     </div>
     <div class="tableWrap txTable">
@@ -1677,7 +1689,7 @@ function expandHTML(p, c) {
       <span class="hint ex-sp" style="display:none">1 股變 4 股填 1 → 4；合併或減資 10 股變 1 股填 10 → 1。</span>
       <button id="ex_addTx" class="primary">補登</button>
       <span style="flex:1"></span>
-      <button id="ex_delPos" class="danger">🗑 刪除整筆持倉（含所有交易）</button>
+      <button id="ex_delPos" class="danger">刪除整筆持倉（含所有交易）</button>
     </div>
     <div id="ex_status" class="status"></div>`;
 }
@@ -1990,7 +2002,7 @@ $('aiTarget').addEventListener('change', () => {
 });
 segBind('aiMarket');
 
-// 解析 ③ 目前選定的分析標的；無效時在 fetchStatus 顯示原因並回 null
+// 解析「AI 分析」目前選定的分析標的；無效時在 fetchStatus 顯示原因並回 null
 function resolveAiTarget() {
   const st = $('fetchStatus');
   const tv = $('aiTarget').value;
@@ -2005,7 +2017,7 @@ function resolveAiTarget() {
   if (!pos) { st.className = 'status error'; st.textContent = '請先新增持倉或選擇自行輸入'; return null; }
   return { market: pos.market, symbol: pos.symbol, pos };
 }
-// 載入走勢圖與數據（③ 主資料流）：成功回 true。「產生個股 AI 分析」會在資料未載入或標的變更時自動先呼叫（一鍵分析）
+// 載入走勢圖與數據（「AI 分析」主資料流）：成功回 true。「產生個股 AI 分析」會在資料未載入或標的變更時自動先呼叫（一鍵分析）
 async function loadYearData() {
   const st = $('fetchStatus'); st.className = 'status';
   const t = resolveAiTarget();
@@ -2120,7 +2132,7 @@ function drawChart(hoverIdx = -1) {
   const yAt = v => padT + (priceB - padT) * (1 - (v - lo) / (hi - lo));
 
   ctx.strokeStyle = cssVar('--border'); ctx.fillStyle = cssVar('--muted');
-  ctx.font = '11px -apple-system, "PingFang TC", sans-serif'; ctx.lineWidth = 1;
+  ctx.font = '11px "IBM Plex Mono", ui-monospace, Menlo, "PingFang TC", sans-serif'; ctx.lineWidth = 1;
   for (let s = 0; s <= 5; s++) {
     const v = lo + (hi - lo) * s / 5, y = yAt(v);
     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
@@ -2368,7 +2380,7 @@ function drawPerfChart() {
   const pad = (hi - lo) * 0.06; lo -= pad; hi += pad;
   const xAt = i => padL + (W - padL - padR) * (dates.length === 1 ? .5 : i / (dates.length - 1));
   const yAt = v => padT + (H - padT - padB) * (1 - (v - lo) / (hi - lo));
-  ctx.strokeStyle = cssVar('--border'); ctx.fillStyle = cssVar('--muted'); ctx.font = '11px -apple-system, sans-serif'; ctx.lineWidth = 1;
+  ctx.strokeStyle = cssVar('--border'); ctx.fillStyle = cssVar('--muted'); ctx.font = '11px "IBM Plex Mono", ui-monospace, Menlo, sans-serif'; ctx.lineWidth = 1;
   for (let s = 0; s <= 5; s++) { const v = lo + (hi - lo) * s / 5, y = yAt(v); ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke(); ctx.textAlign = 'right'; ctx.fillText(v.toFixed(0), padL - 6, y + 4); }
   const ticks = Math.min(6, dates.length); ctx.textAlign = 'center';
   for (let s = 0; s < ticks; s++) { const i = Math.round(s * (dates.length - 1) / Math.max(1, ticks - 1)); ctx.fillText(dates[i].slice(2), xAt(i), H - 8); }
@@ -2386,7 +2398,7 @@ function renderWatchlist() {
   if (!box) return;
   const chips = (db.watchlist || []).map(w =>
     `<span class="badge ${w.market}" style="padding:4px 10px">${MKT_NAME[w.market]} <b>${esc(w.symbol)}</b> <button class="ghost" data-wlrm="${w.id}" title="移除" style="border:none;padding:0 2px;color:inherit">✕</button></span>`);
-  if (chips.length >= 2) chips.push('<button class="ghost" data-wlclear title="清空整份觀察清單" style="padding:2px 10px;font-size:.8rem">🗑 全部清除</button>');   // 單檔時個別 ✕ 就夠
+  if (chips.length >= 2) chips.push('<button class="ghost" data-wlclear title="清空整份觀察清單" style="padding:2px 10px;font-size:.8rem">全部清除</button>');   // 單檔時個別 ✕ 就夠
   box.innerHTML = chips.join('');
 }
 // 加入觀察清單（共用：手動輸入與 KOL 雷達 chips 皆走此路）；回傳 null=成功、否則錯誤訊息
@@ -2507,7 +2519,7 @@ function renderWatchTable() {
     const label = `<span class="badge ${r.market}">${MKT_NAME[r.market]}</span> <b>${esc(r.symbol)}</b> ${esc(r.name || '')}`;
     if (r.err) return `<tr><td class="l">${label}</td><td colspan="9" class="l" style="color:var(--muted)">⚠️ ${esc(r.err)}</td><td class="act"></td></tr>`;
     const crossTxt = r.cross && r.cross.daysAgo <= 15
-      ? `${r.cross.dir > 0 ? '⭐黃金' : '☠死亡'}${r.cross.daysAgo === 0 ? '（今日）' : `（${r.cross.daysAgo}日前）`}` : '—';
+      ? `${r.cross.dir > 0 ? '黃金' : '死亡'}${r.cross.daysAgo === 0 ? '（今日）' : `（${r.cross.daysAgo}日前）`}` : '—';
     const rsiCls = r.rsi == null ? '' : r.rsi >= 70 ? 'pos' : r.rsi <= 30 ? 'neg' : '';
     const momTxt = r.hist == null ? '—' : `${fnum(r.hist)}${r.hist5 == null ? '' : r.hist > r.hist5 ? ' ↑' : r.hist < r.hist5 ? ' ↓' : ' →'}`;
     return `<tr><td class="l">${label}</td>` +
@@ -2516,7 +2528,7 @@ function renderWatchTable() {
       `<td class="l">${r.trend}</td><td class="l">${crossTxt}</td>` +
       `<td class="${rsiCls}">${fnum(r.rsi)}</td><td>${momTxt}</td><td>${fnum(r.volRatio)}</td>` +
       `<td>${fmtPct(r.offHigh)}</td>` +
-      `<td class="l"><button class="ghost" data-wldeep="${r.id}" title="帶入上方 ③ 抓資料，可接著產生完整個股分析">📊 深入</button></td></tr>`;
+      `<td class="l"><button class="ghost" data-wldeep="${r.id}" title="帶入上方「AI 分析」抓資料，可接著產生完整個股分析">深入</button></td></tr>`;
   }).join('');
   updateTableShadows();
 }
@@ -2528,7 +2540,7 @@ $('wlWrap').addEventListener('click', e => {
   wlSort = wlSort.key === key ? { key, dir: -wlSort.dir } : { key, dir: -1 };
   renderWatchTable();
 });
-// 「深入」：把該檔帶入 ③ 的手動輸入並自動抓一年資料，接著即可產生完整 AI 個股分析
+// 「深入」：把該檔帶入「AI 分析」的手動輸入並自動抓一年資料，接著即可產生完整 AI 個股分析
 $('wlBody').addEventListener('click', e => {
   const b = e.target.closest('[data-wldeep]');
   if (!b) return;
@@ -2569,22 +2581,22 @@ ${profileBlock}
 }
 $('wlAiBtn').addEventListener('click', async () => {
   const st = $('wlStatus'); st.className = 'status';
-  if (!watchData || !watchData.rows.some(r => !r.err)) { st.className = 'status error'; st.textContent = '請先「🔍 快篩全部」取得數據'; return; }
+  if (!watchData || !watchData.rows.some(r => !r.err)) { st.className = 'status error'; st.textContent = '請先「快篩全部」取得數據'; return; }
   $('wlAiBtn').disabled = true; $('wlScanBtn').disabled = true;
   try {
     const prompt = buildWatchPrompt();
     const { text, model, truncated, usageText } = await runAI(prompt, st, { outEl: $('wsOutput') });
     const pv = personaOf(selectedPersona());   // 快篩不用三師會診 → 只有單一/自訂視角才標註
     setPanelReport('ws', `觀察清單快篩總評${pv ? `（${pv.name}）` : ''}`, model, text, '觀察清單快篩', usageText, prompt);
-    st.textContent = (truncated ? `⚠️ 報告被截斷（${truncated}），建議調低推理深度重試。` : `✅ 快篩總評完成（報告顯示於下方面板，已存入 ③ 的報告歷史——可與 ③ 的個股分析同時對照）`) + usageTail(usageText);
+    st.textContent = (truncated ? `⚠️ 報告被截斷（${truncated}），建議調低推理深度重試。` : `✅ 快篩總評完成（報告顯示於下方面板，已存入「AI 分析」的報告歷史——可與「AI 分析」的個股分析同時對照）`) + usageTail(usageText);
   } catch (e) { st.className = 'status error'; st.textContent = '❌ ' + e.message; }
   finally { $('wlAiBtn').disabled = false; $('wlScanBtn').disabled = false; }
 });
 $('wlCopyBtn').addEventListener('click', async () => {
   const st = $('wlStatus'); st.className = 'status';
-  if (!watchData || !watchData.rows.some(r => !r.err)) { st.className = 'status error'; st.textContent = '請先「🔍 快篩全部」取得數據'; return; }
+  if (!watchData || !watchData.rows.some(r => !r.err)) { st.className = 'status error'; st.textContent = '請先「快篩全部」取得數據'; return; }
   const ok = await copyText(buildWatchPrompt());
-  flashBtn('wlCopyBtn', '📋 複製快篩 Prompt', ok);
+  flashBtn('wlCopyBtn', '複製快篩 Prompt', ok);
   if (ok) st.textContent = '✅ 快篩 Prompt 已複製，可貼到 Gemini 等聊天機器人';
 });
 
@@ -2722,7 +2734,7 @@ $('kolSearchBtn').addEventListener('click', async () => {
   const market = segVal('kolMarket') || 'us', days = kolDaysSel();
   $('kolSearchBtn').disabled = true; $('kolGrokBtn').disabled = true;
   try {
-    // 雷達必開 web search（本功能的本質就是搜尋），不受 ③ 的勾選影響
+    // 雷達必開 web search（本功能的本質就是搜尋），不受「AI 分析」的勾選影響
     const prompt = buildKolPrompt(name, market, days);
     const { text, model, usageText } = await runAI(prompt, st, { webSearch: true, outEl: $('kolOutput') });
     setPanelReport('kol', `KOL 選股雷達 — ${name}（近 ${days} 天）`, model, text, 'KOL選股雷達', usageText, prompt);
@@ -2751,7 +2763,7 @@ $('kolGrokBtn').addEventListener('click', async () => {
     kolFound = parseTickerLine(text).map(s => ({ symbol: s, market }));
     renderKolChips();
     st.textContent = (kolFound.length
-      ? `✅ Grok 直查完成：@${handle} 近 ${days} 天主要點名 ${kolFound.length} 檔（完整表格與貼文連結見下方報告，不會蓋掉 ③ 的分析）`
+      ? `✅ Grok 直查完成：@${handle} 近 ${days} 天主要點名 ${kolFound.length} 檔（完整表格與貼文連結見下方報告，不會蓋掉「AI 分析」的分析）`
       : `✅ Grok 直查完成：未解析到代號清單——可能期間內無主要點名，詳見下方報告`) + usageTail(usageText);
   } catch (e) { st.className = 'status error'; st.textContent = '❌ ' + e.message; }
   finally { $('kolGrokBtn').disabled = false; $('kolSearchBtn').disabled = false; }
@@ -3185,7 +3197,7 @@ async function runGrok(prompt, tools, statusEl, outEl) {
   const key = (db.settings.xaiKey || '').trim();
   if (!key) throwKeyError('xaiKey', 'Grok 直查需要 xAI API Key');
   const model = $('searchModelSel').value || 'grok-4.3';
-  const out = outEl || $('aiOutput');   // ④ 的面板（快篩總評／KOL 雷達）自帶輸出區，不佔用 ③
+  const out = outEl || $('aiOutput');   //「觀察清單」的面板（快篩總評／KOL 雷達）自帶輸出區，不佔用「AI 分析」
   out.style.display = 'block'; out.innerHTML = '';
   if (!outEl) { $('aiMeta').style.display = 'none'; $('fuBox').style.display = 'none'; }
   scrollToPanel(out);   // 輸出面板可能在按鈕下方很遠處（尤其手機）——開始產生時帶進視野
@@ -3194,7 +3206,7 @@ async function runGrok(prompt, tools, statusEl, outEl) {
   const tick = () => {
     const s = Math.round((performance.now() - t0) / 1000);
     statusEl.className = 'status';
-    statusEl.innerHTML = `<span class="spinner"></span>⚡ ${esc(phase)}<span class="working-dots"></span>　已 ${s}s` +
+    statusEl.innerHTML = `<span class="spinner"></span>${esc(phase)}<span class="working-dots"></span>　已 ${s}s` +
       (chars ? `　·　已產生 ${chars} 字` : '');
   };
   tick();
@@ -3248,9 +3260,9 @@ async function runAI(prompt, statusEl, opts) {
     else localStorage.removeItem('twbt_apikey');
   }
   const atts = (opts && opts.attachments) || [];   // 追問 AI 的附件（圖片／PDF；文字檔已內嵌 prompt）
-  const out = (opts && opts.outEl) || $('aiOutput');   // 可指定輸出區（④ 的快篩總評／KOL 雷達寫進自己的面板，不佔用 ③）
+  const out = (opts && opts.outEl) || $('aiOutput');   // 可指定輸出區（「觀察清單」的快篩總評／KOL 雷達寫進自己的面板，不佔用「AI 分析」）
   out.style.display = 'block'; out.innerHTML = '';
-  if (!opts || !opts.outEl) { $('aiMeta').style.display = 'none'; $('fuBox').style.display = 'none'; }   // 寫 ③ 時才收起上一份的時間戳、按鈕與追問區
+  if (!opts || !opts.outEl) { $('aiMeta').style.display = 'none'; $('fuBox').style.display = 'none'; }   // 寫「AI 分析」時才收起上一份的時間戳、按鈕與追問區
   scrollToPanel(out);   // 輸出面板可能在按鈕下方很遠處（尤其手機）——開始產生時帶進視野
 
   // ── 作業中動畫：轉圈 + 經過秒數 + 階段（思考中→撰寫中），讓使用者確知 AI 仍在運作 ──
@@ -3259,7 +3271,7 @@ async function runAI(prompt, statusEl, opts) {
   const tick = () => {
     const s = Math.round((performance.now() - t0) / 1000);
     statusEl.className = 'status';
-    statusEl.innerHTML = `<span class="spinner"></span>🤖 ${esc(phase)}<span class="working-dots"></span>　已 ${s}s` +
+    statusEl.innerHTML = `<span class="spinner"></span>${esc(phase)}<span class="working-dots"></span>　已 ${s}s` +
       (chars ? `　·　已產生 ${chars} 字` : (thinkChars ? `　·　已思考 ${thinkChars} 字` : ''));
   };
   tick();
@@ -3742,20 +3754,20 @@ async function flashBtn(id, label, ok) {
 }
 $('copyStockPrompt').addEventListener('click', async () => {
   const st = $('aiStatus'); st.className = 'status';
-  if (!aiData) { st.className = 'status error'; st.textContent = '請先「📊 載入走勢圖與數據」再複製個股 Prompt'; return; }
+  if (!aiData) { st.className = 'status error'; st.textContent = '請先「載入走勢圖與數據」再複製個股 Prompt'; return; }
   const ok = await copyText(buildStockPrompt());
-  flashBtn('copyStockPrompt', '📋 複製個股 Prompt', ok);
+  flashBtn('copyStockPrompt', '複製個股 Prompt', ok);
   if (ok) st.textContent = '✅ 個股 Prompt 已複製，可貼到 Gemini 等聊天機器人（新聞／美股基本面需該機器人能上網查詢）';
 });
 $('copyPfPrompt').addEventListener('click', async () => {
   const st = $('aiStatus'); st.className = 'status';
   if (!db.positions.length) { st.className = 'status error'; st.textContent = '尚無持倉'; return; }
   if (db.positions.some(p => p.market !== 'bond' && p.lastPrice == null)) {
-    st.className = 'status error'; st.textContent = '請先「🔄 更新所有報價」再複製組合 Prompt'; return;
+    st.className = 'status error'; st.textContent = '請先「更新所有報價」再複製組合 Prompt'; return;
   }
   await ensureFX(false);
   const ok = await copyText(buildPortfolioPrompt());
-  flashBtn('copyPfPrompt', '📋 複製組合 Prompt', ok);
+  flashBtn('copyPfPrompt', '複製組合 Prompt', ok);
   if (ok) st.textContent = '✅ 投資組合 Prompt 已複製，可貼到其他聊天機器人';
 });
 
@@ -3764,7 +3776,7 @@ const REPORTS_KEY = 'twpf_reports', REPORTS_MAX = 20;
 let reportHist = [];   // [{id, ts, title, filename, fullText, srcPrompt?}] 新的在前；srcPrompt＝產生報告時送出的 Prompt（供「追問 AI」拿原始數據）
 try { const _r = JSON.parse(localStorage.getItem(REPORTS_KEY) || '[]'); if (Array.isArray(_r)) reportHist = _r; } catch (_) {}
 let lastReport = null;   // { fullText, filename }（複製／下載按鈕的目標＝目前顯示中的報告）
-let lastShownId = null;  // ③ 目前顯示中的報告 id（雷達報告寫入歷史後，用來還原下拉選單的選取）
+let lastShownId = null;  //「AI 分析」目前顯示中的報告 id（雷達報告寫入歷史後，用來還原下拉選單的選取）
 function nowStamp() {
   const d = new Date(), p = n => String(n).padStart(2, '0');
   return { date: isoD(d), full: `${isoD(d)} ${p(d.getHours())}:${p(d.getMinutes())}` };
@@ -3789,13 +3801,13 @@ function showReport(r) {
   $('aiOutput').innerHTML = mdToHtml(r.fullText);
   $('aiOutput').style.display = 'block';
   const nq = fuCount(r.fullText);
-  $('aiMetaText').textContent = `📄 產生於 ${r.ts}` + (nq ? `　·　含 ${nq} 則追問` : '');
+  $('aiMetaText').textContent = `產生於 ${r.ts}` + (nq ? `　·　含 ${nq} 則追問` : '');
   $('aiMeta').style.display = 'flex';
   $('histSel').value = r.id;
   renderFuBox(r);
 }
-// ④ 面板報告（ws＝快篩總評、kol＝KOL 雷達）：存入歷史（可由 ③ 下拉切換），但顯示在各自面板內——
-// 不搶 ③ 的畫面，讓快篩總評、雷達點名清單與 ③ 的個股分析可以同時對照著看
+//「觀察清單」面板報告（ws＝快篩總評、kol＝KOL 雷達）：存入歷史（可由「AI 分析」下拉切換），但顯示在各自面板內——
+// 不搶「AI 分析」的畫面，讓快篩總評、雷達點名清單與「AI 分析」的個股分析可以同時對照著看
 const panelLast = { ws: null, kol: null };
 // 報告開頭：時間戳＋模型＋（API 有回報時）tokens 用量與估算費用＋工具版本——畫面顯示、複製、下載、歷史四者一致
 function reportHeader(title, model, ts, usageText) {
@@ -3809,14 +3821,14 @@ function setPanelReport(prefix, title, model, markdown, filenameBase, usageText,
   if (reportHist.length > REPORTS_MAX) reportHist.length = REPORTS_MAX;
   saveReports();
   renderHistSel();
-  if (lastShownId) $('histSel').value = lastShownId;   // ③ 的顯示與下拉選取維持原樣
+  if (lastShownId) $('histSel').value = lastShownId;   //「AI 分析」的顯示與下拉選取維持原樣
   panelLast[prefix] = entry;
   $(prefix + 'Output').innerHTML = mdToHtml(entry.fullText);
   $(prefix + 'Output').style.display = 'block';
-  $(prefix + 'MetaText').textContent = `📄 產生於 ${ts.full}（已存入 ③ 的報告歷史）`;
+  $(prefix + 'MetaText').textContent = `產生於 ${ts.full}（已存入「AI 分析」的報告歷史）`;
   $(prefix + 'Meta').style.display = 'flex';
 }
-function downloadText(filename, text) {   // 共用下載（③ 報告與 ④ 的快篩總評／雷達報告）
+function downloadText(filename, text) {   // 共用下載（「AI 分析」報告與「觀察清單」的快篩總評／雷達報告）
   const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -3830,7 +3842,7 @@ for (const pfx of ['ws', 'kol']) {
     if (!entry) return;
     const ok = await copyText(entry.fullText), b = $(pfx + 'CopyBtn');
     b.textContent = ok ? '✓ 已複製' : '✗ 複製失敗';
-    setTimeout(() => b.textContent = '📋 複製報告', 1500);
+    setTimeout(() => b.textContent = '複製報告', 1500);
   });
   $(pfx + 'DlBtn').addEventListener('click', () => { const entry = panelLast[pfx]; if (entry) downloadText(entry.filename, entry.fullText); });
 }
@@ -3863,11 +3875,11 @@ $('aiCopyBtn').addEventListener('click', async () => {
   if (!lastReport) return;
   const ok = await copyText(lastReport.fullText), b = $('aiCopyBtn');
   b.textContent = ok ? '✓ 已複製' : '✗ 複製失敗';
-  setTimeout(() => b.textContent = '📋 複製報告', 1500);
+  setTimeout(() => b.textContent = '複製報告', 1500);
 });
 $('aiDownloadBtn').addEventListener('click', () => { if (lastReport) downloadText(lastReport.filename, lastReport.fullText); });
 
-/* ── 追問 AI：就 ③ 目前顯示中的報告再問 AI。回答接在報告末尾（標題帶問題、引言列時間戳／模型／用量），
+/* ── 追問 AI：就「AI 分析」目前顯示中的報告再問 AI。回答接在報告末尾（標題帶問題、引言列時間戳／模型／用量），
    與報告一併存入歷史、複製、下載；多輪追問累積成同一份報告的問答串，下一輪追問會連同先前問答一起給 AI ── */
 const FU_RE = /^## 💬 追問 (\d+)/gm;
 function fuCount(fullText) { return ((fullText || '').match(FU_RE) || []).length; }
@@ -3945,7 +3957,7 @@ const FU_CHIPS = {
 };
 function fuKind(entry) { return entry.symbol ? 'stock' : /投資組合/.test(entry.title || '') ? 'portfolio' : 'other'; }
 let fuFiles = [];   // 待送出的附件 [{ name, kind, size, dataUrl?|text? }]；送出成功後清空，切換報告時保留
-const fuIcon = k => k === 'image' ? '🖼️' : k === 'pdf' ? '📄' : '📝';
+const fuIcon = k => k === 'image' ? '🖼️' : k === 'pdf' ? '' : '📝';
 function renderFuFiles() {
   $('fuFiles').innerHTML = fuFiles.map((f, i) =>
     `<span title="${esc(f.name)}">${fuIcon(f.kind)} ${esc(f.name)} <small>${fuSizeLabel(f.size)}</small><button type="button" data-rm="${i}" title="移除">✕</button></span>`).join('');
@@ -3961,7 +3973,7 @@ async function addFuFiles(list) {
   renderFuFiles();
   st.className = errs.length ? 'status error' : 'status';
   st.textContent = errs.length ? '⚠️ ' + errs.join('；')
-    : (fuFiles.length ? `📎 已附加 ${fuFiles.length} 個檔案（隨追問送給 AI 閱讀；不存入歷史，只記檔名）` : '');
+    : (fuFiles.length ? `已附加 ${fuFiles.length} 個檔案（隨追問送給 AI 閱讀；不存入歷史，只記檔名）` : '');
 }
 $('fuAttachBtn').addEventListener('click', () => $('fuFile').click());
 $('fuFile').addEventListener('change', () => { addFuFiles($('fuFile').files); $('fuFile').value = ''; });
@@ -3972,7 +3984,7 @@ const fuAskBox = document.querySelector('#fuBox .fuAsk');   // 拖放到整個�
 ['dragleave', 'drop'].forEach(ev => fuAskBox.addEventListener(ev, e => { e.preventDefault(); fuAskBox.classList.remove('dragover'); }));
 fuAskBox.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files.length) addFuFiles(e.dataTransfer.files); });
 function fuEntry() { return reportHist.find(r => r.id === lastShownId) || null; }   // 目前顯示中的報告（可能已被歷史擠掉 → null）
-function setAiBusy(b) { for (const id of ['aiBtn', 'pfBtn', 'fuBtn']) $(id).disabled = b; }   // ③ 的三顆 AI 按鈕同進退
+function setAiBusy(b) { for (const id of ['aiBtn', 'pfBtn', 'fuBtn']) $(id).disabled = b; }   //「AI 分析」的三顆 AI 按鈕同進退
 // showReport 時呼叫：範例報告不給追問（虛構數據）；其餘依類型換快速追問、收起上一輪的即時輸出與狀態
 function renderFuBox(r) {
   const box = $('fuBox');
@@ -3996,7 +4008,7 @@ async function askFollowup() {
   setAiBusy(true);
   const n = fuCount(entry.fullText) + 1;
   const files = fuFiles.slice(), binaries = files.filter(f => f.kind !== 'text');   // 送出當下的附件快照；文字檔內嵌 prompt、圖片／PDF 夾在請求
-  $('fuLiveQ').textContent = `💬 追問 ${n}：${q}` + (files.length ? `　📎 ${files.length} 個附件` : '');
+  $('fuLiveQ').textContent = `追問 ${n}：${q}` + (files.length ? `　${files.length} 個附件` : '');
   $('fuLive').style.display = 'block';   // 即時回答區：緊接在報告下方，完成後併入報告原地呈現
   try {
     const { text, model, truncated, usageText } = await runAI(buildFollowupPrompt(entry, q, files), st, { webSearch: $('webSearchChk').checked, outEl: $('fuOutput'), attachments: binaries });
@@ -4023,7 +4035,7 @@ $('fuCopyBtn').addEventListener('click', async () => {
   if (!q) { st.className = 'status error'; st.textContent = '請先輸入要追問的問題'; $('fuInput').focus(); return; }
   if (!entry) { st.className = 'status error'; st.textContent = '找不到目前顯示中的報告'; return; }
   const ok = await copyText(buildFollowupPrompt(entry, q, fuFiles));
-  flashBtn('fuCopyBtn', '📋 複製追問 Prompt', ok);
+  flashBtn('fuCopyBtn', '複製追問 Prompt', ok);
   if (ok) st.textContent = '✅ 追問 Prompt 已複製（含報告全文、原始數據與文字附件），可貼到 Gemini 等聊天機器人' +
     (fuFiles.some(f => f.kind !== 'text') ? '；圖片／PDF 無法隨文字複製，請在該機器人另行上傳' : '');
 });
@@ -4208,7 +4220,7 @@ function bindSettings() {
   $$('.eye').forEach(btn => btn.addEventListener('click', () => {
     const inp = $(btn.dataset.eye), show = inp.type === 'password';
     inp.type = show ? 'text' : 'password';
-    btn.textContent = show ? '🙈' : '👁';
+    btn.textContent = show ? '隱藏' : '顯示';
     btn.title = show ? '隱藏' : '顯示';
   }));
   // 防瀏覽器／密碼管理員把同一組已存密碼自動填到所有金鑰欄位（例如把 OpenAI key 填進 Twelve Data 欄）：
@@ -4258,7 +4270,7 @@ function demoReport() {
 
 ---
 
-> 🎬 **這是內建範例報告**：內容為虛構示意，讓你在填 API 金鑰之前先看到「AI 分析報告長什麼樣子」。實際報告由 AI 依即時抓取的價量、籌碼、基本面與新聞產生，章節更完整（含大盤對照、配息、上次建議檢討等十章）。
+> **這是內建範例報告**：內容為虛構示意，讓你在填 API 金鑰之前先看到「AI 分析報告長什麼樣子」。實際報告由 AI 依即時抓取的價量、籌碼、基本面與新聞產生，章節更完整（含大盤對照、配息、上次建議檢討等十章）。
 
 ## 1. 趨勢判讀
 
@@ -4402,8 +4414,8 @@ function restorePrefsUI() {
   navSc.addEventListener('scroll', updateNavFade, { passive: true });
   window.addEventListener('resize', updateNavFade);
   updateNavFade();
-  // ③ 的操作提示（一開始操作就會被正常狀態訊息取代）
-  $('fetchStatus').textContent = '提示：選好「分析標的」後直接按「🤖 產生個股 AI 分析」即可（會自動載入數據）；想先看走勢圖可按「📊 載入走勢圖與數據」。';
+  //「AI 分析」的操作提示（一開始操作就會被正常狀態訊息取代）
+  $('fetchStatus').textContent = '提示：選好「分析標的」後直接按「產生個股 AI 分析」即可（會自動載入數據）；想先看走勢圖可按「載入走勢圖與數據」。';
   renderAll();
   renderCostBox();   // AI 花費統計（本月合計顯示在摺疊標題）
   $('costMonthSel').addEventListener('change', renderCostBox);
