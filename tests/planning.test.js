@@ -124,5 +124,36 @@ const near = (a, b, e = 1e-6) => Math.abs(a - b) < e;
   check('normTargets：缺值／負值／非數字用預設', JSON.stringify(normTargets({ tw: 70, us: -5, bond: 'x' })) === JSON.stringify({ tw: 70, us: 25, bond: 15 }) && JSON.stringify(normTargets(undefined)) === JSON.stringify(REB_DEFAULT));
 }
 
+// ── 稅務／二代健保試算 ──
+{
+  const { taxEstimate, normTax, TAX_DEFAULT, TAX_LABELS } = T;
+  check('預設參數：2.11%／2 萬／1,000 萬／8.5%／8 萬／28%／100 萬／750 萬／20%', JSON.stringify(TAX_DEFAULT) ===
+    JSON.stringify({ nhiRate: 2.11, nhiMin: 20000, nhiMax: 10000000, creditRate: 8.5, creditCap: 80000, sepRate: 28, osThreshold: 1000000, amtExempt: 7500000, amtRate: 20 }));
+  check('每個參數都有中文標籤', Object.keys(TAX_DEFAULT).every(k => TAX_LABELS[k]));
+  let r = taxEstimate({ twDivs: [4500], osDiv: 0, osInterest: 6175, osGain: 0, marginalRate: null });
+  check('單筆未達 2 萬 → 補充保費 0', r.twDivTotal === 4500 && r.nhi === 0 && r.nhiCount === 0);
+  check('合併抵減 8.5% ＝ 382.5、分開 28% ＝ 1,260', near(r.credit, 382.5) && near(r.sepTax, 1260));
+  check('未填綜所稅率 → 不下結論', r.combineTax === null && r.better === null);
+  check('海外所得未達 100 萬 → 免計入', r.osTotal === 6175 && r.osReport === false);
+  r = taxEstimate({ twDivs: [20000, 19999, 100000], marginalRate: 12 });
+  check('補充保費逐筆計：只有達 2 萬的兩筆（422 + 2,110）', r.nhi === 422 + 2110 && r.nhiCount === 2 && r.twDivCount === 3);
+  check('稅率 12%：合併 = 股利 × 12% − 抵減，較有利', near(r.combineTax, 139999 * 0.12 - 139999 * 0.085) && r.better === 'combine');
+  r = taxEstimate({ twDivs: [2000000], marginalRate: 40 });
+  check('抵減上限 8 萬', r.credit === 80000);
+  check('高稅率大額股利 → 分開計稅較有利', near(r.combineTax, 800000 - 80000) && near(r.sepTax, 560000) && r.better === 'separate');
+  r = taxEstimate({ twDivs: [50000], marginalRate: 5 });
+  check('低稅率：抵減大於稅額 → 合併計稅為負（退稅）', r.combineTax < 0 && r.better === 'combine');
+  r = taxEstimate({ twDivs: [20000000] });
+  check('補充保費單次上限 1,000 萬', r.nhi === Math.round(10000000 * 0.0211));
+  r = taxEstimate({ osDiv: 300000, osInterest: 200000, osGain: 600000 });
+  check('海外所得合計達 100 萬 → 需計入', r.osTotal === 1100000 && r.osReport === true && r.osOverExempt === false);
+  r = taxEstimate({ osDiv: 300000, osInterest: 200000, osGain: -900000 });
+  check('海外交易損失不抵股息與債息', r.osGain === 0 && r.osTotal === 500000 && r.osReport === false);
+  r = taxEstimate({ twDivs: [30000], params: { nhiRate: 3, nhiMin: 50000, creditRate: 10 } });
+  check('參數可調：費率、門檻、抵減率', r.nhi === 0 && near(r.credit, 3000));
+  check('normTax：缺值／負值／空字串用預設', normTax({ nhiRate: -1, sepRate: '', creditCap: 90000 }).nhiRate === 2.11 && normTax({ sepRate: '' }).sepRate === 28 && normTax({ creditCap: 90000 }).creditCap === 90000);
+  check('沒有任何資料 → 全為 0', (() => { const z = taxEstimate({}); return z.twDivTotal === 0 && z.nhi === 0 && z.osTotal === 0 && z.better === null; })());
+}
+
 console.log(`\nplanning: ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

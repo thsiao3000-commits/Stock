@@ -5,7 +5,7 @@ const i = html.indexOf('function sortTxs(');
 const j = html.indexOf('function couponDates(', i);
 if (i < 0 || j < 0) throw new Error('extract failed: split engine');
 const api = new Function('db', html.slice(i, j) +
-  'return { sortTxs, splitRatio, splitFactorAfter, sharesOnAdj, adjustDaysForSplits, ratioToFraction, detectSplits, pendingSplits, netDividend, txLabel, computeStock };'
+  'return { sortTxs, splitRatio, splitFactorAfter, sharesOnAdj, adjustDaysForSplits, ratioToFraction, detectSplits, pendingSplits, netDividend, txLabel, computeStock, realizedByYear };'
 )({ settings: { twFee: 0.1425, twTax: 0.3 } });
 const { sortTxs, splitFactorAfter, sharesOnAdj, adjustDaysForSplits, ratioToFraction, detectSplits, pendingSplits, netDividend, txLabel, computeStock } = api;
 
@@ -117,6 +117,23 @@ check('pendingSplits：只留買進之後的分割', pendingSplits(pos).length =
 check('pendingSplits：已略過不再提示', pendingSplits({ ...pos, splitSkip: ['2024-06-10'] }).length === 0);
 check('pendingSplits：已登錄（日期相差 5 天內）不再提示', pendingSplits({ ...pos, txs: [...pos.txs, { type: 'split', date: '2024-06-07', from: 1, to: 10 }] }).length === 0);
 check('pendingSplits：沒有買進或沒有提示 → 空', pendingSplits({ txs: [] }).length === 0 && pendingSplits({ txs: pos.txs }).length === 0);
+
+// ── 各年度已實現損益（稅務試算用）──
+{
+  const { realizedByYear } = api;
+  const txs2 = [
+    { type: 'buy', date: '2025-01-05', price: 100, qty: 10, fee: 0 },
+    { type: 'sell', date: '2025-06-01', price: 120, qty: 4, fee: 2 },
+    { type: 'split', date: '2026-03-01', from: 1, to: 2 },
+    { type: 'sell', date: '2026-04-01', price: 70, qty: 6, fee: 0 },
+    { type: 'sell', date: '2026-09-01', price: 40, qty: 6, fee: 0 },
+  ];
+  const by = realizedByYear(txs2);
+  check('realizedByYear：2025 ＝ 4×(120−100)−2', near(by['2025'], 78));
+  check('realizedByYear：2026 分割後以新均價 50 計（6×20 − 6×10）', near(by['2026'], 60));
+  check('realizedByYear 各年合計＝computeStock 的已實現損益', near(by['2025'] + by['2026'], computeStock({ market: 'us', txs: txs2 }).realized));
+  check('沒有賣出 → 空物件', Object.keys(realizedByYear([{ type: 'buy', date: '2026-01-01', price: 1, qty: 1 }])).length === 0);
+}
 
 console.log(`\nsplit: ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

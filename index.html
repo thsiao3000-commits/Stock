@@ -709,6 +709,12 @@
     <div id="rebNote" class="hint" style="margin-top:6px"></div>
     <div class="hint" style="margin-top:6px; line-height:1.7">以換算台幣的市值計。目標比例自訂並隨 JSON 備份；改過目標後，試算結果會一併寫進「投資組合總評」的 Prompt。</div>
   </section>
+  <!-- ── 稅務／二代健保試算 ── -->
+  <section id="taxBox">
+    <h2>稅務／二代健保試算 <select id="taxYear" style="font-size:.82rem; padding:4px 8px; vertical-align:middle" aria-label="年度"></select></h2>
+    <div id="taxList"></div>
+    <div class="hint" style="margin-top:10px; line-height:1.7">依已補登的股息與已實現損益估算；門檻以「申報戶」計，這裡只看得到本工具裡的資料。外幣以目前匯率換算（實際以給付日匯率為準）；台股證券交易所得停徵，不列入。費率與門檻可在「設定」的「稅務試算參數」調整，以當年度財政部、健保署公告為準；僅供參考，不構成稅務建議。</div>
+  </section>
   </div>
   </div>
   </div>
@@ -794,6 +800,16 @@
     </div>
     <div class="hint" style="margin-top:2px">web search 由所選 AI 模型的供應商（OpenAI 或 Claude）即時搜尋並附來源；會多一筆搜尋費用（每次搜尋 US$0.01，另加搜尋內容的 tokens；已計入用量標示與花費統計）、也稍慢。不需要時可取消勾選。</div>
     <div class="hint" style="margin-top:2px">金鑰儲存方式：Twelve Data／FinMind／Finnhub／xAI／Claude 金鑰輸入後即<b>自動儲存</b>；OpenAI Key 則由上方勾選決定。所有金鑰都<b>只存在你這台裝置的瀏覽器（localStorage）</b>，本工具純前端、不會把金鑰上傳到任何伺服器；「匯出 JSON」預設也不含金鑰（可勾選包含）。</div>
+    <details class="hintFold" id="taxParamsBox" style="margin:10px 0">
+      <summary>稅務試算參數（每年請對照財政部與健保署公告；預設值查證於 2026-11-11）</summary>
+      <div class="grid" id="taxParams"></div>
+      <div class="grid">
+        <label class="field">綜所稅稅率（選填；填了才會比較股利合併或分開計稅哪個有利）
+          <select id="taxRate"><option value="">未填</option><option value="0">0%（免稅）</option><option value="5">5%</option><option value="12">12%</option><option value="20">20%</option><option value="30">30%</option><option value="40">40%</option></select>
+        </label>
+        <label class="field">&nbsp;<button id="taxResetBtn" class="ghost" type="button">參數恢復預設值</button></label>
+      </div>
+    </details>
     <div class="row" style="margin-top:6px">
       <span class="hint">資料備份：</span>
       <button id="exportBtn" class="ghost">匯出 JSON</button>
@@ -928,7 +944,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v2.3.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v2.4.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1641,6 +1657,38 @@ function rebalance(cur, targets, noSell) {
   for (const r of rows) { const d = base * r.tgtPct / 100 - r.cur; r.delta = Math.abs(d) < 0.5 ? 0 : d; }
   return { ok: true, reason: '', total, sumT, newCash, rows };
 }
+// ── 稅務／二代健保試算 ──
+// 預設值查證於 2026-11-11：補充保費 2.11%、單筆達 2 萬起扣、單次上限 1,000 萬（年度結算改革已暫緩）；
+// 股利合併計稅抵減 8.5%、每戶上限 8 萬，或 28% 分開計稅；海外所得每戶達 100 萬計入基本所得額、
+// 基本所得額免稅額 750 萬（115 年度公告）、稅率 20%。每年請對照財政部與健保署公告，可在設定調整。
+const TAX_DEFAULT = { nhiRate: 2.11, nhiMin: 20000, nhiMax: 10000000, creditRate: 8.5, creditCap: 80000, sepRate: 28, osThreshold: 1000000, amtExempt: 7500000, amtRate: 20 };
+const TAX_LABELS = {
+  nhiRate: '補充保費費率 %', nhiMin: '補充保費起扣金額（單筆）', nhiMax: '補充保費單次計費上限',
+  creditRate: '股利可抵減稅額比率 %', creditCap: '股利可抵減稅額上限（每戶）', sepRate: '股利分開計稅稅率 %',
+  osThreshold: '海外所得計入門檻（每戶）', amtExempt: '基本所得額免稅額', amtRate: '基本稅額稅率 %',
+};
+function normTax(p) {
+  const o = {};
+  for (const k of Object.keys(TAX_DEFAULT)) { const v = p && p[k] !== '' && p[k] != null ? Number(p[k]) : NaN; o[k] = Number.isFinite(v) && v >= 0 ? v : TAX_DEFAULT[k]; }
+  return o;
+}
+// twDivs：該年度每筆台股現金股利（稅前）；osDiv／osInterest／osGain：海外股息、債息、已實現價差（台幣）
+// marginalRate：綜所稅稅率 %（null＝未填，不下結論）
+function taxEstimate({ twDivs, osDiv, osInterest, osGain, marginalRate, params }) {
+  const p = normTax(params), divs = (twDivs || []).filter(v => v > 0);
+  const twDivTotal = divs.reduce((s, v) => s + v, 0);
+  const charged = divs.filter(v => v >= p.nhiMin);
+  const nhi = charged.reduce((s, v) => s + Math.round(Math.min(v, p.nhiMax) * p.nhiRate / 100), 0);
+  const credit = Math.min(twDivTotal * p.creditRate / 100, p.creditCap);
+  const sepTax = twDivTotal * p.sepRate / 100;
+  const hasRate = marginalRate != null && marginalRate !== '' && Number.isFinite(+marginalRate);
+  const combineTax = hasRate ? twDivTotal * (+marginalRate) / 100 - credit : null;   // 負數＝可退稅
+  const better = !hasRate || !twDivTotal ? null : (combineTax <= sepTax ? 'combine' : 'separate');
+  const gain = Math.max(0, +osGain || 0);   // 海外財產交易損失只能抵同年度的交易所得，不能抵股息與債息
+  const osTotal = (+osDiv || 0) + (+osInterest || 0) + gain;
+  return { params: p, twDivTotal, twDivCount: divs.length, nhi, nhiCount: charged.length, credit, sepTax, combineTax, better,
+    osDiv: +osDiv || 0, osInterest: +osInterest || 0, osGain: gain, osTotal, osReport: osTotal >= p.osThreshold, osOverExempt: osTotal > p.amtExempt };
+}
 /* ════════════════ 規劃工具結束 ════════════════ */
 
 /* ════════════════ 損益引擎（加權平均成本法） ════════════════ */
@@ -1720,6 +1768,20 @@ function txLabel(t) {
   if (t.type === 'sell') return '賣出';
   if (t.type === 'split') return `${t.to < t.from ? '合併' : '分割'} ${t.from}→${t.to}`;
   return t.withholdPct > 0 ? `股息（預扣 ${t.withholdPct}%）` : '股息';
+}
+// 各年度的已實現損益（加權平均成本法，與 computeStock 同一套算法；稅務試算用）
+function realizedByYear(txs) {
+  let qty = 0, cost = 0; const out = {};
+  for (const t of sortTxs(txs)) {
+    if (t.type === 'split') qty *= splitRatio(t);
+    else if (t.type === 'buy') { qty += t.qty; cost += t.qty * t.price + (t.fee || 0); }
+    else if (t.type === 'sell' && qty > 0) {
+      const q = Math.min(t.qty, qty), avg = cost / qty, y = t.date.slice(0, 4);
+      out[y] = (out[y] || 0) + q * t.price - (t.fee || 0) - q * avg;
+      qty -= q; cost -= q * avg;
+    }
+  }
+  return out;
 }
 function computeStock(p, priceOverride = null) {
   let qty = 0, cost = 0, realized = 0, div = 0, firstBuy = null;
@@ -1803,7 +1865,7 @@ let expandedId = null;
 let editTxId = null;   // 正在編輯的交易 id（null＝新增模式）
 let flashId = null;    // 剛新增成功的持倉 id（用於高亮提示）
 let quoteNote = null;  // {id, msg} 個股報價更新結果（renderAll 後於明細面板顯示）
-function renderAll() { renderSummary(); renderTable(); renderAISelect(); renderPerf(); renderWatchlist(); renderCalendar(); renderRebalance(); }
+function renderAll() { renderSummary(); renderTable(); renderAISelect(); renderPerf(); renderWatchlist(); renderCalendar(); renderRebalance(); renderTax(); }
 
 // 表格捲動陰影：表格寬度超出容器、右側（或左側）還有欄位時，於邊緣顯示漸層提示
 function shadowOne(s) {
@@ -1868,6 +1930,60 @@ function mvByMarket() {   // 各市場市值（換算台幣；缺匯率的外幣
   const by = { tw: 0, us: 0, bond: 0 };
   for (const p of db.positions) { const c = computeRow(p), mv = toTWD(c.mv ?? c.cost, posCcy(p)); if (mv != null) by[p.market] += mv; }
   return by;
+}
+/* ── 稅務／二代健保試算 ── */
+function taxInputs(year) {
+  const y = String(year), today = todayISO();
+  const twDivs = []; let osDiv = 0, osInterest = 0, osGain = 0, missFx = false;
+  const add = (v, ccy) => { const t = toTWD(v, ccy); if (t == null) { missFx = true; return 0; } return t; };
+  for (const p of db.positions) {
+    if (p.market === 'bond') {   // 海外債：該年度已到的配息（買進當年扣掉付給前手的息）
+      const b = p.bond, c = computeBond(p);
+      let v = couponDates(b).filter(d => d.slice(0, 4) === y && d <= today).length * c.couponAmt;
+      if (b.buyDate.slice(0, 4) === y) v = Math.max(0, v - (b.accruedPaid || 0));
+      osInterest += add(v, posCcy(p));
+      continue;
+    }
+    for (const t of (p.txs || [])) {
+      if (t.type !== 'dividend' || t.date.slice(0, 4) !== y) continue;
+      const gross = t.gross ?? t.amount ?? 0;
+      if (p.market === 'tw') twDivs.push(gross); else osDiv += add(gross, 'USD');
+    }
+    if (p.market === 'us') osGain += add(realizedByYear(p.txs)[y] || 0, 'USD');
+  }
+  const r = db.settings.taxRate;
+  return { twDivs, osDiv, osInterest, osGain, marginalRate: r === '' || r == null ? null : +r, params: db.settings.tax, missFx };
+}
+function renderTax() {
+  const sel = $('taxYear'), cy = new Date().getFullYear();
+  if (!sel.options.length) sel.innerHTML = [cy, cy - 1, cy - 2].map(v => `<option value="${v}">${v} 年度</option>`).join('');
+  const inp = taxInputs(sel.value), r = taxEstimate(inp), p = r.params, M = v => fmtMoney(Math.round(v), 'TWD');
+  const pct = v => +(+v).toFixed(2) + '%';
+  const rows = [];
+  rows.push(['台股股利所得', r.twDivCount ? `已補登的現金股息 ${r.twDivCount} 筆（稅前）` : '這個年度沒有補登台股現金股息', M(r.twDivTotal)]);
+  rows.push([`二代健保補充保費（${pct(p.nhiRate)}）`,
+    r.nhiCount ? `${r.nhiCount} 筆單筆達 ${M(p.nhiMin)}，由發放公司代扣` : `單筆未達 ${M(p.nhiMin)}，免扣`, M(r.nhi)]);
+  let way = `合併計稅可抵減 ${pct(p.creditRate)}（${M(r.credit)}，每戶上限 ${M(p.creditCap)}）；${pct(p.sepRate)} 分開計稅 ${M(r.sepTax)}`;
+  if (r.combineTax != null && r.twDivTotal) way += `。以綜所稅率 ${pct(inp.marginalRate)} 估，合併計稅的股利稅負約 ${r.combineTax < 0 ? '退稅 ' + M(-r.combineTax) : M(r.combineTax)}`;
+  else if (r.twDivTotal) way += '。在「設定」填綜所稅稅率，才會比較哪個有利';
+  rows.push(['股利課稅方式', way, r.better === 'combine' ? '合併較有利' : r.better === 'separate' ? '分開較有利' : '—']);
+  rows.push(['海外所得（美股＋海外債）',
+    `股息 ${M(r.osDiv)}＋債息 ${M(r.osInterest)}＋已實現價差 ${M(r.osGain)}＝${M(r.osTotal)}；` +
+    (r.osReport ? `已達 ${M(p.osThreshold)} 門檻，需全數計入基本所得額（免稅額 ${M(p.amtExempt)}、稅率 ${pct(p.amtRate)}）` + (r.osOverExempt ? '，且已超過免稅額' : '')
+                : `未達 ${M(p.osThreshold)} 申報門檻`) + (inp.missFx ? '（缺匯率，外幣部分未計入）' : ''),
+    r.osReport ? '需計入' : '免計入']);
+  $('taxList').innerHTML = rows.map(([k, d, v]) =>
+    `<div class="calRow"><span class="calMain"><b>${k}</b><small>${esc(d)}</small></span><span class="calAmt"><b>${v}</b></span></div>`).join('');
+}
+function renderTaxParams() {
+  const p = normTax(db.settings.tax);
+  $('taxParams').innerHTML = Object.keys(TAX_DEFAULT).map(k =>
+    `<label class="field">${TAX_LABELS[k]}<input type="number" step="any" min="0" data-tax="${k}" value="${p[k]}"></label>`).join('');
+  $$('#taxParams [data-tax]').forEach(el => el.oninput = () => {
+    const cur = normTax(db.settings.tax), v = parseFloat(el.value);
+    if (Number.isFinite(v) && v >= 0) { cur[el.dataset.tax] = v; db.settings.tax = cur; saveDB(); renderTax(); }
+  });
+  $('taxRate').value = db.settings.taxRate == null ? '' : String(db.settings.taxRate);
 }
 /* ── 再平衡試算 ── */
 function rebResult() { return rebalance(mvByMarket(), db.settings.rebTargets, !!db.settings.rebNoSell); }
@@ -4663,7 +4779,7 @@ function importData(file) {
     db.alerts = Array.isArray(data.alerts) ? data.alerts.filter(a => a && a.id && a.symbol && a.price > 0 && (a.dir === 'above' || a.dir === 'below')) : [];   // 舊備份無此欄位 → 空
     db.settings = Object.assign({ twelveKey: '', finmindToken: '', finnhubKey: '', xaiKey: '', anthropicKey: '', theme: db.settings.theme, twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '', cpName: '', cpDesc: '' }, data.settings || {});   // 舊備份無 theme → 沿用目前的
     if (!THEMES.includes(db.settings.theme)) db.settings.theme = 'dark';
-    applyTheme();
+    applyTheme(); renderTaxParams();
     if (data.openaiKey) localStorage.setItem('twbt_apikey', data.openaiKey);
     if (Array.isArray(data.reports)) { reportHist = data.reports.slice(0, REPORTS_MAX); saveReports(); }   // 舊版備份無此欄位 → 保留現有歷史
     if (data.llmUsage && typeof data.llmUsage === 'object') { llmUsage = sanitizeUsageLog(data.llmUsage); saveUsage(); }   // 舊版備份無此欄位 → 保留現有統計
@@ -4693,6 +4809,10 @@ function bindSettings() {
   $('aiProfile').addEventListener('input', e => { db.settings.aiProfile = e.target.value; saveDB(); });   // 投資偏好：不 trim（保留換行），組 prompt 時才 trim
   $('twFee').addEventListener('input', e => { db.settings.twFee = parseFloat(e.target.value) || 0; saveDB(); renderAll(); });
   $('twTax').addEventListener('input', e => { db.settings.twTax = parseFloat(e.target.value) || 0; saveDB(); renderAll(); });
+  renderTaxParams();
+  $('taxYear').addEventListener('change', renderTax);
+  $('taxRate').addEventListener('change', e => { db.settings.taxRate = e.target.value === '' ? '' : +e.target.value; saveDB(); renderTax(); });
+  $('taxResetBtn').addEventListener('click', () => { delete db.settings.tax; saveDB(); renderTaxParams(); renderTax(); });
   $('rebNoSell').addEventListener('change', e => { db.settings.rebNoSell = e.target.checked; saveDB(); fillRebalance(); });
   $('themeSel').addEventListener('change', e => { db.settings.theme = e.target.value; saveDB(); applyTheme(); });
   $('fxOverride').addEventListener('input', e => {
