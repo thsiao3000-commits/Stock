@@ -107,6 +107,33 @@ function check(name, cond) { cond ? (pass++, console.log('  ✓', name)) : (fail
   check('truncated=max_output_tokens', r.truncated === 'max_output_tokens');
   check('截斷時仍擷取 usage（response.incomplete）', r.usage && r.usage.output_tokens === 64000);
 
+  console.log('G. web search 次數（計工具費）');
+  const ws = (id, action, status) => ({ type: 'web_search_call', id, status: status || 'completed', action });
+  calls = []; responses = [okStream([
+    { type: 'response.output_item.done', item: ws('ws_1', { type: 'search', query: 'a' }) },
+    { type: 'response.output_item.done', item: ws('ws_2', { type: 'open_page', url: 'https://x' }) },
+    { type: 'response.output_item.done', item: ws('ws_3', { type: 'search', query: 'b' }) },
+    { type: 'response.output_text.delta', delta: '內容' },
+    { type: 'response.completed', response: { usage: { input_tokens: 1, output_tokens: 1 }, output: [
+      ws('ws_1', { type: 'search', query: 'a' }), ws('ws_2', { type: 'open_page', url: 'https://x' }), ws('ws_3', { type: 'search', query: 'b' }),
+      ws('ws_4', { type: 'find_in_page' }), ws('ws_5', { type: 'search', query: 'c' }, 'failed'), { type: 'message' } ] } },
+  ])];
+  let rw = await streamResponses('k', 'gpt-6.1-sol', 'P', 'medium', () => {}, true, null, null, []);
+  check('結尾事件的 output：只數 action=search 且未失敗的呼叫（開頁／頁內尋找不計）', rw.webSearches === 2);
+  calls = []; responses = [okStream([
+    { type: 'response.output_item.done', item: ws('ws_1', { type: 'search', query: 'a' }) },
+    { type: 'response.output_item.done', item: ws('ws_1', { type: 'search', query: 'a' }) },
+    { type: 'response.output_item.done', item: ws('ws_2', { type: 'search', query: 'b' }) },
+    { type: 'response.output_item.done', item: { type: 'reasoning', id: 'rs_1' } },
+    { type: 'response.output_text.delta', delta: '內容' },
+    { type: 'response.completed', response: { usage: { input_tokens: 1, output_tokens: 1 } } },
+  ])];
+  rw = await streamResponses('k', 'gpt-6.1-sol', 'P', 'medium', () => {}, true, null, null, []);
+  check('結尾事件沒帶 output → 用串流逐筆事件計數（同 id 不重複）', rw.webSearches === 2);
+  calls = []; responses = [okStream(NORMAL_EVENTS)];
+  rw = await streamResponses('k', 'gpt-6.1-sol', 'P', 'medium', () => {}, false, null, null, []);
+  check('沒搜尋 → 0', rw.webSearches === 0);
+
   console.log(fail === 0 ? `ALL ${pass} TESTS PASSED` : `${fail} TEST(S) FAILED`);
   process.exit(fail === 0 ? 0 : 1);
 })();

@@ -100,6 +100,7 @@ const reset = (...r) => { calls = []; responses = r; };
   check('搜尋時觸發 onSearch、回報 searched', searches === 1 && r.searched === true);
   check('引用去重後附文末', r.text.startsWith('營收創高') && r.text.includes('**📎 引用來源（web search）**') && r.text.includes('1. [新聞 A](https://a.example/1)') && r.text.includes('2. [新聞  B](https://b.example/2)') && !r.text.includes('3. ['));
   check('message_delta 的累計 usage 覆蓋 message_start', r.usage.input_tokens === 9000 && r.usage.output_tokens === 700);
+  check('回報搜尋次數（server_tool_use.web_search_requests）', r.webSearches === 1);
 
   console.log('D. 附件（圖片／PDF）');
   const atts = [{ name: 'a.png', kind: 'image', dataUrl: 'data:image/png;base64,AAAA' }, { name: 'b.pdf', kind: 'pdf', dataUrl: 'data:application/pdf;base64,BBBB' }];
@@ -145,6 +146,7 @@ const reset = (...r) => { calls = []; responses = r; };
   check('server_tool_use 的 input 由 JSON 片段還原', m2[1].content[2].type === 'server_tool_use' && m2[1].content[2].id === 'srvtoolu_9' && m2[1].content[2].input.query === 'q');
   check('正文跨回合接續', r.text === '前半後半' && seen[seen.length - 1] === '前半後半');
   check('usage 跨回合加總', r.usage.input_tokens === 2500 && r.usage.output_tokens === 300);
+  check('沒回報搜尋次數 → 0', r.webSearches === 0);
   const paused = () => okStream([start(), bStart(0, { type: 'text', text: '' }), bDelta(0, { type: 'text_delta', text: 'x' }), bStop(0), mDelta('pause_turn', { output_tokens: 1 })]);
   reset(paused(), paused(), paused(), paused(), paused(), paused(), paused());
   r = await streamClaude('k', 'claude-fable-5-2', 'P', '', () => {}, true, null, null, []);

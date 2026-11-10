@@ -314,7 +314,7 @@
       <label><input id="rememberKey" type="checkbox"> 記住 OpenAI API Key（不勾＝關閉頁面即忘、每次重填）</label>
       <label><input id="webSearchChk" type="checkbox" checked> 🌐 AI 分析時用 web search（個股新聞；組合含債券時查發行人信用與美債殖利率）</label>
     </div>
-    <div class="hint" style="margin-top:2px">web search 由所選 AI 模型的供應商（OpenAI 或 Claude）即時搜尋並附來源；會多一筆搜尋費用、也稍慢。不需要時可取消勾選。</div>
+    <div class="hint" style="margin-top:2px">web search 由所選 AI 模型的供應商（OpenAI 或 Claude）即時搜尋並附來源；會多一筆搜尋費用（每次搜尋 US$0.01，另加搜尋內容的 tokens；已計入用量標示與花費統計）、也稍慢。不需要時可取消勾選。</div>
     <div class="hint" style="margin-top:2px">🔐 金鑰儲存方式：Twelve Data／FinMind／Finnhub／xAI／Claude 金鑰輸入後即<b>自動儲存</b>；OpenAI Key 則由上方勾選決定。所有金鑰都<b>只存在你這台裝置的瀏覽器（localStorage）</b>，本工具純前端、不會把金鑰上傳到任何伺服器；「匯出 JSON」預設也不含金鑰（可勾選包含）。</div>
     <div class="row" style="margin-top:6px">
       <span class="hint">資料備份：</span>
@@ -340,7 +340,7 @@
     <div class="tableScroll" style="margin-top:8px">
       <table id="costTable"></table>
     </div>
-    <div class="hint" style="margin-top:6px; line-height:1.7">每次 AI 呼叫（OpenAI／Claude／xAI）成功完成後自動累計，保留最近 12 個月、只存在本機瀏覽器（隨「匯出 JSON」備份）。費用為依價格表估算的 <b>tokens 費用</b>，另加 xAI <b>x_search 工具費</b>（依 xAI 回報的抓取貼文數，每 1,000 則 US$5；列於「工具費」欄）；不含 OpenAI／Claude 的 web search 工具費；中途失敗的呼叫與「複製 Prompt」到其他聊天機器人的用量不在統計內，實際帳單以 OpenAI／Anthropic／xAI 後台為準。</div>
+    <div class="hint" style="margin-top:6px; line-height:1.7">每次 AI 呼叫（OpenAI／Claude／xAI）成功完成後自動累計，保留最近 12 個月、只存在本機瀏覽器（隨「匯出 JSON」備份）。費用為依價格表估算的 <b>tokens 費用</b>，另加<b>工具費</b>（列於「工具費」欄）：OpenAI／Claude 的 web search 每 1,000 次搜尋 US$10、xAI x_search 每抓 1,000 則貼文 US$5，數量取自各家 API 的回報；中途失敗的呼叫與「複製 Prompt」到其他聊天機器人的用量不在統計內，實際帳單以 OpenAI／Anthropic／xAI 後台為準。</div>
   </details>
 
   <!-- ── 損益總覽 ── -->
@@ -488,7 +488,7 @@
     </div>
     <details class="hintFold">
       <summary>ℹ️ 使用提示：省 token 技巧、報告歷史、分析視角、上次建議檢討、追問 AI</summary>
-      <div class="hint">「產生 AI 分析」會呼叫所選的 AI 模型（OpenAI 或 Claude，耗 token）；若想省 token，可改按「複製 Prompt」把同一份提問貼到訂閱制聊天機器人（如 Gemini）。新聞與美股基本面那段需該機器人能上網查詢才會生效；台股的技術面／籌碼／配息等數據已內含在 Prompt 中。報告自動保留<b>最近 20 份</b>於本機（重新整理不消失），可由報告上方的下拉選單切換、對照前後觀點變化。「分析視角」可切換單一風格（含<b>供應鏈瓶頸獵人</b>與<b>自訂視角</b>——把你欣賞的分析師方法論寫成準則）或<b>三師會診</b>（價值×成長×技術各自表態、主持人裁決）；同一檔重複分析時會自動附上<b>上次建議檢討</b>（對照期間實際走勢、檢討上次判斷對錯）。每次 AI 呼叫完成後，狀態列與報告開頭會標示本次 <b>tokens 用量與估算費用</b>（費率取自線上價格表，離線改用內建表；Grok 直查會把 x_search 工具費一併算入並註明抓取則數；OpenAI／Claude 的 web search 工具費不含；價格表查無的模型只顯示 tokens）；各月累計見頁面上方的<b>💰 AI 花費統計</b>。報告下方可<b>💬 追問 AI</b>：就這份報告繼續問（AI 會拿到報告全文與產生時的原始數據，回答有據可查），回答接在報告末尾、一併存入歷史；多輪追問會累積成同一份報告的問答串。追問可<b>📎 附加檔案</b>——圖片／PDF（如法說會簡報截圖、券商對帳單、研究報告）隨請求直接送給 AI 閱讀，文字檔（txt／md／csv／json）內容內嵌進 Prompt；附件不存入歷史、只記檔名。</div>
+      <div class="hint">「產生 AI 分析」會呼叫所選的 AI 模型（OpenAI 或 Claude，耗 token）；若想省 token，可改按「複製 Prompt」把同一份提問貼到訂閱制聊天機器人（如 Gemini）。新聞與美股基本面那段需該機器人能上網查詢才會生效；台股的技術面／籌碼／配息等數據已內含在 Prompt 中。報告自動保留<b>最近 20 份</b>於本機（重新整理不消失），可由報告上方的下拉選單切換、對照前後觀點變化。「分析視角」可切換單一風格（含<b>供應鏈瓶頸獵人</b>與<b>自訂視角</b>——把你欣賞的分析師方法論寫成準則）或<b>三師會診</b>（價值×成長×技術各自表態、主持人裁決）；同一檔重複分析時會自動附上<b>上次建議檢討</b>（對照期間實際走勢、檢討上次判斷對錯）。每次 AI 呼叫完成後，狀態列與報告開頭會標示本次 <b>tokens 用量與估算費用</b>（費率取自線上價格表，離線改用內建表；web search 與 x_search 的工具費會一併算入並註明搜尋次數／抓取則數；價格表查無的模型只顯示 tokens）；各月累計見頁面上方的<b>💰 AI 花費統計</b>。報告下方可<b>💬 追問 AI</b>：就這份報告繼續問（AI 會拿到報告全文與產生時的原始數據，回答有據可查），回答接在報告末尾、一併存入歷史；多輪追問會累積成同一份報告的問答串。追問可<b>📎 附加檔案</b>——圖片／PDF（如法說會簡報截圖、券商對帳單、研究報告）隨請求直接送給 AI 閱讀，文字檔（txt／md／csv／json）內容內嵌進 Prompt；附件不存入歷史、只記檔名。</div>
     </details>
     <div id="aiStatus" class="status"></div>
     <div id="aiMeta" style="display:none; align-items:center; gap:10px; margin-top:12px; padding:8px 12px; background:var(--panel2); border:1px solid var(--border); border-radius:8px; font-size:.82rem; color:var(--muted); flex-wrap:wrap;">
@@ -720,7 +720,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.55.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.56.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -2618,7 +2618,7 @@ function usageOf(u) {
 // 狀態列／報告開頭的一行字：「tokens 輸入 12,345／輸出 3,456（含推理 1,200）　·　約 US$0.108」；查無費率標「費率未知」
 const fmtTok = n => Number(n).toLocaleString('en-US');
 const fmtUSD = c => 'US$' + (c < 0.01 ? c.toFixed(4) : c.toFixed(3));
-// toolFee＝已知的工具費 { cost, note }（目前只有 xAI x_search 能算）→ 併入總額並註明；否則有 toolNote 就標「不含 … 工具費」
+// toolFee＝已知的工具費 { cost, note }（web search 次數或 xAI x_search 抓取數）→ 併入總額並註明；否則有 toolNote 就標「不含 … 工具費」
 function usageLabel(usage, cost, toolNote, toolFee) {
   if (!usage) return '';
   let s = `tokens 輸入 ${fmtTok(usage.input)}／輸出 ${fmtTok(usage.output)}`;
@@ -2646,9 +2646,16 @@ function xaiToolFee(rawUsage) {
   return { cost: posts * XAI_TOOL_RATES.x_posts_fetched + users * XAI_TOOL_RATES.x_users_fetched + web * XAI_TOOL_RATES.web_search_calls, note: parts.join('、') || '抓取 0 則' };
 }
 const usageTail = t => t ? '　·　' + t : '';   // 接在 ✅ 完成訊息後面
+// OpenAI／Claude 的 web search 工具費：兩家都是每 1,000 次搜尋 US$10（另加搜尋內容的 tokens，已含在輸入 tokens 內）。
+// 次數來源——OpenAI：回應 output 裡 action 為 search 的 web_search_call（開頁／頁內尋找不計）；Claude：usage.server_tool_use.web_search_requests（失敗的搜尋不計費）。
+// 來源：developers.openai.com/api/docs/pricing、platform.claude.com web search tool 文件（2026-11-10 查）。次數未知或 0 → null
+const WEB_SEARCH_RATE = 10 / 1000;
+function webSearchFee(n) {
+  return Number.isFinite(n) && n > 0 ? { cost: n * WEB_SEARCH_RATE, note: `${fmtTok(n)} 次搜尋` } : null;
+}
 
 /* ── AI 花費統計：每次呼叫完成後累計到「月份 → 模型」（localStorage，保留最近 12 個月） ── */
-// 結構：{ 'yyyy-MM': { <模型 ID>: { calls, input, output, cost, tool, unpriced } } }；cost＝tokens＋工具費合計、tool＝其中的工具費（目前只有 xAI x_search）；
+// 結構：{ 'yyyy-MM': { <模型 ID>: { calls, input, output, cost, tool, unpriced } } }；cost＝tokens＋工具費合計、tool＝其中的工具費（web search／x_search）；
 // unpriced＝tokens 無法估價的次數（費率未知或 API 未回 usage）
 const USAGE_KEY = 'twpf_llm_usage', USAGE_MONTHS_MAX = 12;
 const monthKeyOf = (d = new Date()) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
@@ -2703,7 +2710,7 @@ function renderCostBox() {
   const costCell = r => (r.calls > r.unpriced || !r.calls || r.tool > 0 ? fmtUSD(r.cost) : '費率未知') + (r.unpriced && r.calls > r.unpriced ? `<span class="hint">（${r.unpriced} 次未計）</span>` : '');
   const toolCell = r => r.tool > 0 ? fmtUSD(r.tool) : '—';
   const pct = r => total.cost > 0 && r.cost > 0 ? (r.cost / total.cost * 100).toFixed(0) + '%' : '—';
-  $('costTable').innerHTML = `<thead><tr><th class="l">模型</th><th>次數</th><th>輸入 tokens</th><th>輸出 tokens</th><th title="目前只計 xAI x_search（依抓取貼文數）">工具費</th><th>估算費用</th><th>占比</th></tr></thead><tbody>` +
+  $('costTable').innerHTML = `<thead><tr><th class="l">模型</th><th>次數</th><th>輸入 tokens</th><th>輸出 tokens</th><th title="web search（每次搜尋）與 xAI x_search（依抓取貼文數）">工具費</th><th>估算費用</th><th>占比</th></tr></thead><tbody>` +
     (rows.length ? rows.map(r => `<tr><td class="l">${esc(r.model)}</td><td>${fmtTok(r.calls)}</td><td>${fmtTok(r.input)}</td><td>${fmtTok(r.output)}</td><td>${toolCell(r)}</td><td>${costCell(r)}</td><td>${pct(r)}</td></tr>`).join('')
       : `<tr><td class="l" colspan="7" style="color:var(--muted)">${picked} 尚無 AI 呼叫紀錄</td></tr>`) +
     (rows.length ? `<tr style="font-weight:600"><td class="l">合計</td><td>${fmtTok(total.calls)}</td><td>${fmtTok(total.input)}</td><td>${fmtTok(total.output)}</td><td>${toolCell(total)}</td><td>${costCell(total)}</td><td></td></tr>` : '') + '</tbody>';
@@ -2789,11 +2796,15 @@ async function streamResponses(key, model, prompt, effort, onDelta, webSearch, o
     const err = new Error(e.error?.message || ('OpenAI HTTP ' + res.status));
     err.status = res.status; throw err;
   }
-  let full = '', failMsg = null, truncated = null, usage = null;
+  let full = '', failMsg = null, truncated = null, usage = null, finalOutput = null;
+  const searchIds = new Set();   // 已完成的搜尋呼叫（計工具費用）：串流的 output_item.done 逐筆收，結尾事件有完整 output 時以它為準
+  const isSearchCall = it => it && it.type === 'web_search_call' && (!it.action || it.action.type === 'search') && it.status !== 'failed';
   const anns = [];   // web search 引用（url_citation annotations）——過去只拼 delta、引用整批遺失，全靠模型自願把網址寫進正文
   await readSSE(res, j => {
     const t = j.type || '';
     if (j.response && j.response.usage) usage = j.response.usage;   // response.completed／incomplete 帶 usage（tokens 計費依據）
+    if (j.response && Array.isArray(j.response.output) && (t === 'response.completed' || t === 'response.incomplete')) finalOutput = j.response.output;
+    if (t === 'response.output_item.done' && isSearchCall(j.item)) searchIds.add(j.item.id || searchIds.size);
     if (t.endsWith('output_text.delta') && typeof j.delta === 'string') { full += j.delta; onDelta(full); }
     else if (t.endsWith('output_text.annotation.added') && j.annotation && j.annotation.url) anns.push(j.annotation);
     else if (t.endsWith('reasoning_summary_text.delta') && typeof j.delta === 'string') { onThink && onThink(j.delta); }   // 思考摘要（兼保活）
@@ -2803,7 +2814,8 @@ async function streamResponses(key, model, prompt, effort, onDelta, webSearch, o
   });
   if (failMsg) throw new Error(failMsg);
   if (!full) { const err = new Error('Responses API 未回傳內容'); err.status = 400; throw err; }
-  return { text: full + citeBlock(anns), truncated, usage };
+  const webSearches = finalOutput ? finalOutput.filter(isSearchCall).length : searchIds.size;
+  return { text: full + citeBlock(anns), truncated, usage, webSearches };
 }
 // web search 引用 → 報告尾端「引用來源」清單（依 URL 去重；標題去掉 []，避免打壞 Markdown 連結）
 function citeBlock(anns) {
@@ -2877,7 +2889,7 @@ function claudeUsage(u) {
   return { input_tokens: u.input_tokens + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0), output_tokens: u.output_tokens };
 }
 async function streamClaude(key, model, prompt, effort, onDelta, webSearch, onSearch, onThink, atts) {
-  let useFallbacks = true, searched = false, text = '', truncated = null, prior = null;
+  let useFallbacks = true, searched = false, text = '', truncated = null, prior = null, webSearches = 0;
   const total = { input_tokens: 0, output_tokens: 0 }; let gotUsage = false;
   const cites = [];
   const post = body => fetch('https://api.anthropic.com/v1/messages', {
@@ -2910,6 +2922,8 @@ async function streamClaude(key, model, prompt, effort, onDelta, webSearch, onSe
     text = acc.text; cites.push(...acc.cites);
     const u = claudeUsage(acc.usage);
     if (u) { gotUsage = true; total.input_tokens += u.input_tokens; total.output_tokens += u.output_tokens; }
+    const ws = acc.usage && acc.usage.server_tool_use && acc.usage.server_tool_use.web_search_requests;
+    if (Number.isFinite(ws) && ws > 0) webSearches += ws;   // 每回合各自回報、跨續跑回合加總
     if (acc.error) throw new Error(acc.error);
     if (acc.stop === 'refusal') {
       const d = acc.stopDetails || {};
@@ -2921,7 +2935,7 @@ async function streamClaude(key, model, prompt, effort, onDelta, webSearch, onSe
     if (acc.stop === 'pause_turn') truncated = 'pause_turn';
     break;
   }
-  return { text: text + citeBlock(cites), truncated, usage: gotUsage ? total : null, searched };
+  return { text: text + citeBlock(cites), truncated, usage: gotUsage ? total : null, searched, webSearches };
 }
 // ── xAI（Grok）Responses API：KOL 雷達「直查 X」用；格式與 OpenAI Responses 相容（CORS 已實測全通）──
 // 引用可能以 response.citations（URL 陣列）或 annotation 事件回傳，兩者都接、去重後附文末
@@ -3069,10 +3083,11 @@ async function runAI(prompt, statusEl, opts) {
       } else throw e;
     }
     paint(r.text, true);
-    const usage = usageOf(r.usage);   // tokens 用量＋估算費用（web search 工具費另計，不在此估算內）
+    const usage = usageOf(r.usage);   // tokens 用量＋估算費用
     const cost = usage ? estimateCostUSD(await loadPricing(), model, usage.input, usage.output) : null;
-    recordUsage(model, usage, cost);   // 累計到「AI 花費統計」
-    return { text: r.text, model, truncated: r.truncated, usage, cost, usageText: usageLabel(usage, cost, searched ? 'web search' : '') };
+    const toolFee = webSearchFee(r.webSearches);   // web search 工具費（依回應回報的搜尋次數）；次數未知 → null、有搜尋時標示「不含工具費」
+    recordUsage(model, usage, cost, toolFee ? toolFee.cost : 0);   // 累計到「AI 花費統計」（含工具費）
+    return { text: r.text, model, truncated: r.truncated, usage, cost, toolFee, usageText: usageLabel(usage, cost, searched || toolFee ? 'web search' : '', toolFee) };
   } finally {
     clearInterval(timer);   // 停動畫；最終的 ✅／❌ 訊息由呼叫端覆蓋
   }

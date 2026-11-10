@@ -32,6 +32,20 @@
 
 ---
 
+## [v1.56.0] — 2026-11-10
+
+### 新增
+- **web search 工具費算進費用與花費統計**：開著 web search 的 AI 呼叫（個股分析、組合總評、KOL 網路搜查、追問）完成後，狀態列與報告開頭的用量改為 **tokens 費用＋web search 工具費的合計**，並註明搜尋次數（例：`約 US$0.084（含 web search 工具費 US$0.030：3 次搜尋）`）；「💰 AI 花費統計」的「工具費」欄與各項合計一併納入。OpenAI 與 Claude 都是**每 1,000 次搜尋 US$10**（每次 US$0.01）。
+  - **OpenAI**：數回應 `output` 裡 `action` 為 `search` 的 `web_search_call`（開頁、頁內尋找與失敗的呼叫不計）；結尾事件沒帶 `output` 時改用串流的逐筆事件計數。
+  - **Claude**：取 `usage.server_tool_use.web_search_requests`（失敗的搜尋不計費），續跑回合加總。
+  - 拿不到搜尋次數時維持原本的「不含 web search 工具費」標示。
+
+### 說明
+- 搜尋內容本身的 tokens 原本就包含在輸入 tokens 內，不另計。OpenAI 文件只寫「search 動作會產生工具呼叫費」，沒有明定開頁／頁內尋找是否計費，本工具依字面只計 search；若實際帳單有出入以 OpenAI 後台為準。本版之前的 web search 工具費無法回補。
+
+### 測試
+- `tests/streamresponses.test.js` 增至 21 項（搜尋次數計數）、`tests/claude.test.js` 增至 47 項、`tests/pricing.test.js` 增至 74 項（web search 工具費與標籤）。
+
 ## [v1.55.0] — 2026-11-10
 
 ### 新增

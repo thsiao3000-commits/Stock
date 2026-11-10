@@ -10,7 +10,7 @@ function extract(startMarker, endMarker) {
 }
 const src = extract('const PRICING_URL', '/* ════════════════ OpenAI（串流）');
 // 每次呼叫得到一組全新的模組（pricingPromise 是快取，測 loadPricing 兩種路徑要各自乾淨）
-const fresh = () => new Function(src + '\nreturn { PRICING_FALLBACK, loadPricing, effectiveRates, estimateCostUSD, usageOf, usageLabel, usageTail, monthKeyOf, sanitizeUsageLog, addUsageRecord, usageMonthRows, USAGE_MONTHS_MAX, xaiToolFee, XAI_TOOL_RATES };')();
+const fresh = () => new Function(src + '\nreturn { PRICING_FALLBACK, loadPricing, effectiveRates, estimateCostUSD, usageOf, usageLabel, usageTail, monthKeyOf, sanitizeUsageLog, addUsageRecord, usageMonthRows, USAGE_MONTHS_MAX, xaiToolFee, XAI_TOOL_RATES, webSearchFee };')();
 
 let pass = 0, fail = 0;
 function check(name, cond) { cond ? (pass++, console.log('  ✓', name)) : (fail++, console.log('  ✗ FAIL:', name)); }
@@ -152,6 +152,13 @@ const TABLE = { schema_version: 1, updated_at: '2026-09-25', models: {
   check('統計：無工具費的模型 tool＝0', mr.rows[1].tool === 0 && near(mr.rows[1].cost, 0.07));
   check('統計：月合計含工具費', near(mr.total.cost, 0.44) && near(mr.total.tool, 0.25));
   check('舊紀錄（無 tool 欄）讀入後 tool＝0、合計不變', M.sanitizeUsageLog({ '2026-11': { m: { calls: 1, input: 1, output: 1, cost: 0.5, unpriced: 0 } } })['2026-11'].m.tool === 0 && near(M.usageMonthRows({ '2026-11': { m: { calls: 1, input: 1, output: 1, cost: 0.5, unpriced: 0 } } }, '2026-11').total.tool, 0));
+
+  console.log('H. web search 工具費（OpenAI／Claude，每次搜尋 US$0.01）');
+  fee = M.webSearchFee(3);
+  check('3 次搜尋 → 0.03', near(fee.cost, 0.03) && fee.note === '3 次搜尋');
+  check('1,500 次 → 15、千分位', near(M.webSearchFee(1500).cost, 15) && M.webSearchFee(1500).note === '1,500 次搜尋');
+  check('0 次／未知／壞值 → null', M.webSearchFee(0) === null && M.webSearchFee(undefined) === null && M.webSearchFee(null) === null && M.webSearchFee('3') === null && M.webSearchFee(-1) === null);
+  check('標籤：含 web search 工具費', M.usageLabel({ input: 12000, output: 3000, reasoning: 0 }, 0.054, 'web search', M.webSearchFee(3)) === 'tokens 輸入 12,000／輸出 3,000　·　約 US$0.084（含 web search 工具費 US$0.030：3 次搜尋）');
 
   console.log(fail === 0 ? `ALL ${pass} TESTS PASSED` : `${fail} TEST(S) FAILED`);
   process.exit(fail === 0 ? 0 : 1);
