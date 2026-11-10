@@ -96,7 +96,7 @@
   }
   #tabBar button { border-top: 2px solid transparent; margin-top: -1px; padding: 0; }
   #tabBar button.on { color: var(--accent); border-top-color: var(--accent); font-weight: 700; }
-  main { max-width: 1280px; margin: 0 auto; padding: 0 20px 60px; }
+  main { max-width: 1800px; margin: 0; padding: 0 20px 60px; }   /* 桌面靠左對齊頂部列，寬螢幕讓內容區跟著放大 */
   /* 分頁：一次只顯示一個 */
   .tab { display: none; }
   .tab.on { display: block; }
@@ -104,6 +104,8 @@
   .cols { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 20px; align-items: start; }
   .cols > .col { min-width: 0; }
   @media (min-width: 1024px) { .cols.wide { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); } }
+  /* AI 分析：報告是主角，右欄（報告）比左欄（走勢圖與操作）寬 */
+  @media (min-width: 1024px) { .cols.wide.aiCols { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); } }
   .cols:has(> .col:nth-child(2):empty) { grid-template-columns: minmax(0, 1fr) !important; }
   /* 持倉：桌面＝表格在上、明細在下；平板＝卡片清單｜明細；手機＝卡片，點入後明細取代列表 */
   #holdLayout { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 20px; align-items: start; }
@@ -468,7 +470,7 @@
 
   <!-- ══ 分頁：AI 分析 ══ -->
   <div class="tab" data-tab="ai">
-  <div class="cols wide">
+  <div class="cols wide aiCols">
   <div class="col">
   <!-- ── 走勢圖與 AI 分析 ── -->
   <section id="sec3">
@@ -944,7 +946,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v2.4.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v2.4.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
