@@ -1,12 +1,12 @@
 # 💼 我的投資組合 + AI 分析
 
-**版本：v1.53.0**（版本號見 `index.html` 的 `APP_VERSION`，並對應 git tag；變更紀錄見 [CHANGELOG.md](CHANGELOG.md)）
+**版本：v1.54.0**（版本號見 `index.html` 的 `APP_VERSION`，並對應 git tag；變更紀錄見 [CHANGELOG.md](CHANGELOG.md)）
 
 追蹤**台股、美股、海外公司債**的個人投資組合工具：逐筆記錄交易、以**加權平均成本法**計算已實現／未實現損益（含台股費稅、股息、債券配息與匯率換算），並可一鍵產生 **AI 技術分析**（針對你的持倉個人化）與**投資組合總評**。
 
 | 工具 | 用途 | 需求 |
 |---|---|---|
-| 💼 **index.html**（主工具） | 持倉管理＋損益總覽＋走勢圖＋AI 分析 | 瀏覽器；美股需 Twelve Data Key、AI 需 OpenAI Key |
+| 💼 **index.html**（主工具） | 持倉管理＋損益總覽＋走勢圖＋AI 分析 | 瀏覽器；美股需 Twelve Data Key、AI 需 OpenAI Key 或 Claude Key |
 | 🐍 **twse_realtime.py** | 台股**盤中即時**報價輪詢（終端機） | Python 3，免帳號免金鑰 |
 
 ---
@@ -35,7 +35,9 @@
 - **觀察清單快篩**：「還沒買、在觀察」的標的（上限 12 檔，可逐檔移除或**一鍵全部清除**）一鍵抓一年價量、算指標**並排比較**（趨勢／均線交叉／RSI／MACD 動能／量比／距 52 週高），表格可**點欄位標題排序**，並可讓 **AI 排序評分**找出值得深入的對象，再一鍵帶入完整個股分析；快篩總評顯示於 ④ 區**專屬面板**（含複製／下載），與 ③ 的個股分析**可同時對照**、互不覆蓋；消息面另會概查**社群輿情**（台股 PTT／Threads、美股 X／Reddit，並提醒情緒過熱常為反指標）。
 - **KOL 選股雷達（三模式）**：**⚡ Grok 直查 X**（填 xAI Key，`x_search` 鎖定 KOL **本人帳號**貼文直讀，範圍可選 **2／5／10／30／60／90 天**——一手最即時，約 US$0.02–0.05/次；搜尋模型可在設定選 **grok-4.3（預設）／grok-4.7**；報告含**期間分段總結**表，強迫 AI 覆蓋整個範圍而非只總結最近幾天）；**🔍 網路搜查**（OpenAI web search 靠二手轉述，滯後數天～數週）；**✂️ 貼文擷取**（貼上原文本地抽 `$代號`，零費用）。KOL 欄位內建**預設清單下拉**（Serenity 台股、Michael Burry 美股，清空輸入框即可挑選），也可自行輸入任何「名稱 @帳號」。表格皆附**發文日期＋當時價位＋來源連結**，追不追由你對照現價自行判斷；一鍵加入觀察清單接快篩動線。雷達報告顯示在**雷達面板內**（含複製／下載），與快篩總評、③ 的個股分析**可同時對照**、互不覆蓋。
 - **報告可保存＋歷史切換**：報告開頭自動標記**產生時間、AI 模型、工具版本**；一鍵**複製**或**下載為 `.md`**（檔名帶標的與日期）；自動保留**最近 20 份**於本機（重新整理不消失、開頁還原上次報告），下拉選單可切換對照前後觀點變化。
-- **Tokens 用量與費用標示**：每次 AI 呼叫（OpenAI／xAI）完成後，狀態列與報告開頭（**用量：**）標示本次**輸入／輸出 tokens（含推理）與估算美元費用**，並隨報告一起進歷史、複製與下載；費率取自線上價格表 [pricing.json](https://thsiao3000-commits.github.io/BenchAI-Support/pricing.json)（美元／每百萬 tokens，支援優惠價與長上下文費率，開頁預抓一次），抓不到自動改用內建後備表；價格表查無的模型（如自訂模型）只顯示 tokens、標示「費率未知」。估算**只算 tokens**，不含 OpenAI web search／xAI x_search 的工具呼叫費（有用到時會註明）。
+- **AI 模型可選 OpenAI 或 Claude**：設定卡「AI 思考模型」可選 **gpt-6-astra／gpt-6.1-sol（預設）／gpt-6.1-terra**（用 OpenAI Key）或 **Claude Fable 5.2／Claude Opus 5.5／Claude Sonnet 5.5**（用 Claude Key，Anthropic Messages API 瀏覽器直連），兩把金鑰擇一即可。兩家都支援串流、web search（附引用來源）、推理深度與追問附件（圖片／PDF）。
+- **Tokens 用量與費用標示**：每次 AI 呼叫（OpenAI／Claude／xAI）完成後，狀態列與報告開頭（**用量：**）標示本次**輸入／輸出 tokens（含推理）與估算美元費用**，並隨報告一起進歷史、複製與下載；費率取自線上價格表 [pricing.json](https://thsiao3000-commits.github.io/BenchAI-Support/pricing.json)（美元／每百萬 tokens，支援優惠價與長上下文費率，開頁預抓一次），抓不到自動改用內建後備表；價格表查無的模型（如自訂模型）只顯示 tokens、標示「費率未知」。估算**只算 tokens**，不含 OpenAI web search／xAI x_search 的工具呼叫費（有用到時會註明）。
+- **💰 AI 花費統計（每月彙總）**：設定卡下方的摺疊區塊，標題顯示**本月估算花費與呼叫次數**；展開為依模型彙總的表格（次數／輸入／輸出 tokens／估算費用／占比＋合計），可切換月份回看。每次 AI 呼叫成功後自動累計，保留最近 12 個月、只存本機並隨 JSON 備份；不含工具費與失敗的呼叫，實際帳單以 OpenAI／Anthropic／xAI 後台為準。
 - **引用來源清單**：開啟 web search 時，報告尾端自動附上**去重後的新聞來源連結**（接住 API 的 url_citation 引用事件，不再依賴模型自願寫出網址）。
 - **列印友善**：`Ctrl/Cmd+P` 列印或存 PDF 自動轉**白底黑字**、隱藏設定區與按鈕（**API 金鑰不會被印出**）。
 - **資料匯出／匯入**：一鍵匯出全部持倉與設定為 JSON（備份、跨裝置／跨瀏覽器搬移），匯入即還原；可選擇是否包含 API 金鑰。
@@ -60,7 +62,7 @@
 node tests/run_tests.js
 ```
 
-先對 `index.html` 內嵌 JS 做語法檢查，再跑 `tests/*.test.js`（Markdown 渲染／XSS 跳脫／全形表格容錯、OpenAI 串流保活與 400 降級重試等 mock 測試）。GitHub Actions 於每次 push 自動執行。
+先對 `index.html` 內嵌 JS 做語法檢查，再跑 `tests/*.test.js`（Markdown 渲染／XSS 跳脫／全形表格容錯、OpenAI 串流保活與 400 降級重試、Claude 串流／續跑／引用等 mock 測試）。GitHub Actions 於每次 push 自動執行。
 
 ---
 
@@ -72,7 +74,8 @@ node tests/run_tests.js
 1. 展開頂部「**🔑 API 與參數設定**」：
    - **Twelve Data API Key** — 美股報價用。到 [twelvedata.com](https://twelvedata.com) 免費註冊取得（800 credits／天、8／分鐘，個人使用綽綽有餘）。只用台股＋債券可不填。
    - **FinMind Token** — 台股**上櫃**用，**選填**。免填即可運作；若被限流再到 [finmindtrade.com](https://finmindtrade.com) 免費註冊取得 token 提高額度。
-   - **OpenAI API Key** — AI 分析用。可勾選「記住」存於本機。
+   - **OpenAI API Key** — AI 分析用（選 OpenAI 模型時）。可勾選「記住」存於本機。
+   - **Claude API Key** — AI 分析用（選 Claude 模型時；[platform.claude.com](https://platform.claude.com) 取得）。與 OpenAI Key 擇一即可；輸入即自動儲存於本機。
 2. 「**② 我的持倉**」→「＋ 新增持倉」：選市場、填首筆買進（債券填面額／票息／到期日等）。
 3. 按「**🔄 更新所有報價**」：台股、美股、匯率一次更新。
 4. 點任一持倉列可展開：補登**買進／賣出／現金股息**、債券**更新市價**、刪除。
@@ -111,7 +114,7 @@ node tests/run_tests.js
 |---|---|---|
 | TWSE `STOCK_DAY` | 台股**上市**日線／最新收盤 | 收盤資料（非盤中）；未還原除權息；每月一請求 |
 | FinMind | 台股**上櫃**日線；台股**配息**（除息／發放日）、**三大法人買賣超**、**月營收**、**PER／PBR／殖利率**；**櫃買指數** | TWSE 查無時自動接手；籌碼／基本面供 AI 分析（僅台股）；免 token 可用，被限流可填免費 token |
-| OpenAI web search | 個股**即時新聞**（AI 自行搜尋並附來源） | 個股分析時觸發，可於設定關閉；會多一筆搜尋費用 |
+| OpenAI／Claude web search（依所選模型） | 個股**即時新聞**（AI 自行搜尋並附來源） | 個股分析時觸發，可於設定關閉；會多一筆搜尋費用 |
 | TWSE `FMTQIK` | 加權指數（AI 大盤對照） | 收盤資料；每月一請求、間隔 0.5 秒避免限流 |
 | Twelve Data | 美股報價／日線／SPY | 免費方案 800 credits／天、8／分鐘 |
 | open.er-api.com | USD/TWD 匯率 | 每日更新；工具快取 12 小時，可手動覆寫 |
@@ -125,7 +128,7 @@ node tests/run_tests.js
 ## 🌐 部署到 GitHub Pages
 
 > **先理解兩件事**
-> 1. **資料永遠在你自己的瀏覽器**：Pages 只負責把 HTML 送到瀏覽器，之後 API Key、資產明細、交易紀錄全部存在你裝置的 localStorage，API 請求由瀏覽器**直連** OpenAI／TWSE／Twelve Data，**不經過 GitHub**。GitHub 看不到你的任何資料。
+> 1. **資料永遠在你自己的瀏覽器**：Pages 只負責把 HTML 送到瀏覽器，之後 API Key、資產明細、交易紀錄全部存在你裝置的 localStorage，API 請求由瀏覽器**直連** OpenAI／Anthropic／TWSE／Twelve Data，**不經過 GitHub**。GitHub 看不到你的任何資料。
 > 2. **發佈出來的「網站」是公開的**：知道網址的人都能打開（這支工具是 BYOK，訪客得自己填自己的 key，碰不到你的）。把 repo 設 private 只隱藏原始碼、不會讓網站變私密。
 
 **步驟**
@@ -142,7 +145,7 @@ node tests/run_tests.js
 
 **上線後的安全注意**
 
-- **金鑰**：只存在你自己的瀏覽器。注意儲存行為分兩種——**OpenAI Key** 勾「記住」才存；**Twelve Data／FinMind／Finnhub／xAI** 金鑰**輸入即自動儲存**於 localStorage。建議給這工具用的 key 都設**用量上限**；在公用電腦上除了別勾「記住」，**其他金鑰也不要輸入**（或用完手動清空欄位）。
+- **金鑰**：只存在你自己的瀏覽器。注意儲存行為分兩種——**OpenAI Key** 勾「記住」才存；**Twelve Data／FinMind／Finnhub／xAI／Claude** 金鑰**輸入即自動儲存**於 localStorage。建議給這工具用的 key 都設**用量上限**；在公用電腦上除了別勾「記住」，**其他金鑰也不要輸入**（或用完手動清空欄位）。
 - **共用 origin** ⚠️：同帳號底下所有 Pages 專案共用 `https://thsiao3000-commits.github.io` 這個 origin，彼此的 localStorage 互通。若日後在同帳號掛其他頁面，那些頁面的 JS 讀得到本工具存的 key。化解：改用**自訂網域**取得獨立 origin，或別在同帳號放來路不明的頁面。
 - **想連「網站本身」都不公開**：改用 Cloudflare Pages／Netlify（可從 private repo 部署、原始碼不公開，並能加存取密碼）。
 
@@ -169,7 +172,7 @@ python3 twse_realtime.py --loop 2330   # 每 5 秒輪詢，Ctrl+C 停止
 - **匯率不對？** 在設定的「USD/TWD 匯率」直接填想用的數字（留空＝自動）。
 - **AI 分析很慢？** 推理深度選「低」會快很多；報告以串流逐字顯示，不用等全部完成。產生期間狀態列會顯示轉圈動畫＋經過秒數＋「思考中／撰寫中」，思考階段另有「**已思考 N 字**」進度——只要秒數或字數持續跳動就代表 AI 正在運作、沒有當機。
 - **AI 報告寫到一半就停／被截斷？** 多半是達到輸出長度上限（推理深度越高，推理本身越吃額度）。本工具上限已提高，並會在截斷時於狀態列以「⚠️」提示；遇到時把「AI 推理深度」調低再產生一次即可。
-- **追問能附檔案嗎？** 可以：圖片、PDF、文字檔（txt／md／csv／json），最多 5 個、單檔 10 MB。圖片與 PDF 以 base64 夾在請求裡直接送 OpenAI（PDF 每頁同時以文字與影像計費，長 PDF 很吃 token；OpenAI 單次請求 PDF 上限約 100 頁），文字檔內容則內嵌 Prompt。附件不會存入報告歷史，只在回答的引言列記下檔名。
+- **追問能附檔案嗎？** 可以：圖片、PDF、文字檔（txt／md／csv／json），最多 5 個、單檔 10 MB。圖片與 PDF 以 base64 夾在請求裡直接送給所選的 AI（OpenAI 或 Claude；PDF 每頁同時以文字與影像計費，長 PDF 很吃 token；OpenAI 單次請求 PDF 上限約 100 頁），文字檔內容則內嵌 Prompt。附件不會存入報告歷史，只在回答的引言列記下檔名。
 - **追問 AI 會花多少 token？** 每次追問都把報告全文＋原始數據（個股約 1～2 萬 tokens 輸入）再送一次，多輪追問時問答串也會累積；費用照常標示於狀態列與回答的引言列。想省 token 可用「📋 複製追問 Prompt」貼到訂閱制聊天機器人。
 - **狀態列顯示「❌ Load failed」（Safari）？** 這是連線在半路被切斷，不是額度或程式錯誤。v1.36.0 起已用 reasoning summary 串流保活，大幅降低 Safari 於長推理靜默期砍線的問題；若仍偶發，多半是網路瞬斷、Mac 休眠或分頁長時間退到背景——重按一次即可，或改用 Chrome。
 - **金鑰欄位被自動填成別的 key？** 已加入防瀏覽器／密碼管理員自動填入的處理（欄位載入時唯讀、點擊才解鎖）。若你的瀏覽器仍硬要填，請到瀏覽器密碼管理員刪掉對 `github.io` 儲存的密碼，或關閉該站自動填入。

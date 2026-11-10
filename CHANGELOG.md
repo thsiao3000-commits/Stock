@@ -32,6 +32,25 @@
 
 ---
 
+## [v1.54.0] — 2026-11-10
+
+### 新增
+- **AI 思考模型加入 Claude**：設定卡「AI 思考模型」下拉新增 **Claude Fable 5.2（最強，$8／$40）／Claude Opus 5.5（$4／$20）／Claude Sonnet 5.5（較省，$2／$10）**，並新增 **Claude API Key** 欄位（輸入即自動存於本機，匯出 JSON 預設不含）。選 Claude 模型時，個股分析、組合總評、快篩總評、KOL 網路搜查、追問 AI 全部改走 Anthropic Messages API（瀏覽器直連 `api.anthropic.com`，串流顯示），OpenAI 模型照舊用 OpenAI Key——兩把金鑰擇一即可使用 AI 分析。自訂模型名稱以 `claude-` 開頭者也走 Claude API。
+  - **web search**：改用 Claude 的 `web_search` 工具，引用來源同樣去重後附在報告末尾；搜尋回合過長（`pause_turn`）會自動接續，最多 5 次。
+  - **推理深度**：沿用「AI 推理深度」（低／中／高 → `effort`；「預設」＝交給模型預設）。Claude 這三個模型的思考無法關閉，思考摘要持續串流（兼作 Safari 60 秒斷線保活）。
+  - **追問附件**：圖片與 PDF 以 base64 直接送給 Claude 閱讀（`image`／`document`）。
+  - **安全分類器誤擋**：預設開啟 Anthropic 的伺服器端自動後備（beta `fallbacks: "default"`，由後備模型重跑）；帳號不支援時自動拿掉重試。仍被拒絕會在狀態列說明並建議改用其他模型。
+  - **價目表**：線上 `pricing.json` 原已收錄這三個模型；內嵌後備表同步補上，tokens 用量、估算費用與下方的月統計都照常運作（Claude 的輸出 tokens 已含思考）。
+- **💰 AI 花費統計（每月彙總表）**：設定卡下方新增摺疊區塊，標題直接顯示**本月估算花費與呼叫次數**；展開後是依模型彙總的表格（次數／輸入 tokens／輸出 tokens／估算費用／占比＋合計列），可用月份下拉回看先前月份。每次 AI 呼叫（OpenAI／Claude 的個股分析、組合總評、快篩總評、KOL 網路搜查、追問 AI，以及 xAI 的 Grok 直查）成功完成後自動累計，費率沿用 v1.49.0 的線上價格表（BenchAI-Support `pricing.json`，抓不到用內建後備表）。價格表查無的模型（自訂模型）照記次數與 tokens、費用標「費率未知」，合計列註明幾次未計。
+- 統計存於本機 localStorage（`twpf_llm_usage`，月份 → 模型，保留最近 12 個月），隨「匯出／匯入 JSON」備份還原（舊版備份無此欄位時保留現有統計）；「🗑️ 清除統計」可歸零（不影響報告歷史）。
+
+### 說明
+- 統計為 **tokens 估算費用**，不含 web search／x_search 工具費；中途失敗的呼叫與「複製 Prompt」到其他聊天機器人的用量不計，實際帳單以 OpenAI／Anthropic／xAI 後台為準。升版前的呼叫沒有紀錄，從本版開始累計。
+
+### 測試
+- 新增 `tests/claude.test.js`（45 項）：請求標頭與本體格式、串流累積、usage、web search 引用、附件格式、自動後備降級重試、`pause_turn` 續跑與上限、截斷／拒絕／串流錯誤、下拉選單與價格後備表同步。
+- `tests/pricing.test.js` 增至 55 項（含三個 Claude 模型的後備費率）：月份鍵、同月同模型累加、費用排序、費率未知計數、月合計、月份隔離、12 個月上限、讀檔／匯入資料清洗。
+
 ## [v1.53.0] — 2026-11-08
 
 ### 變更

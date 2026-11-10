@@ -10,7 +10,7 @@ function extract(startMarker, endMarker) {
 }
 const src = extract('const PRICING_URL', '/* ════════════════ OpenAI（串流）');
 // 每次呼叫得到一組全新的模組（pricingPromise 是快取，測 loadPricing 兩種路徑要各自乾淨）
-const fresh = () => new Function(src + '\nreturn { PRICING_FALLBACK, loadPricing, effectiveRates, estimateCostUSD, usageOf, usageLabel, usageTail };')();
+const fresh = () => new Function(src + '\nreturn { PRICING_FALLBACK, loadPricing, effectiveRates, estimateCostUSD, usageOf, usageLabel, usageTail, monthKeyOf, sanitizeUsageLog, addUsageRecord, usageMonthRows, USAGE_MONTHS_MAX };')();
 
 let pass = 0, fail = 0;
 function check(name, cond) { cond ? (pass++, console.log('  ✓', name)) : (fail++, console.log('  ✗ FAIL:', name)); }
@@ -51,6 +51,10 @@ const TABLE = { schema_version: 1, updated_at: '2026-09-25', models: {
   check('內嵌後備表已移除 grok-4.5', !M.PRICING_FALLBACK.models['grok-4.5']);
   check('內嵌後備表 gpt-6.1-sol 10,000 / 5,000 → 0.07', near(M.estimateCostUSD(M.PRICING_FALLBACK, 'gpt-6.1-sol', 10000, 5000), 0.07));
 
+  check('內嵌後備表 claude-opus-5-5 12,000 / 3,000 → 0.108', near(M.estimateCostUSD(M.PRICING_FALLBACK, 'claude-opus-5-5', 12000, 3000), 0.108));
+  check('內嵌後備表 claude-fable-5-2 10,000 / 5,000 → 0.28', near(M.estimateCostUSD(M.PRICING_FALLBACK, 'claude-fable-5-2', 10000, 5000), 0.28));
+  check('內嵌後備表 claude-sonnet-5-5 10,000 / 5,000 → 0.07', near(M.estimateCostUSD(M.PRICING_FALLBACK, 'claude-sonnet-5-5', 10000, 5000), 0.07));
+
   console.log('C. usageOf 格式正規化');
   let u = M.usageOf({ input_tokens: 1200, output_tokens: 300, total_tokens: 1500, output_tokens_details: { reasoning_tokens: 120 } });
   check('Responses API 格式', u.input === 1200 && u.output === 300 && u.reasoning === 120);
@@ -79,7 +83,7 @@ const TABLE = { schema_version: 1, updated_at: '2026-09-25', models: {
   global.fetch = async () => { throw new Error('offline'); };
   let t = await M1.loadPricing();
   check('fetch 失敗 → 退回內嵌後備表', t === M1.PRICING_FALLBACK);
-  for (const id of ['gpt-6-astra', 'gpt-6.1-sol', 'gpt-6.1-terra', 'grok-4.3', 'grok-4.7'])
+  for (const id of ['gpt-6-astra', 'gpt-6.1-sol', 'gpt-6.1-terra', 'claude-fable-5-2', 'claude-opus-5-5', 'claude-sonnet-5-5', 'grok-4.3', 'grok-4.7'])
     check(`後備表含下拉選單模型 ${id}`, !!t.models[id]);
   const M2 = fresh();
   global.fetch = async (url, opts) => ({ ok: true, json: async () => ({ schema_version: 1, updated_at: '2099-01-01', models: { 'x': { input: 1, output: 2 } } }) });
@@ -94,6 +98,32 @@ const TABLE = { schema_version: 1, updated_at: '2026-09-25', models: {
   global.fetch = async () => ({ ok: true, json: async () => ({ garbage: true }) });
   t = await M4.loadPricing();
   check('JSON 缺 models → 退回內嵌後備表', t === M4.PRICING_FALLBACK);
+
+  console.log('F. AI 花費統計（月份 → 模型累計）');
+  check('monthKeyOf 補零', M.monthKeyOf(new Date(2026, 0, 31)) === '2026-01' && M.monthKeyOf(new Date(2026, 10, 10)) === '2026-11');
+  const log = {};
+  M.addUsageRecord(log, '2026-11', 'gpt-6.1-sol', { input: 10000, output: 5000, reasoning: 0 }, 0.07);
+  M.addUsageRecord(log, '2026-11', 'gpt-6.1-sol', { input: 2000, output: 1000, reasoning: 0 }, 0.014);
+  M.addUsageRecord(log, '2026-11', 'grok-4.3', { input: 40000, output: 4000, reasoning: 0 }, 0.06);
+  M.addUsageRecord(log, '2026-11', 'my-custom', { input: 500, output: 100, reasoning: 0 }, null);
+  M.addUsageRecord(log, '2026-11', 'gpt-6.1-sol', null, null);
+  M.addUsageRecord(log, '2026-10', 'gpt-6-astra', { input: 1000, output: 1000, reasoning: 0 }, 0.06);
+  let mr = M.usageMonthRows(log, '2026-11');
+  check('同模型同月累加', mr.rows[0].model === 'gpt-6.1-sol' && mr.rows[0].calls === 3 && mr.rows[0].input === 12000 && mr.rows[0].output === 6000 && near(mr.rows[0].cost, 0.084));
+  check('依費用高→低排序', mr.rows.map(x => x.model).join() === 'gpt-6.1-sol,grok-4.3,my-custom');
+  check('費率未知／無 usage 計入 unpriced、不計費用', mr.rows[0].unpriced === 1 && mr.rows[2].unpriced === 1 && mr.rows[2].cost === 0 && mr.rows[2].input === 500);
+  check('月合計', mr.total.calls === 5 && mr.total.input === 52500 && mr.total.output === 10100 && near(mr.total.cost, 0.144) && mr.total.unpriced === 2);
+  check('月份互不混算', M.usageMonthRows(log, '2026-10').total.calls === 1 && near(M.usageMonthRows(log, '2026-10').total.cost, 0.06));
+  mr = M.usageMonthRows(log, '2025-01');
+  check('無紀錄月份 → 空表、合計為 0', mr.rows.length === 0 && mr.total.calls === 0 && mr.total.cost === 0);
+  check('log 為 null 也可', M.usageMonthRows(null, '2026-11').rows.length === 0);
+  const big = {};
+  for (let i = 0; i < 15; i++) M.addUsageRecord(big, M.monthKeyOf(new Date(2025, i, 1)), 'm', { input: 1, output: 1 }, 0.001);
+  check(`只保留最近 ${M.USAGE_MONTHS_MAX} 個月`, Object.keys(big).length === M.USAGE_MONTHS_MAX && !big['2025-03'] && !!big['2025-04'] && !!big['2026-03']);
+  const clean = M.sanitizeUsageLog({ '2026-11': { 'gpt-6.1-sol': { calls: 2, input: 100, output: 50, cost: 0.01, unpriced: 0 }, bad: null, neg: { calls: -1, input: 'x', cost: NaN } }, 'not-a-month': { m: { calls: 1 } }, '2026-10': 'junk' });
+  check('sanitize 保留合法紀錄', clean['2026-11']['gpt-6.1-sol'].calls === 2 && near(clean['2026-11']['gpt-6.1-sol'].cost, 0.01));
+  check('sanitize 丟棄非法月份／紀錄、壞數字歸零', !clean['not-a-month'] && !clean['2026-10'] && !('bad' in clean['2026-11']) && clean['2026-11'].neg.calls === 0 && clean['2026-11'].neg.cost === 0 && clean['2026-11'].neg.input === 0);
+  check('sanitize 非物件 → 空表', Object.keys(M.sanitizeUsageLog(null)).length === 0 && Object.keys(M.sanitizeUsageLog([1, 2])).length === 0 && Object.keys(M.sanitizeUsageLog('x')).length === 0);
 
   console.log(fail === 0 ? `ALL ${pass} TESTS PASSED` : `${fail} TEST(S) FAILED`);
   process.exit(fail === 0 ? 0 : 1);
