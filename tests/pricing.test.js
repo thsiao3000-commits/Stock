@@ -10,7 +10,7 @@ function extract(startMarker, endMarker) {
 }
 const src = extract('const PRICING_URL', '/* ════════════════ OpenAI（串流）');
 // 每次呼叫得到一組全新的模組（pricingPromise 是快取，測 loadPricing 兩種路徑要各自乾淨）
-const fresh = () => new Function(src + '\nreturn { PRICING_FALLBACK, loadPricing, effectiveRates, estimateCostUSD, usageOf, usageLabel, usageTail, monthKeyOf, sanitizeUsageLog, addUsageRecord, usageMonthRows, USAGE_MONTHS_MAX };')();
+const fresh = () => new Function(src + '\nreturn { PRICING_FALLBACK, loadPricing, effectiveRates, estimateCostUSD, usageOf, usageLabel, usageTail, monthKeyOf, sanitizeUsageLog, addUsageRecord, usageMonthRows, USAGE_MONTHS_MAX, xaiToolFee, XAI_TOOL_RATES };')();
 
 let pass = 0, fail = 0;
 function check(name, cond) { cond ? (pass++, console.log('  ✓', name)) : (fail++, console.log('  ✗ FAIL:', name)); }
@@ -124,6 +124,34 @@ const TABLE = { schema_version: 1, updated_at: '2026-09-25', models: {
   check('sanitize 保留合法紀錄', clean['2026-11']['gpt-6.1-sol'].calls === 2 && near(clean['2026-11']['gpt-6.1-sol'].cost, 0.01));
   check('sanitize 丟棄非法月份／紀錄、壞數字歸零', !clean['not-a-month'] && !clean['2026-10'] && !('bad' in clean['2026-11']) && clean['2026-11'].neg.calls === 0 && clean['2026-11'].neg.cost === 0 && clean['2026-11'].neg.input === 0);
   check('sanitize 非物件 → 空表', Object.keys(M.sanitizeUsageLog(null)).length === 0 && Object.keys(M.sanitizeUsageLog([1, 2])).length === 0 && Object.keys(M.sanitizeUsageLog('x')).length === 0);
+
+  console.log('G. xAI x_search 工具費（依抓取項目數）');
+  const det = (o) => ({ input_tokens: 1, output_tokens: 1, server_side_tool_usage_details: o });
+  let fee = M.xaiToolFee(det({ web_search_calls: 0, x_search_calls: 2, x_posts_fetched: 44, x_users_fetched: 3 }));
+  check('官方範例：44 則貼文＋3 個帳號 → 0.22＋0.03＝0.25', near(fee.cost, 0.25));
+  check('註記列出則數與帳號數（不列呼叫次數）', fee.note === '44 則貼文、3 個帳號檔案');
+  fee = M.xaiToolFee(det({ x_search_calls: 5, x_posts_fetched: 1200, x_users_fetched: 0 }));
+  check('1,200 則貼文 → 6.00、千分位', near(fee.cost, 6) && fee.note === '1,200 則貼文');
+  fee = M.xaiToolFee(det({ x_search_calls: 1, x_posts_fetched: 0, x_users_fetched: 0 }));
+  check('搜尋了但抓到 0 則 → 費用 0（已知，不是未知）', fee && fee.cost === 0 && fee.note === '抓取 0 則');
+  fee = M.xaiToolFee(det({ web_search_calls: 4, x_posts_fetched: 10 }));
+  check('web_search 按次計（4 次 0.02）＋貼文 0.05', near(fee.cost, 0.07) && fee.note === '10 則貼文、4 次 web search');
+  check('只有呼叫次數、沒有抓取數（舊格式）→ null', M.xaiToolFee(det({ x_search_calls: 3 })) === null);
+  check('無明細／null → null', M.xaiToolFee({ input_tokens: 1, output_tokens: 1 }) === null && M.xaiToolFee(null) === null);
+  check('壞數字不計', near(M.xaiToolFee(det({ x_posts_fetched: 20, x_users_fetched: 'x' })).cost, 0.1));
+  const ug = { input: 40000, output: 4000, reasoning: 0 };
+  check('標籤：總額含工具費並註明', M.usageLabel(ug, 0.06, 'x_search', { cost: 0.25, note: '44 則貼文、3 個帳號檔案' }) === 'tokens 輸入 40,000／輸出 4,000　·　約 US$0.310（含 x_search 工具費 US$0.250：44 則貼文、3 個帳號檔案）');
+  check('標籤：tokens 費率未知仍列工具費', M.usageLabel(ug, null, 'x_search', { cost: 0.25, note: '44 則貼文' }) === 'tokens 輸入 40,000／輸出 4,000　·　tokens 費率未知；x_search 工具費 US$0.250：44 則貼文');
+  check('標籤：無工具費資料 → 維持「不含 x_search 工具費」', M.usageLabel(ug, 0.06, 'x_search', null).endsWith('約 US$0.060（不含 x_search 工具費）'));
+  const tl = {};
+  M.addUsageRecord(tl, '2026-11', 'grok-4.3', ug, 0.06, 0.25);
+  M.addUsageRecord(tl, '2026-11', 'grok-4.3', ug, 0.06, 0);
+  M.addUsageRecord(tl, '2026-11', 'gpt-6.1-sol', { input: 10000, output: 5000 }, 0.07);
+  mr = M.usageMonthRows(tl, '2026-11');
+  check('統計：工具費併入合計、另記 tool 欄', near(mr.rows[0].cost, 0.37) && near(mr.rows[0].tool, 0.25) && mr.rows[0].model === 'grok-4.3');
+  check('統計：無工具費的模型 tool＝0', mr.rows[1].tool === 0 && near(mr.rows[1].cost, 0.07));
+  check('統計：月合計含工具費', near(mr.total.cost, 0.44) && near(mr.total.tool, 0.25));
+  check('舊紀錄（無 tool 欄）讀入後 tool＝0、合計不變', M.sanitizeUsageLog({ '2026-11': { m: { calls: 1, input: 1, output: 1, cost: 0.5, unpriced: 0 } } })['2026-11'].m.tool === 0 && near(M.usageMonthRows({ '2026-11': { m: { calls: 1, input: 1, output: 1, cost: 0.5, unpriced: 0 } } }, '2026-11').total.tool, 0));
 
   console.log(fail === 0 ? `ALL ${pass} TESTS PASSED` : `${fail} TEST(S) FAILED`);
   process.exit(fail === 0 ? 0 : 1);
