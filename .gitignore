@@ -2,3 +2,5 @@
 __pycache__/
 .env
 design_handoff_stock_tw_responsive/
+_harness.html
+/*.png
