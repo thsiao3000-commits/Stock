@@ -4,6 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>💼 我的投資組合 + AI 分析</title>
+<script id="themeBoot">
+// 佈景主題先行套用（避免載入瞬間閃一下錯的配色）；規則與下方 storedTheme()/resolveTheme() 相同
+(function () {
+  var t = 'light';
+  try { var j = JSON.parse(localStorage.getItem('twpf_v1') || 'null'); if (j) t = (j.settings && j.settings.theme) || 'dark'; } catch (e) {}
+  if (t !== 'dark' && t !== 'light') t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
 <style>
   :root {
     --bg: #0f1419;
@@ -16,6 +25,31 @@
     --up: #ff6b6b;     /* 台股慣例：紅漲 */
     --down: #2ecc8f;   /* 綠跌 */
     --gold: #f6b93b;
+    --on-accent: #04101f;   /* 主按鈕文字 */
+    --panel3: #141b25;      /* 明細面板底色 */
+    --head: #131b26;        /* 頁首漸層起點 */
+    --code: #0d1117;
+    --ma20: #ff9f43; --ma60: #b48ff0;
+    --badge-tw: #7cc7ff; --badge-tw-bd: #2b5d86;
+    --badge-us: #ffd28a; --badge-us-bd: #8a6a2b;
+    --badge-bond: #9be8c5; --badge-bond-bd: #2b7a55;
+    /* rgba() 用的三原色（半透明底色、陰影、圖表量能柱） */
+    --bg-rgb: 15,20,25; --accent-rgb: 74,163,255; --gold-rgb: 246,185,59; --up-rgb: 255,107,107; --down-rgb: 46,204,143;
+    --shadow: rgba(0,0,0,.5);
+    color-scheme: dark;
+  }
+  /* 淺色佈景：由 <html data-theme="light"> 啟用（「跟隨系統」由 JS 解析成 dark／light 後寫入） */
+  :root[data-theme="light"] {
+    --bg: #f4f2ec; --panel: #fffefb; --panel2: #f1eee7; --border: #d9d4c8; --text: #1d1c1a; --muted: #666156;
+    --accent: #0b5cad; --up: #c0392b; --down: #1e8e5a; --gold: #8a6d1a;
+    --on-accent: #ffffff; --panel3: #f7f5ef; --head: #e9e5dc; --code: #ebe7dc;
+    --ma20: #e08a1e; --ma60: #8e6fd0;
+    --badge-tw: #1f6fb2; --badge-tw-bd: #9cc3e4;
+    --badge-us: #8f6410; --badge-us-bd: #dcc48e;
+    --badge-bond: #1e7a52; --badge-bond-bd: #9fd3bb;
+    --bg-rgb: 244,242,236; --accent-rgb: 11,92,173; --gold-rgb: 138,109,26; --up-rgb: 192,57,43; --down-rgb: 30,142,90;
+    --shadow: rgba(60,50,30,.18);
+    color-scheme: light;
   }
   * { box-sizing: border-box; }
   body {
@@ -25,7 +59,7 @@
   }
   header {
     padding: 24px 20px 12px; text-align: center;
-    background: linear-gradient(180deg, #131b26, var(--bg));
+    background: linear-gradient(180deg, var(--head), var(--bg));
   }
   header h1 { margin: 0 0 4px; font-size: 1.6rem; }
   header p { margin: 0; color: var(--muted); font-size: .9rem; }
@@ -35,13 +69,13 @@
   #topNav {
     position: sticky; top: 0; z-index: 20;
     border-bottom: 1px solid var(--border);
-    background: rgba(15,20,25,.93); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    background: rgba(var(--bg-rgb),.93); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
   }
   #topNavScroll { text-align: center; white-space: nowrap; overflow-x: auto; padding: 8px 12px; scrollbar-width: none; }
   #topNavScroll::-webkit-scrollbar { display: none; }
   #topNav.canScroll::after {   /* 內容溢出且未捲到底時的右緣提示（JS 切換） */
     content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 32px;
-    pointer-events: none; background: linear-gradient(to left, rgba(15,20,25,.95), transparent);
+    pointer-events: none; background: linear-gradient(to left, rgba(var(--bg-rgb),.95), transparent);
   }
   #topNav a {
     display: inline-block; color: var(--muted); text-decoration: none;
@@ -59,7 +93,7 @@
   section, details.box, #kolBox, #helpQ0 { scroll-margin-top: 54px; }   /* 錨點落點避開 sticky 導覽高度 */
   /* 範例資料橫幅：JS 以 style.display 切換 flex/none（display 不寫在 CSS，避免 inline '' 回落問題） */
   #demoBar { align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 16px; padding: 10px 16px;
-    background: rgba(246,185,59,.1); border: 1px solid var(--gold); border-radius: 12px; font-size: .86rem; }
+    background: rgba(var(--gold-rgb),.1); border: 1px solid var(--gold); border-radius: 12px; font-size: .86rem; }
   section, details.box {
     background: var(--panel); border: 1px solid var(--border);
     border-radius: 14px; padding: 20px; margin-top: 20px; display: block;
@@ -87,7 +121,7 @@
   details.hintFold > summary:hover { color: var(--accent); }
   details.hintFold > .hint { margin-top: 6px; line-height: 1.7; }
   button.primary {
-    background: var(--accent); color: #04101f; font-weight: 700;
+    background: var(--accent); color: var(--on-accent); font-weight: 700;
     padding: 10px 22px; cursor: pointer; border: none;
   }
   button.primary:hover { filter: brightness(1.1); }
@@ -115,8 +149,8 @@
   .tableScroll { overflow-x: auto; border-radius: 8px; }
   /* 捲動陰影提示：表格還有欄位可往右（或往左）捲時，邊緣出現漸層，避免「總損益」等右側欄位被默默藏揉 */
   .tableWrap::before, .tableWrap::after { content: ''; position: absolute; top: 1px; bottom: 1px; width: 36px; pointer-events: none; opacity: 0; transition: opacity .15s; z-index: 3; border-radius: 8px; }
-  .tableWrap::before { left: 1px; background: linear-gradient(90deg, rgba(15,20,25,.7), transparent); }
-  .tableWrap::after  { right: 1px; background: linear-gradient(270deg, rgba(15,20,25,.7), transparent); }
+  .tableWrap::before { left: 1px; background: linear-gradient(90deg, rgba(var(--bg-rgb),.7), transparent); }
+  .tableWrap::after  { right: 1px; background: linear-gradient(270deg, rgba(var(--bg-rgb),.7), transparent); }
   .tableWrap.more-l::before { opacity: 1; }
   .tableWrap.more-r::after  { opacity: 1; }
   table { border-collapse: collapse; width: 100%; font-size: .84rem; }
@@ -125,19 +159,19 @@
   th { position: sticky; top: 0; background: var(--panel2); color: var(--muted); font-weight: 600; }
   td.l, th.l { text-align: left; }
   tr.prow { cursor: pointer; }
-  tr.prow:hover td { background: rgba(74,163,255,.06); }
+  tr.prow:hover td { background: rgba(var(--accent-rgb),.06); }
   /* 新增持倉成功後，該列短暫高亮，讓使用者確認「加進去了」 */
-  @keyframes rowflash { 0% { background: rgba(246,185,59,.32); } 100% { background: transparent; } }
+  @keyframes rowflash { 0% { background: rgba(var(--gold-rgb),.32); } 100% { background: transparent; } }
   tr.flash td { animation: rowflash 1.6s ease-out; }
   .badge { display: inline-block; font-size: .72rem; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--border); color: var(--muted); }
-  .badge.tw { color: #7cc7ff; border-color: #2b5d86; }
-  .badge.us { color: #ffd28a; border-color: #8a6a2b; }
-  .badge.bond { color: #9be8c5; border-color: #2b7a55; }
+  .badge.tw { color: var(--badge-tw); border-color: var(--badge-tw-bd); }
+  .badge.us { color: var(--badge-us); border-color: var(--badge-us-bd); }
+  .badge.bond { color: var(--badge-bond); border-color: var(--badge-bond-bd); }
   /* 持倉明細面板：移到表格外，永遠以可視寬度呈現，編輯／刪除 icon 不再被橫向捲動藏到最右邊 */
   #posExpand { margin-top: 12px; }
-  .expandPanel { background: #141b25; border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .expandPanel { background: var(--panel3); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
   .splitHint { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; padding: 10px 14px;
-    border: 1px solid var(--gold); border-radius: 8px; background: rgba(246,185,59,.08); font-size: .9rem; }
+    border: 1px solid var(--gold); border-radius: 8px; background: rgba(var(--gold-rgb),.08); font-size: .9rem; }
   .splitHint > span:first-child { flex: 1 1 260px; }
   .splitHintBtns { display: flex; gap: 8px; }
   .epHead { display: flex; align-items: center; gap: 10px; font-size: .95rem; margin-bottom: 10px; }
@@ -146,7 +180,7 @@
   /* 交易明細的操作欄：黏在右緣，橫向捲動時 icon 永遠可見 */
   .txTable th.act, .txTable td.act { position: sticky; right: 0; }
   .txTable th.act { background: var(--panel2); z-index: 2; }
-  .txTable td.act { background: #141b25; box-shadow: -8px 0 8px -6px rgba(0,0,0,.5); }
+  .txTable td.act { background: var(--panel3); box-shadow: -8px 0 8px -6px var(--shadow); }
   .txTable td.act .tact { display: inline-flex; gap: 6px; }
   .txTable td.act .tact button { padding: 5px 10px; font-size: .95rem; }
   .tableWrap.txTable::after { display: none; }   /* \u64cd\u4f5c\u6b04\u5df2\u91d8\u53f3\uff0c\u4e0d\u9700\u53f3\u5074\u6372\u52d5\u63d0\u793a */
@@ -158,7 +192,7 @@
   #chart { width: 100%; height: 360px; display: block; }
   #tooltip {
     position: absolute; pointer-events: none; display: none;
-    background: rgba(15,20,25,.95); border: 1px solid var(--border);
+    background: rgba(var(--bg-rgb),.95); border: 1px solid var(--border);
     border-radius: 8px; padding: 6px 10px; font-size: .78rem; white-space: nowrap; z-index: 5;
   }
   .legend { display: flex; gap: 18px; font-size: .8rem; color: var(--muted); margin-top: 6px; flex-wrap: wrap; }
@@ -170,8 +204,8 @@
   .aiReport h1, .aiReport h2, .aiReport h3, .aiReport h4 { color: var(--accent); margin: 14px 0 6px; }
   .aiReport h1 { font-size: 1.2rem; } .aiReport h2 { font-size: 1.1rem; } .aiReport h3 { font-size: 1rem; }
   .aiReport table { margin: 8px 0; } .aiReport th, .aiReport td { text-align: left; position: static; }
-  .aiReport code { background: #0d1117; padding: 1px 6px; border-radius: 5px; font-size: .85em; }
-  .aiReport pre { background: #0d1117; padding: 12px; border-radius: 8px; overflow-x: auto; }
+  .aiReport code { background: var(--code); padding: 1px 6px; border-radius: 5px; font-size: .85em; }
+  .aiReport pre { background: var(--code); padding: 12px; border-radius: 8px; overflow-x: auto; }
   .aiReport ul, .aiReport ol { padding-left: 22px; }
   .aiReport a { color: var(--accent); word-break: break-all; }
   .aiReport blockquote { border-left: 3px solid var(--accent); margin: 8px 0; padding: 2px 12px; color: var(--muted); }
@@ -182,7 +216,7 @@
   .fuChips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
   .fuChips button { font-size: .78rem; padding: 4px 11px; border-radius: 99px; color: var(--muted); background: none; cursor: pointer; }
   .fuChips button:hover { border-color: var(--accent); color: var(--text); }
-  .fuAsk.dragover { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(74,163,255,.25); }
+  .fuAsk.dragover { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(var(--accent-rgb),.25); }
   .fuFiles { display: none; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .fuFiles span { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; padding: 3px 6px 3px 10px; border-radius: 99px; border: 1px solid var(--border); background: var(--panel); color: var(--text); max-width: 100%; }
   .fuFiles span small { color: var(--muted); }
@@ -195,7 +229,9 @@
   @media (max-width: 600px) { main { padding: 8px 12px 40px; } section, details.box { padding: 14px; } th, td { padding: 6px 7px; } table { font-size: .8rem; } }
   /* 列印／存 PDF：白底黑字省墨，隱藏設定（含 API 金鑰）、按鈕、輸入欄與圖表 */
   @media print {
-    :root { --bg:#fff; --panel:#fff; --panel2:#f5f5f5; --border:#bbb; --text:#111; --muted:#555; --accent:#0b5cad; --up:#c0392b; --down:#1e8e5a; --gold:#8a6d1a; }
+    :root, :root[data-theme] { --bg:#fff; --panel:#fff; --panel2:#f5f5f5; --border:#bbb; --text:#111; --muted:#555; --accent:#0b5cad; --up:#c0392b; --down:#1e8e5a; --gold:#8a6d1a;
+      --on-accent:#fff; --panel3:#fff; --head:#fff; --code:#f2f2f2; --badge-tw:#1f6fb2; --badge-tw-bd:#9cc3e4; --badge-us:#8f6410; --badge-us-bd:#dcc48e; --badge-bond:#1e7a52; --badge-bond-bd:#9fd3bb;
+      --bg-rgb:255,255,255; --accent-rgb:11,92,173; --gold-rgb:138,109,26; --up-rgb:192,57,43; --down-rgb:30,142,90; color-scheme: light; }
     body, header { background: #fff; }
     button, input, select, textarea, label.field, .seg, .pw, .status, .hint, .legend,
     #setupBox, #addBox, #chartWrap, #perfChartWrap, #manualWrap, #topNav, #onboardBox, .fuAsk, #fuLive { display: none !important; }
@@ -310,6 +346,9 @@
       </label>
       <label class="field">USD/TWD 匯率（留空＝自動抓取）
         <input id="fxOverride" type="number" step="0.0001" min="0" placeholder="自動">
+      </label>
+      <label class="field">佈景主題
+        <select id="themeSel"><option value="auto">跟隨系統</option><option value="dark">深色</option><option value="light">淺色</option></select>
       </label>
     </div>
     <label class="field" style="margin-top:12px">🎯 投資目標與風險偏好（選填；會寫進個股與組合的 AI Prompt，讓「加碼／減碼／停損」等建議貼合你的目標，而非通用答案）
@@ -479,10 +518,10 @@
     </div>
     <div class="legend" id="chartLegend" style="display:none">
       <span><i style="background:var(--accent)"></i>收盤價</span>
-      <span><i style="background:#ff9f43"></i>MA20</span>
-      <span><i style="background:#b48ff0"></i>MA60</span>
+      <span><i style="background:var(--ma20)"></i>MA20</span>
+      <span><i style="background:var(--ma60)"></i>MA60</span>
       <span><i style="background:var(--gold)"></i>我的均價</span>
-      <span><i style="background:rgba(255,107,107,.5)"></i>量能（紅漲綠跌日）</span>
+      <span><i style="background:rgba(var(--up-rgb),.5)"></i>量能（紅漲綠跌日）</span>
       <span><span style="color:var(--up)">▲</span> 買進　<span style="color:var(--down)">▼</span> 賣出</span>
     </div>
     <div class="row">
@@ -725,7 +764,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.58.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.59.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -771,15 +810,30 @@ function daysBetween(a, b) { return Math.round((parseD(b) - parseD(a)) / 8640000
 
 /* ════════════════ 資料儲存 ════════════════ */
 const DB_KEY = 'twpf_v1';
-let db = { positions: [], watchlist: [], settings: { twelveKey: '', finmindToken: '', finnhubKey: '', xaiKey: '', anthropicKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '', cpName: '', cpDesc: '' } };
+// ── 佈景主題：設定值 auto／dark／light；新使用者預設淺色，升級前就有資料的使用者維持深色 ──
+const THEMES = ['auto', 'dark', 'light'];
+function storedTheme(saved) {   // saved：localStorage 裡的 db（沒有＝新使用者）
+  if (!saved) return 'light';
+  const t = saved.settings && saved.settings.theme;
+  return THEMES.includes(t) ? t : 'dark';
+}
+function resolveTheme(pref, systemDark) { return pref === 'dark' || pref === 'light' ? pref : (systemDark ? 'dark' : 'light'); }
+let db = { positions: [], watchlist: [], settings: { twelveKey: '', finmindToken: '', finnhubKey: '', xaiKey: '', anthropicKey: '', theme: 'light', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '', cpName: '', cpDesc: '' } };
 function loadDB() {
   try {
     const j = JSON.parse(localStorage.getItem(DB_KEY) || 'null');
-    if (j && Array.isArray(j.positions)) { db = j; db.settings = Object.assign({ twelveKey: '', finmindToken: '', finnhubKey: '', xaiKey: '', anthropicKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '', cpName: '', cpDesc: '' }, j.settings || {}); }
+    if (j && Array.isArray(j.positions)) { const theme = storedTheme(j); db = j; db.settings = Object.assign({ theme, twelveKey: '', finmindToken: '', finnhubKey: '', xaiKey: '', anthropicKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '', cpName: '', cpDesc: '' }, j.settings || {}); }
   } catch (_) {}
   if (!Array.isArray(db.watchlist)) db.watchlist = [];   // 舊資料無觀察清單 → 補空陣列
 }
 function saveDB() { localStorage.setItem(DB_KEY, JSON.stringify(db)); }
+const sysDark = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
+function applyTheme() {
+  document.documentElement.setAttribute('data-theme', resolveTheme(db.settings.theme, !!(sysDark && sysDark.matches)));
+  if (typeof drawChart === 'function') { drawChart(); drawPerfChart(); }   // <canvas> 的顏色不吃 CSS，換主題要重畫
+}
+if (sysDark && sysDark.addEventListener) sysDark.addEventListener('change', () => { if (db.settings.theme === 'auto') applyTheme(); });
+const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();   // 給 <canvas> 取主題色
 function posCcy(p) { return p.market === 'tw' ? 'TWD' : p.market === 'us' ? 'USD' : (p.bond.currency || 'USD'); }
 const MKT_NAME = { tw: '台股', us: '美股', bond: '債券' };
 
@@ -2065,7 +2119,7 @@ function drawChart(hoverIdx = -1) {
   const xAt = i => padL + (W - padL - padR) * (days.length === 1 ? .5 : i / (days.length - 1));
   const yAt = v => padT + (priceB - padT) * (1 - (v - lo) / (hi - lo));
 
-  ctx.strokeStyle = '#2d3a4b'; ctx.fillStyle = '#8b9bb0';
+  ctx.strokeStyle = cssVar('--border'); ctx.fillStyle = cssVar('--muted');
   ctx.font = '11px -apple-system, "PingFang TC", sans-serif'; ctx.lineWidth = 1;
   for (let s = 0; s <= 5; s++) {
     const v = lo + (hi - lo) * s / 5, y = yAt(v);
@@ -2085,11 +2139,11 @@ function drawChart(hoverIdx = -1) {
   days.forEach((d, i) => {
     const v = vols[i]; if (!v) return;
     const up = d.close >= (i === 0 ? (d.open ?? d.close) : days[i - 1].close);
-    ctx.fillStyle = up ? 'rgba(255,107,107,.5)' : 'rgba(46,204,143,.5)';
+    ctx.fillStyle = up ? `rgba(${cssVar('--up-rgb')},.5)` : `rgba(${cssVar('--down-rgb')},.5)`;
     const bh = v / vMax * volH;
     ctx.fillRect(xAt(i) - bw / 2, H - padB - bh, bw, bh);
   });
-  ctx.fillStyle = '#8b9bb0'; ctx.textAlign = 'right';
+  ctx.fillStyle = cssVar('--muted'); ctx.textAlign = 'right';
   ctx.fillText('量', padL - 6, H - padB - volH / 2 + 4);
   // MA20／MA60 疊線（讓圖跟 AI 報告談的均線對得上）；先畫均線再畫收盤價，收盤線蓋在最上層
   const drawMA = (arr, col) => {
@@ -2098,18 +2152,18 @@ function drawChart(hoverIdx = -1) {
     arr.forEach((v, i) => { if (v == null) return; const x = xAt(i), y = yAt(v); if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y); });
     ctx.stroke();
   };
-  drawMA(aiData._ma20, '#ff9f43');
-  drawMA(aiData._ma60, '#b48ff0');
+  drawMA(aiData._ma20, cssVar('--ma20'));
+  drawMA(aiData._ma60, cssVar('--ma60'));
   // 收盤價
-  ctx.strokeStyle = '#4aa3ff'; ctx.lineWidth = 2; ctx.beginPath();
+  ctx.strokeStyle = cssVar('--accent'); ctx.lineWidth = 2; ctx.beginPath();
   closes.forEach((v, i) => i === 0 ? ctx.moveTo(xAt(i), yAt(v)) : ctx.lineTo(xAt(i), yAt(v)));
   ctx.stroke();
   // 均價線
   if (avg != null) {
-    ctx.strokeStyle = '#f6b93b'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 5]);
+    ctx.strokeStyle = cssVar('--gold'); ctx.lineWidth = 1.5; ctx.setLineDash([6, 5]);
     ctx.beginPath(); ctx.moveTo(padL, yAt(avg)); ctx.lineTo(W - padR, yAt(avg)); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = '#f6b93b'; ctx.textAlign = 'left';
+    ctx.fillStyle = cssVar('--gold'); ctx.textAlign = 'left';
     ctx.fillText('均價 ' + avg.toFixed(2), padL + 4, yAt(avg) - 5);
   }
   // 買賣標記
@@ -2120,7 +2174,7 @@ function drawChart(hoverIdx = -1) {
       const i = idxOf.get(t.date);
       if (i == null) continue;
       const x = xAt(i), y = yAt(closes[i]);
-      ctx.fillStyle = t.type === 'buy' ? '#ff6b6b' : '#2ecc8f';
+      ctx.fillStyle = cssVar(t.type === 'buy' ? '--up' : '--down');
       ctx.beginPath();
       if (t.type === 'buy') { ctx.moveTo(x, y + 9); ctx.lineTo(x - 4.5, y + 17); ctx.lineTo(x + 4.5, y + 17); }
       else { ctx.moveTo(x, y - 9); ctx.lineTo(x - 4.5, y - 17); ctx.lineTo(x + 4.5, y - 17); }
@@ -2129,9 +2183,9 @@ function drawChart(hoverIdx = -1) {
   }
   if (hoverIdx >= 0) {
     const x = xAt(hoverIdx);
-    ctx.strokeStyle = 'rgba(230,237,243,.35)'; ctx.lineWidth = 1;
+    ctx.strokeStyle = cssVar('--muted'); ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, H - padB); ctx.stroke();
-    ctx.fillStyle = '#4aa3ff'; ctx.beginPath();
+    ctx.fillStyle = cssVar('--accent'); ctx.beginPath();
     ctx.arc(x, yAt(closes[hoverIdx]), 3.5, 0, Math.PI * 2); ctx.fill();
   }
 }
@@ -2314,13 +2368,13 @@ function drawPerfChart() {
   const pad = (hi - lo) * 0.06; lo -= pad; hi += pad;
   const xAt = i => padL + (W - padL - padR) * (dates.length === 1 ? .5 : i / (dates.length - 1));
   const yAt = v => padT + (H - padT - padB) * (1 - (v - lo) / (hi - lo));
-  ctx.strokeStyle = '#2d3a4b'; ctx.fillStyle = '#8b9bb0'; ctx.font = '11px -apple-system, sans-serif'; ctx.lineWidth = 1;
+  ctx.strokeStyle = cssVar('--border'); ctx.fillStyle = cssVar('--muted'); ctx.font = '11px -apple-system, sans-serif'; ctx.lineWidth = 1;
   for (let s = 0; s <= 5; s++) { const v = lo + (hi - lo) * s / 5, y = yAt(v); ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke(); ctx.textAlign = 'right'; ctx.fillText(v.toFixed(0), padL - 6, y + 4); }
   const ticks = Math.min(6, dates.length); ctx.textAlign = 'center';
   for (let s = 0; s < ticks; s++) { const i = Math.round(s * (dates.length - 1) / Math.max(1, ticks - 1)); ctx.fillText(dates[i].slice(2), xAt(i), H - 8); }
-  ctx.strokeStyle = '#666'; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(padL, yAt(100)); ctx.lineTo(W - padR, yAt(100)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle = cssVar('--muted'); ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(padL, yAt(100)); ctx.lineTo(W - padR, yAt(100)); ctx.stroke(); ctx.setLineDash([]);
   const line = (arr, col) => { ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); let started = false; arr.forEach((v, i) => { if (v == null) return; const x = xAt(i), y = yAt(v); if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y); }); ctx.stroke(); };
-  line(bench, '#4aa3ff'); line(port, '#f6b93b');
+  line(bench, cssVar('--accent')); line(port, cssVar('--gold'));
 }
 window.addEventListener('resize', () => { if (perfData) drawPerfChart(); });
 
@@ -4058,6 +4112,7 @@ function fillSettingsUI() {
   $('twFee').value = db.settings.twFee;
   $('twTax').value = db.settings.twTax;
   $('fxOverride').value = db.settings.fxOverride || '';
+  $('themeSel').value = db.settings.theme;
   $('aiProfile').value = db.settings.aiProfile || '';
   const k = localStorage.getItem('twbt_apikey');
   $('apiKey').value = k || '';
@@ -4096,7 +4151,9 @@ function importData(file) {
     if (!confirm(`匯入將「覆蓋」目前的 ${db.positions.length} 筆持倉與設定，改為備份檔的 ${data.positions.length} 筆。確定要繼續？`)) return;
     db.positions = data.positions.filter(p => p && p.id && p.market);
     db.watchlist = Array.isArray(data.watchlist) ? data.watchlist.filter(w => w && w.id && w.symbol && w.market) : [];
-    db.settings = Object.assign({ twelveKey: '', finmindToken: '', finnhubKey: '', xaiKey: '', anthropicKey: '', twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '', cpName: '', cpDesc: '' }, data.settings || {});
+    db.settings = Object.assign({ twelveKey: '', finmindToken: '', finnhubKey: '', xaiKey: '', anthropicKey: '', theme: db.settings.theme, twFee: 0.1425, twTax: 0.3, fxOverride: '', aiProfile: '', cpName: '', cpDesc: '' }, data.settings || {});   // 舊備份無 theme → 沿用目前的
+    if (!THEMES.includes(db.settings.theme)) db.settings.theme = 'dark';
+    applyTheme();
     if (data.openaiKey) localStorage.setItem('twbt_apikey', data.openaiKey);
     if (Array.isArray(data.reports)) { reportHist = data.reports.slice(0, REPORTS_MAX); saveReports(); }   // 舊版備份無此欄位 → 保留現有歷史
     if (data.llmUsage && typeof data.llmUsage === 'object') { llmUsage = sanitizeUsageLog(data.llmUsage); saveUsage(); }   // 舊版備份無此欄位 → 保留現有統計
@@ -4126,6 +4183,7 @@ function bindSettings() {
   $('aiProfile').addEventListener('input', e => { db.settings.aiProfile = e.target.value; saveDB(); });   // 投資偏好：不 trim（保留換行），組 prompt 時才 trim
   $('twFee').addEventListener('input', e => { db.settings.twFee = parseFloat(e.target.value) || 0; saveDB(); renderAll(); });
   $('twTax').addEventListener('input', e => { db.settings.twTax = parseFloat(e.target.value) || 0; saveDB(); renderAll(); });
+  $('themeSel').addEventListener('change', e => { db.settings.theme = e.target.value; saveDB(); applyTheme(); });
   $('fxOverride').addEventListener('input', e => {
     db.settings.fxOverride = e.target.value.trim(); saveDB();
     ensureFX(false).then(renderSummary);
@@ -4304,6 +4362,7 @@ function restorePrefsUI() {
 }
 (function init() {
   loadDB();
+  applyTheme();
   bindSettings();
   loadPricing();   // 預抓模型價格表（抓不到退回內嵌表）——AI 呼叫完成時據此標示 tokens 用量與估算費用
   $('appVer').textContent = APP_VERSION;
