@@ -151,6 +151,15 @@
     .pw .eye { min-height: 36px; }
   }
   #aiReportBox:has(#aiOutput:not(:empty)) #aiEmpty { display: none; }
+  /* 資產配置環圈圖 */
+  .alloc { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 24px; }
+  .donut { width: 128px; height: 128px; flex: none; }
+  .donut text { font-family: var(--font-mono); font-size: 9px; font-weight: 600; fill: var(--muted); }
+  .allocLegend { flex: 1 1 160px; display: grid; gap: 8px; font-size: .9rem; }
+  .allocLegend > div:not(.allocWarn) { display: flex; align-items: center; gap: 8px; }
+  .allocLegend i { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+  .allocLegend b { margin-left: auto; font-family: var(--font-mono); }
+  .allocWarn { color: var(--gold); font-size: .82rem; }
   h2 .hint { font-family: var(--font-sans); font-weight: 400; }
   /* 範例資料橫幅：JS 以 style.display 切換 flex/none（display 不寫在 CSS，避免 inline '' 回落問題） */
   #demoBar { align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 16px; padding: 10px 16px;
@@ -359,7 +368,13 @@
     <div id="qStatus" class="status"></div>
   </section>
   </div>
-  <div class="col" id="homeSide"></div>
+  <div class="col" id="homeSide">
+  <!-- ── 資產配置 ── -->
+  <section id="allocBox">
+    <h2>資產配置</h2>
+    <div id="allocBody"></div>
+  </section>
+  </div>
   </div>
   </div>
 
@@ -875,7 +890,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v2.0.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v2.1.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1456,6 +1471,31 @@ function weeklyAgg(days) {   // 日線 → 週線（週一為一週起點）
   return [...map.values()];
 }
 
+/* ════════════════ 規劃工具（純函式：資產配置） ════════════════ */
+const CONC_PCT = 40;   // 單一持股占比超過此門檻就提示集中度偏高
+// items: [{ market, symbol, mv }]（mv 為換算台幣的市值）→ 各市場占比＋最大單一持股
+function allocStats(items, threshold = CONC_PCT) {
+  const list = (items || []).filter(x => x && x.mv > 0);
+  const total = list.reduce((s, x) => s + x.mv, 0);
+  const by = {};
+  for (const x of list) by[x.market] = (by[x.market] || 0) + x.mv;
+  const byMkt = ['tw', 'us', 'bond'].filter(m => by[m] > 0).map(m => ({ market: m, mv: by[m], pct: by[m] / total * 100 }));
+  let top = null;
+  for (const x of list) if (!top || x.mv > top.mv) top = x;
+  const topPct = top ? top.mv / total * 100 : 0;
+  return { total, byMkt, top: top ? { symbol: top.symbol, market: top.market, pct: topPct } : null, warn: !!top && topPct > threshold };
+}
+// 環圈圖各段：以周長 100 為單位的長度與起點（由 12 點鐘方向順時針）
+function donutArcs(byMkt) {
+  let off = 0;
+  return (byMkt || []).map(g => { const a = { market: g.market, len: g.pct, offset: off }; off += g.pct; return a; });
+}
+function fmtCompact(v) {   // NT$2.69M／NT$325K／NT$980
+  const a = Math.abs(v || 0);
+  return 'NT$' + (a >= 1e6 ? (v / 1e6).toFixed(2) + 'M' : a >= 1e3 ? Math.round(v / 1e3) + 'K' : Math.round(v || 0));
+}
+/* ════════════════ 規劃工具結束 ════════════════ */
+
 /* ════════════════ 損益引擎（加權平均成本法） ════════════════ */
 // ── 股票分割／合併（type:'split'，from → to；合併填 10 → 1）──
 // 同一天的分割排在買賣之前：分割生效日當天的成交已是分割後價格。
@@ -1673,7 +1713,29 @@ function renderSummary() {
       `<td class="${clsOf(g.total)}">${fmtMoney(g.total, 'TWD')}</td>` +
       `<td>${mvT > 0 ? (g.mv / mvT * 100).toFixed(1) + '%' : '—'}</td></tr>`;
   }).join('');
+  renderAlloc();
   updateTableShadows();
+}
+
+// 資產配置：環圈圖（台股／美股／債券，換算台幣市值）＋圖例占比＋集中度警示
+function renderAlloc() {
+  const items = [];
+  for (const p of db.positions) {
+    const c = computeRow(p), mv = toTWD(c.mv ?? c.cost, posCcy(p));
+    if (mv != null) items.push({ market: p.market, symbol: p.symbol, mv });
+  }
+  const a = allocStats(items);
+  if (!a.total) { $('allocBody').innerHTML = '<div class="hint">尚無持倉；新增持倉並更新報價後，這裡會顯示台股／美股／債券的配置比例。</div>'; return; }
+  const arcs = donutArcs(a.byMkt).map(x =>
+    `<circle cx="50" cy="50" r="38" fill="none" stroke="var(--badge-${x.market})" stroke-width="16" pathLength="100" ` +
+    `stroke-dasharray="${x.len.toFixed(3)} 100" stroke-dashoffset="${(-x.offset).toFixed(3)}" transform="rotate(-90 50 50)"/>`).join('');
+  $('allocBody').innerHTML =
+    `<div class="alloc"><svg class="donut" viewBox="0 0 100 100" role="img" aria-label="資產配置環圈圖">${arcs}` +
+    `<text x="50" y="50" text-anchor="middle" dominant-baseline="central">${fmtCompact(a.total)}</text></svg>` +
+    `<div class="allocLegend">` + a.byMkt.map(g =>
+      `<div><i style="background:var(--badge-${g.market})"></i><span>${MKT_NAME[g.market]}</span><b>${g.pct.toFixed(1)}%</b></div>`).join('') +
+    (a.warn ? `<div class="allocWarn">單一持股 ${esc(a.top.symbol)} 占 ${a.top.pct.toFixed(1)}%，集中度偏高</div>` : '') +
+    `</div></div>`;
 }
 
 function renderTable() {
