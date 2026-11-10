@@ -164,6 +164,7 @@
   .alertChip { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 1px 4px 1px 8px; border: 1px solid var(--border); border-radius: 99px; color: var(--text); white-space: nowrap; }
   .alertChip button { border: none; padding: 0 4px; min-height: 0; font-size: .8rem; color: var(--muted); }
   #planAlertRow { align-items: center; margin: 0 0 12px; }
+  .rebIn { width: 64px; padding: 4px 6px; text-align: right; margin-right: 4px; }
   /* 資產配置環圈圖 */
   .alloc { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 24px; }
   .donut { width: 128px; height: 128px; flex: none; }
@@ -696,7 +697,19 @@
     </div>
   </section>
   </div>
-  <div class="col" id="perfSide"></div>
+  <div class="col" id="perfSide">
+  <!-- ── 再平衡試算 ── -->
+  <section id="rebBox">
+    <h2>再平衡試算</h2>
+    <div class="tableWrap"><div class="tableScroll"><table>
+      <thead><tr><th class="l">市場</th><th>目前</th><th>目標</th><th>建議調整</th></tr></thead>
+      <tbody id="rebBody"></tbody>
+    </table></div></div>
+    <label style="display:flex; align-items:center; gap:8px; margin-top:12px; font-size:.9rem"><input id="rebNoSell" type="checkbox"> 只用新資金補足、不賣出</label>
+    <div id="rebNote" class="hint" style="margin-top:6px"></div>
+    <div class="hint" style="margin-top:6px; line-height:1.7">以換算台幣的市值計。目標比例自訂並隨 JSON 備份；改過目標後，試算結果會一併寫進「投資組合總評」的 Prompt。</div>
+  </section>
+  </div>
   </div>
   </div>
 
@@ -915,7 +928,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v2.2.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v2.3.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1598,6 +1611,36 @@ function extractPlanLevels(md, lastPrice) {
   }
   return out;
 }
+// ── 再平衡試算 ──
+const REB_MARKETS = ['tw', 'us', 'bond'];
+const REB_DEFAULT = { tw: 60, us: 25, bond: 15 };
+function normTargets(t) {
+  const o = {};
+  for (const m of REB_MARKETS) { const v = t && Number(t[m]); o[m] = Number.isFinite(v) && v >= 0 ? v : REB_DEFAULT[m]; }
+  return o;
+}
+// cur：各市場目前市值（台幣）；targets：目標 %（合計需為 100）；noSell：只用新資金補足、不賣出
+// → { ok, reason, total, sumT, newCash, rows:[{market,cur,curPct,tgtPct,delta}] }（delta 正＝買、負＝賣）
+function rebalance(cur, targets, noSell) {
+  const t = normTargets(targets);
+  const c = {}; let total = 0;
+  for (const m of REB_MARKETS) { c[m] = Math.max(0, +(cur && cur[m]) || 0); total += c[m]; }
+  const sumT = REB_MARKETS.reduce((s, m) => s + t[m], 0);
+  const rows = REB_MARKETS.map(m => ({ market: m, cur: c[m], curPct: total > 0 ? c[m] / total * 100 : 0, tgtPct: t[m], delta: null }));
+  if (!(total > 0)) return { ok: false, reason: 'empty', total, sumT, newCash: 0, rows };
+  if (Math.abs(sumT - 100) > 0.01) return { ok: false, reason: 'sum', total, sumT, newCash: 0, rows };
+  let newCash = 0;
+  if (noSell) {
+    for (const m of REB_MARKETS) {
+      if (c[m] <= 0) continue;
+      if (t[m] <= 0) return { ok: false, reason: 'nosell', total, sumT, newCash: 0, rows, market: m };   // 目標 0% 但有部位：不賣出就到不了
+      newCash = Math.max(newCash, c[m] / (t[m] / 100) - total);
+    }
+  }
+  const base = total + newCash;
+  for (const r of rows) { const d = base * r.tgtPct / 100 - r.cur; r.delta = Math.abs(d) < 0.5 ? 0 : d; }
+  return { ok: true, reason: '', total, sumT, newCash, rows };
+}
 /* ════════════════ 規劃工具結束 ════════════════ */
 
 /* ════════════════ 損益引擎（加權平均成本法） ════════════════ */
@@ -1760,7 +1803,7 @@ let expandedId = null;
 let editTxId = null;   // 正在編輯的交易 id（null＝新增模式）
 let flashId = null;    // 剛新增成功的持倉 id（用於高亮提示）
 let quoteNote = null;  // {id, msg} 個股報價更新結果（renderAll 後於明細面板顯示）
-function renderAll() { renderSummary(); renderTable(); renderAISelect(); renderPerf(); renderWatchlist(); renderCalendar(); }
+function renderAll() { renderSummary(); renderTable(); renderAISelect(); renderPerf(); renderWatchlist(); renderCalendar(); renderRebalance(); }
 
 // 表格捲動陰影：表格寬度超出容器、右側（或左側）還有欄位時，於邊緣顯示漸層提示
 function shadowOne(s) {
@@ -1821,6 +1864,52 @@ function renderSummary() {
   updateTableShadows();
 }
 
+function mvByMarket() {   // 各市場市值（換算台幣；缺匯率的外幣部位不計）
+  const by = { tw: 0, us: 0, bond: 0 };
+  for (const p of db.positions) { const c = computeRow(p), mv = toTWD(c.mv ?? c.cost, posCcy(p)); if (mv != null) by[p.market] += mv; }
+  return by;
+}
+/* ── 再平衡試算 ── */
+function rebResult() { return rebalance(mvByMarket(), db.settings.rebTargets, !!db.settings.rebNoSell); }
+function renderRebalance() {
+  const t = normTargets(db.settings.rebTargets), r = rebResult();
+  $('rebNoSell').checked = !!db.settings.rebNoSell;
+  $('rebBody').innerHTML = r.rows.map(x =>
+    `<tr><td class="l"><span class="badge ${x.market}">${MKT_NAME[x.market]}</span></td><td>${r.total > 0 ? x.curPct.toFixed(1) + '%' : '—'}</td>` +
+    `<td><input type="number" class="rebIn" data-reb="${x.market}" min="0" max="100" step="1" value="${t[x.market]}" aria-label="${MKT_NAME[x.market]}目標百分比">%</td>` +
+    `<td id="reb_d_${x.market}"></td></tr>`).join('');
+  $$('#rebBody .rebIn').forEach(el => el.oninput = () => {
+    const cur = normTargets(db.settings.rebTargets);
+    const v = parseFloat(el.value);
+    cur[el.dataset.reb] = Number.isFinite(v) && v >= 0 ? v : 0;
+    db.settings.rebTargets = cur; saveDB(); fillRebalance();
+  });
+  fillRebalance();
+}
+function fillRebalance() {   // 只更新結果欄與說明（不重建輸入框，打字時焦點不會跳掉）
+  const r = rebResult();
+  for (const x of r.rows) {
+    const td = $('reb_d_' + x.market); if (!td) continue;
+    td.className = r.ok && x.delta ? (x.delta > 0 ? 'pos' : 'neg') : '';
+    td.textContent = !r.ok ? '—' : x.delta === 0 ? '不需調整' : `${x.delta > 0 ? '買' : '賣'} ${fmtMoney(Math.abs(x.delta), 'TWD')}`;
+  }
+  const note = $('rebNote'); note.className = 'hint';
+  if (r.reason === 'empty') note.textContent = '尚無持倉或缺報價／匯率，無法試算。';
+  else if (r.reason === 'sum') { note.className = 'status error'; note.textContent = `目標合計 ${+r.sumT.toFixed(2)}%，需為 100% 才能試算。`; }
+  else if (r.reason === 'nosell') { note.className = 'status error'; note.textContent = `${MKT_NAME[r.market]}目標為 0% 但目前有部位：不賣出無法達成，請調整目標或取消勾選。`; }
+  else note.textContent = db.settings.rebNoSell
+    ? (r.newCash > 0.5 ? `需投入新資金約 ${fmtMoney(r.newCash, 'TWD')}，全部用於買進，即可達到目標比例。` : '目前比例已符合目標，不需投入新資金。')
+    : '賣出金額未扣手續費與證交稅；債券通常有最小交易面額，實際調整以整數單位為準。';
+}
+// 給投資組合總評 Prompt 的一行（使用者改過目標或勾選才附）
+function rebPromptLine() {
+  if (!db.settings.rebTargets && !db.settings.rebNoSell) return '';
+  const r = rebResult();
+  if (!r.ok) return '';
+  const tg = r.rows.map(x => `${MKT_NAME[x.market]} ${x.tgtPct}%`).join('、');
+  const adj = r.rows.map(x => `${MKT_NAME[x.market]} ${x.delta === 0 ? '不需調整' : (x.delta > 0 ? '買 ' : '賣 ') + fmtMoney(Math.abs(x.delta), 'TWD')}`).join('、');
+  return `\n- 我設定的目標配置：${tg}${db.settings.rebNoSell ? `（只用新資金補足、不賣出；需投入約 ${fmtMoney(r.newCash, 'TWD')}）` : ''}；程式試算的調整金額：${adj}（請在第 4 章以此為基礎給建議，並指出這個目標本身是否合理）`;
+}
 // 資產配置：環圈圖（台股／美股／債券，換算台幣市值）＋圖例占比＋集中度警示
 function renderAlloc() {
   const items = [];
@@ -4070,7 +4159,7 @@ ${lines.join('\n')}
 - 總市值 ${fmtMoney(mvT, 'TWD')}、持有成本 ${fmtMoney(costT, 'TWD')}
 - 未實現損益 ${fmtMoney(unrealT, 'TWD')}（${costT > 0 ? fmtPct(unrealT / costT * 100) : '—'}）、已實現＋股息息收 ${fmtMoney(rdT, 'TWD')}、總損益 ${fmtMoney(totalT, 'TWD')}${xirrLine}${curveLine}
 - 市場配置：${alloc(byMkt) || '—'}；幣別配置：${alloc(byCcy) || '—'}
-- 個別部位占比：${weights || '—'}
+- 個別部位占比：${weights || '—'}${rebPromptLine()}
 ${profileBlock}${bondNote}
 請依下列章節撰寫：
 ${bondCheck}1. 資產配置與集中度（單一標的、市場、幣別的集中風險）
@@ -4604,6 +4693,7 @@ function bindSettings() {
   $('aiProfile').addEventListener('input', e => { db.settings.aiProfile = e.target.value; saveDB(); });   // 投資偏好：不 trim（保留換行），組 prompt 時才 trim
   $('twFee').addEventListener('input', e => { db.settings.twFee = parseFloat(e.target.value) || 0; saveDB(); renderAll(); });
   $('twTax').addEventListener('input', e => { db.settings.twTax = parseFloat(e.target.value) || 0; saveDB(); renderAll(); });
+  $('rebNoSell').addEventListener('change', e => { db.settings.rebNoSell = e.target.checked; saveDB(); fillRebalance(); });
   $('themeSel').addEventListener('change', e => { db.settings.theme = e.target.value; saveDB(); applyTheme(); });
   $('fxOverride').addEventListener('input', e => {
     db.settings.fxOverride = e.target.value.trim(); saveDB();

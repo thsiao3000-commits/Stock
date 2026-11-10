@@ -97,5 +97,32 @@ const near = (a, b, e = 1e-6) => Math.abs(a - b) < e;
   check('沒有表格 → 空陣列', extractPlanLevels('只有文字 1,000', 100).length === 0 && extractPlanLevels(null).length === 0);
 }
 
+// ── 再平衡試算 ──
+{
+  const { rebalance, normTargets, REB_DEFAULT } = T;
+  const cur = { tw: 2170000, us: 201929, bond: 322400 }, total = 2694329;
+  let r = rebalance(cur, { tw: 60, us: 25, bond: 15 }, false);
+  const d = Object.fromEntries(r.rows.map(x => [x.market, Math.round(x.delta)]));
+  check('一般再平衡：台股賣 553,403、美股買 471,653、債券買 81,749', r.ok && d.tw === -553403 && d.us === 471653 && d.bond === 81749);
+  check('買賣金額相抵為 0、不需新資金', Math.abs(r.rows.reduce((s, x) => s + x.delta, 0)) < 1e-6 && r.newCash === 0);
+  check('目前占比', r.rows.map(x => x.curPct.toFixed(1)).join() === '80.5,7.5,12.0');
+  r = rebalance(cur, { tw: 60, us: 25, bond: 15 }, true);
+  const need = 2170000 / 0.6 - total;
+  check('只用新資金：需投入＝最超配市場回到目標所需', r.ok && near(r.newCash, need) && near(r.rows[0].delta, 0));
+  check('只用新資金：沒有任何賣出、買進合計＝新資金', r.rows.every(x => x.delta >= 0) && near(r.rows.reduce((s, x) => s + x.delta, 0), need, 1e-3));
+  check('只用新資金：調整後比例符合目標', r.rows.every(x => near((x.cur + x.delta) / (total + r.newCash) * 100, x.tgtPct, 1e-6)));
+  r = rebalance(cur, { tw: 50, us: 30, bond: 30 }, false);
+  check('目標合計不是 100% → 不試算並回報合計', !r.ok && r.reason === 'sum' && r.sumT === 110 && r.rows[0].delta === null);
+  r = rebalance(cur, { tw: 100, us: 0, bond: 0 }, true);
+  check('不賣出但目標 0% 的市場有部位 → 無法達成', !r.ok && r.reason === 'nosell' && r.market === 'us');
+  r = rebalance({ tw: 0, us: 0, bond: 0 }, REB_DEFAULT, false);
+  check('無持倉 → empty', !r.ok && r.reason === 'empty');
+  r = rebalance({ tw: 100, us: 0, bond: 0 }, { tw: 50, us: 50, bond: 0 }, false);
+  check('目前沒有的市場也能設目標（買進）', r.ok && r.rows[1].delta === 50 && r.rows[0].delta === -50 && r.rows[2].delta === 0);
+  r = rebalance({ tw: 60, us: 25, bond: 15 }, REB_DEFAULT, true);
+  check('已符合目標 → 全部不需調整', r.ok && r.newCash === 0 && r.rows.every(x => x.delta === 0));
+  check('normTargets：缺值／負值／非數字用預設', JSON.stringify(normTargets({ tw: 70, us: -5, bond: 'x' })) === JSON.stringify({ tw: 70, us: 25, bond: 15 }) && JSON.stringify(normTargets(undefined)) === JSON.stringify(REB_DEFAULT));
+}
+
 console.log(`\nplanning: ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);
