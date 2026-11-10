@@ -80,6 +80,10 @@ const reset = (...r) => { calls = []; responses = r; };
   r = await streamClaude('k', 'claude-fable-5-2', 'P', '', () => {}, false, null, null, []);
   check('effort 未指定 → 不送 output_config（用模型預設）', !('output_config' in calls[0].body));
 
+  reset(okStream(NORMAL));
+  r = await streamClaude('k', 'claude-haiku-5-5', 'P', 'low', () => {}, false, null, null, []);
+  check('Haiku 5.5：不送 fallbacks 與 beta 標頭（無伺服器端後備）、其餘照舊', !('fallbacks' in calls[0].body) && !('anthropic-beta' in calls[0].headers) && calls[0].body.thinking.type === 'adaptive' && calls[0].body.output_config.effort === 'low' && r.text === '## 報告內容');
+
   console.log('C. web search 與引用');
   const cite = (url, title) => ({ type: 'web_search_result_location', url, title, cited_text: 'x' });
   reset(okStream([
@@ -168,9 +172,9 @@ const reset = (...r) => { calls = []; responses = r; };
   console.log('H. 下拉選單／金鑰欄位／價格表同步');
   const sel = extract('<select id="modelSel">', '</select>');
   const ids = [...sel.matchAll(/<option value="(claude-[^"]+)"/g)].map(m => m[1]);
-  check('下拉含 Fable 5.2／Opus 5.5／Sonnet 5.5', ids.join() === 'claude-fable-5-2,claude-opus-5-5,claude-sonnet-5-5');
+  check('下拉含 Fable 5.2／Opus 5.5／Sonnet 5.5／Haiku 5.5', ids.join() === 'claude-fable-5-2,claude-opus-5-5,claude-sonnet-5-5,claude-haiku-5-5');
   const fb = extract('const PRICING_FALLBACK', '} };');
-  check('三個 Claude 模型都在內嵌價格後備表', ids.every(id => fb.includes(`'${id}'`)));
+  check('下拉的 Claude 模型都在內嵌價格後備表', ids.every(id => fb.includes(`'${id}'`)));
   check('有 Claude API Key 欄位（password）', /<input id="anthropicKey" type="password"/.test(html));
   check('金鑰存 db.settings.anthropicKey、匯出預設清掉', html.includes("db.settings.anthropicKey = e.target.value.trim()") && html.includes("settings.anthropicKey = '';"));
   check('runAI 依模型選供應商', html.includes('const claude = isClaudeModel(model);') && html.includes('if (claude) r = await streamClaude('));

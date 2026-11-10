@@ -55,6 +55,9 @@ const TABLE = { schema_version: 1, updated_at: '2026-09-25', models: {
   check('內嵌後備表 claude-fable-5-2 10,000 / 5,000 → 0.28', near(M.estimateCostUSD(M.PRICING_FALLBACK, 'claude-fable-5-2', 10000, 5000), 0.28));
   check('內嵌後備表 claude-sonnet-5-5 10,000 / 5,000 → 0.07', near(M.estimateCostUSD(M.PRICING_FALLBACK, 'claude-sonnet-5-5', 10000, 5000), 0.07));
 
+  check('內嵌後備表 claude-haiku-5-5 一般：20,000 / 4,000 → 0.004', near(M.estimateCostUSD(M.PRICING_FALLBACK, 'claude-haiku-5-5', 20000, 4000), 0.004));
+  check('內嵌後備表 claude-haiku-5-5 超過 100K 輸入改用長上下文費率：120,000 / 4,000 → 0.07', near(M.estimateCostUSD(M.PRICING_FALLBACK, 'claude-haiku-5-5', 120000, 4000), 0.07));
+
   console.log('C. usageOf 格式正規化');
   let u = M.usageOf({ input_tokens: 1200, output_tokens: 300, total_tokens: 1500, output_tokens_details: { reasoning_tokens: 120 } });
   check('Responses API 格式', u.input === 1200 && u.output === 300 && u.reasoning === 120);
@@ -83,7 +86,7 @@ const TABLE = { schema_version: 1, updated_at: '2026-09-25', models: {
   global.fetch = async () => { throw new Error('offline'); };
   let t = await M1.loadPricing();
   check('fetch 失敗 → 退回內嵌後備表', t === M1.PRICING_FALLBACK);
-  for (const id of ['gpt-6-astra', 'gpt-6.1-sol', 'gpt-6.1-terra', 'claude-fable-5-2', 'claude-opus-5-5', 'claude-sonnet-5-5', 'grok-4.3', 'grok-4.7'])
+  for (const id of ['gpt-6-astra', 'gpt-6.1-sol', 'gpt-6.1-terra', 'claude-fable-5-2', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'grok-4.3', 'grok-4.7'])
     check(`後備表含下拉選單模型 ${id}`, !!t.models[id]);
   const M2 = fresh();
   global.fetch = async (url, opts) => ({ ok: true, json: async () => ({ schema_version: 1, updated_at: '2099-01-01', models: { 'x': { input: 1, output: 2 } } }) });

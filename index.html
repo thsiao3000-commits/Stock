@@ -276,6 +276,7 @@
             <option value="claude-fable-5-2">Claude Fable 5.2（最強）</option>
             <option value="claude-opus-5-5">Claude Opus 5.5</option>
             <option value="claude-sonnet-5-5">Claude Sonnet 5.5（較省）</option>
+            <option value="claude-haiku-5-5">Claude Haiku 5.5（最省）</option>
           </optgroup>
           <option value="__custom__">自訂…</option>
         </select>
@@ -720,7 +721,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v1.56.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v1.57.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -2576,6 +2577,7 @@ const PRICING_FALLBACK = { schema_version: 1, updated_at: '2026-11-10', models: 
   'claude-fable-5-2':  { input: 8.00, output: 40.00 },
   'claude-opus-5-5':   { input: 4.00, output: 20.00 },
   'claude-sonnet-5-5': { input: 2.00, output: 10.00 },
+  'claude-haiku-5-5':  { input: 0.10, output: 0.50, long_context: { threshold: 100000, input: 0.50, output: 2.50 } },
   'grok-4.7':      { input: 2.00,  output: 6.00,  long_context: { threshold: 200000, input: 4.00,  output: 12.00 } },
   'grok-4.3':      { input: 1.25,  output: 2.50,  long_context: { threshold: 200000, input: 2.50,  output: 5.00 } },
 } };
@@ -2826,7 +2828,7 @@ function citeBlock(anns) {
     cites.map((a, i) => `${i + 1}. [${String(a.title || a.url).replace(/[\[\]]/g, ' ').trim()}](${a.url})`).join('\n');
 }
 /* ════════════════ Anthropic Claude（Messages API 串流） ════════════════ */
-// 模型 ID 以 claude- 開頭即走這條路（下拉的 Fable 5.2／Opus 5.5／Sonnet 5.5，或自訂模型）。純前端直連：
+// 模型 ID 以 claude- 開頭即走這條路（下拉的 Fable 5.2／Opus 5.5／Sonnet 5.5／Haiku 5.5，或自訂模型）。純前端直連：
 // 需帶 anthropic-dangerous-direct-browser-access 標頭（CORS 已實測開放）；金鑰只存本機、只送往 api.anthropic.com。
 const isClaudeModel = m => /^claude-/i.test(String(m || ''));
 const ANTHROPIC_VERSION = '2026-10-21', ANTHROPIC_FALLBACK_BETA = 'server-side-fallback-2026-07-01', ANTHROPIC_MAX_CONT = 5;
@@ -2848,8 +2850,9 @@ function claudeBody(model, prompt, effort, webSearch, atts, prior) {
     model, max_tokens: 64000, stream: true,
     thinking: { type: 'adaptive', display: 'summarized' },
     messages: [{ role: 'user', content: claudeContent(prompt, atts) }, ...(prior && prior.length ? [{ role: 'assistant', content: prior }] : [])],
-    fallbacks: 'default',   // 安全分類器誤擋時由伺服器自動改用後備模型重跑（beta；不支援時 streamClaude 會拿掉重試）
   };
+  // 安全分類器誤擋時由伺服器自動改用後備模型重跑（beta；不支援時 streamClaude 會拿掉重試）。Haiku 沒有伺服器端後備，不送
+  if (!/haiku/i.test(model)) body.fallbacks = 'default';
   if (effort) body.output_config = { effort };
   if (webSearch) body.tools = [{ type: 'web_search_20260209', name: 'web_search' }];
   return body;
