@@ -131,5 +131,16 @@ check('runAI／runGrok 寫 ③ 時收起追問區', (html.match(/\$\('fuBox'\)\.
 check('showReport 顯示追問數並渲染追問區', html.includes('renderFuBox(r);') && html.includes('含 ${nq} 則追問'));
 check('範例報告不提供追問', html.includes('if (!r || r.demo) { box.style.display = \'none\'; return; }'));
 
+// ── 複製單則追問回答（v2.5.0）：followupParts 拆出各輪問答 ──
+const fuParts = followupParts(REPORT + sec1 + sec2 + secLong);
+check('拆出三輪、編號正確', fuParts.length === 3 && fuParts.map(p => p.n).join() === '1,2,3');
+check('回答只含內文（無標題、引言列、分隔線）', fuParts[0].answer === '支撐 1,000。' && fuParts[1].answer === '壓力 1,100。' && fuParts[2].answer === '答。');
+check('短問題取標題、長問題取「問題全文」', fuParts[0].question === '支撐在哪？' && fuParts[2].question.startsWith('如果未來一週跌破 MA60') && fuParts[2].question.endsWith('直接停損出場？'));
+const secMd = followupSection(1, 'q', '## 小標\n\n- a\n\n---\n\n> 引言\n\n結論。', 'm', 'ts', '');
+const pMd = followupParts(REPORT + secMd + sec2);
+check('回答內的標題／分隔線／引言完整保留', pMd[0].answer === '## 小標\n\n- a\n\n---\n\n> 引言\n\n結論。' && pMd[1].answer === '壓力 1,100。');
+check('無追問／空值回空陣列', followupParts(REPORT).length === 0 && followupParts(undefined).length === 0);
+check('showReport 流程會加上「複製回答」按鈕', html.includes('addFuCopyBtns(r);') && html.includes("b.textContent = '複製回答'"));
+
 console.log(fail === 0 ? `ALL ${pass} TESTS PASSED` : `${fail} TEST(S) FAILED`);
 process.exit(fail === 0 ? 0 : 1);

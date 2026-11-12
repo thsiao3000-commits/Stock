@@ -301,6 +301,8 @@
   .fuChips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
   .fuChips button { font-size: .78rem; padding: 4px 11px; border-radius: 99px; color: var(--muted); background: none; cursor: pointer; }
   .fuChips button:hover { border-color: var(--accent); color: var(--text); }
+  .aiReport h2 .fuCopy { float: right; margin: -2px 0 4px 12px; font-size: .75rem; font-weight: 400; padding: 3px 10px; border-radius: 4px; color: var(--muted); }
+  .aiReport h2 .fuCopy:hover { color: var(--text); }
   .fuAsk.dragover { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(var(--accent-rgb),.25); }
   .fuFiles { display: none; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .fuFiles span { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; padding: 3px 6px 3px 10px; border-radius: 99px; border: 1px solid var(--border); background: var(--panel); color: var(--text); max-width: 100%; }
@@ -577,7 +579,7 @@
           <button id="fuAttachBtn" class="ghost" title="附加圖片／PDF／文字檔（也可直接貼上或拖進此框）">附加檔案</button>
           <input id="fuFile" type="file" multiple accept="image/*,.pdf,application/pdf,.txt,.md,.markdown,.csv,.tsv,.json,.log,text/plain,text/csv,text/markdown,application/json" style="display:none">
           <button id="fuCopyBtn" class="ghost">複製追問 Prompt</button>
-          <span class="hint">Ctrl／⌘＋Enter 送出；可附加圖片／PDF／文字檔（最多 5 個、單檔 10 MB，也可貼上或拖進來）；回答接在報告末尾，連同報告一併存入歷史、可複製與下載</span>
+          <span class="hint">Ctrl／⌘＋Enter 送出；可附加圖片／PDF／文字檔（最多 5 個、單檔 10 MB，也可貼上或拖進來）；回答接在報告末尾，連同報告一併存入歷史、可複製與下載；每則追問標題右側的「複製回答」可單獨複製該則回答</span>
         </div>
         <div id="fuChips" class="fuChips"></div>
       </div>
@@ -946,7 +948,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v2.4.1';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v2.5.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -4534,6 +4536,21 @@ function followupSection(n, question, answer, model, ts, usageText, fileNames) {
     (short !== q ? `**問題全文：** ${q}\n\n` : '') +
     `> 🕒 ${ts}　｜　AI 模型：${model}${usageText ? `　｜　用量：${usageText}` : ''}${att}\n\n${String(answer || '').trim()}\n`;
 }
+// 把報告拆出各輪追問：[{n, question（全文）, answer（純回答，不含標題／問題全文／引言列）}]——供每則追問的「複製回答」
+function followupParts(fullText) {
+  const t = fullText || '', re = /^## 💬 追問 (\d+)：(.*)$/gm, heads = [];
+  let m;
+  while ((m = re.exec(t))) heads.push({ n: +m[1], title: m[2].trim(), start: m.index, bodyStart: re.lastIndex });
+  return heads.map((h, i) => {
+    const last = i + 1 >= heads.length;
+    let body = t.slice(h.bodyStart, last ? t.length : heads[i + 1].start);
+    if (!last) body = body.replace(/\n+---\s*$/, '');   // 下一輪追問開頭的分隔線不屬於這則回答
+    const fq = /^\s*\*\*問題全文：\*\* (.*)$/m.exec(body);
+    const meta = /^> 🕒 .*$/m.exec(body);   // 引言列（時間戳／模型／用量）之後才是回答
+    if (meta) body = body.slice(meta.index + meta[0].length);
+    return { n: h.n, question: fq ? fq[1].trim() : h.title, answer: body.trim() };
+  });
+}
 /* ── 追問附件：圖片／PDF 轉 base64 data URL 夾進請求、文字檔讀成字串內嵌 Prompt；不存歷史、只記檔名 ── */
 const FU_FILE_MAX = 10 * 1024 * 1024, FU_TOTAL_MAX = 20 * 1024 * 1024, FU_FILES_MAX = 5, FU_TEXT_MAX = 300 * 1024;
 const FU_TEXT_EXT = /\.(txt|md|markdown|csv|tsv|json|log)$/i;
@@ -4607,7 +4624,24 @@ function renderFuBox(r) {
   box.style.display = 'block';
   $('fuLive').style.display = 'none'; $('fuOutput').innerHTML = '';
   $('fuStatus').textContent = ''; $('fuStatus').className = 'status';
+  addFuCopyBtns(r);
   $('fuChips').innerHTML = FU_CHIPS[fuKind(r)].map(q => `<button type="button" data-q="${esc(q)}">${esc(q)}</button>`).join('');
+}
+// 報告裡每則「💬 追問 N」標題右側加「複製回答」：只複製該則回答的 Markdown（不含問題與引言列）
+function addFuCopyBtns(r) {
+  const parts = followupParts(r.fullText);
+  $('aiOutput').querySelectorAll('h2').forEach(h => {
+    const m = /^💬 追問 (\d+)/.exec(h.textContent), p = m && parts.find(x => x.n === +m[1]);
+    if (!p || !p.answer) return;
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'ghost fuCopy'; b.textContent = '複製回答'; b.title = `複製追問 ${p.n} 的回答（Markdown）`;
+    b.onclick = async () => {
+      const ok = await copyText(p.answer);
+      b.textContent = ok ? '✓ 已複製' : '✗ 複製失敗';
+      setTimeout(() => b.textContent = '複製回答', 1500);
+    };
+    h.appendChild(b);
+  });
 }
 $('fuChips').addEventListener('click', e => {
   const b = e.target.closest('button[data-q]'); if (!b) return;
