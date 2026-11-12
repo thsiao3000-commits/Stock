@@ -75,6 +75,9 @@
     min-height: 52px; padding: env(safe-area-inset-top) max(20px, env(safe-area-inset-right)) 0 max(20px, env(safe-area-inset-left));
     background: var(--panel); border-bottom: 1px solid var(--border);
   }
+  /* 新版偵測提示條：線上版本比目前載入的新時出現在頂部列下方 */
+  #updBar { display: none; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 8px max(20px, env(safe-area-inset-right)) 8px max(20px, env(safe-area-inset-left)); background: var(--panel2); border-bottom: 1px solid var(--accent); font-size: .85rem; }
+  #updBar button { font-size: .8rem; padding: 4px 12px; }
   #appBar .brand { display: flex; align-items: baseline; gap: 6px; align-self: center; white-space: nowrap; }
   #appBar .appName { font-family: var(--font-serif); font-weight: 700; font-size: 1.05rem; }
   #appVer { font-size: .74rem; color: var(--muted); }
@@ -321,7 +324,7 @@
       --bg-rgb:255,255,255; --accent-rgb:11,92,173; --gold-rgb:138,109,26; --up-rgb:192,57,43; --down-rgb:30,142,90; color-scheme: light; }
     body, header { background: #fff; }
     button, input, select, textarea, label.field, .seg, .pw, .status, .hint, .legend,
-    #setupBox, #addBox, #chartWrap, #perfChartWrap, #manualWrap, #appBar, #tabBar, #onboardBox, .fuAsk, #fuLive { display: none !important; }
+    #setupBox, #addBox, #chartWrap, #perfChartWrap, #manualWrap, #appBar, #tabBar, #updBar, #onboardBox, .fuAsk, #fuLive { display: none !important; }
     section, details.box { border-color: #ccc; }
     .expandPanel, .txTable td.act { background: #fff; box-shadow: none; }
     .aiReport { background: #fff; border: none; padding: 0; overflow: visible; }
@@ -343,6 +346,11 @@
   </nav>
   <button type="button" id="settingsBtn" data-tab="settings">設定</button>
 </header>
+<div id="updBar" role="status">
+  <span id="updText"></span>
+  <button type="button" id="updBtn" class="primary">立即更新</button>
+  <button type="button" id="updLater" class="ghost">稍後</button>
+</div>
 <main>
   <!-- ══ 分頁：總覽 ══ -->
   <div class="tab" data-tab="home">
@@ -948,7 +956,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v2.5.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v2.6.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -5031,7 +5039,56 @@ function restorePrefsUI() {
   if (savedKolDays && [...$('kolDays').options].some(o => o.value === savedKolDays)) $('kolDays').value = savedKolDays;
   $('webSearchChk').checked = localStorage.getItem('twbt_websearch') !== '0';   // 預設開啟
 }
+/* ── 新版偵測：瀏覽器（尤其 iPhone Safari 久開的分頁）可能一直顯示快取的舊頁面。開頁與切回前景時，
+   不走快取抓一次線上的 index.html、讀出 APP_VERSION，比目前載入的新就在頂部顯示提示條。file:// 開啟時不檢查 ── */
+function parseAppVersion(text) {
+  const m = /const APP_VERSION = '(v\d+\.\d+\.\d+)'/.exec(text || '');
+  return m ? m[1] : null;
+}
+function cmpVersion(a, b) {   // >0：a 較新；格式不對的一律視為 0.0.0
+  const p = v => { const m = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(String(v || '').trim()); return m ? [+m[1], +m[2], +m[3]] : [0, 0, 0]; };
+  const x = p(a), y = p(b);
+  return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
+}
+const UPD_INTERVAL = 10 * 60 * 1000;   // 兩次檢查至少間隔 10 分鐘（每次要下載整份 index.html）
+let updLastCheck = 0, updRemote = null, updDismissed = null;
+async function checkForUpdate(force) {
+  if (!/^https?:$/.test(location.protocol)) return;
+  if (!force && Date.now() - updLastCheck < UPD_INTERVAL) return;
+  updLastCheck = Date.now();
+  try {
+    const res = await fetch(location.pathname + '?_upd=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) return;
+    const remote = parseAppVersion(await res.text());
+    if (!remote || cmpVersion(remote, APP_VERSION) <= 0 || remote === updDismissed) return;
+    updRemote = remote;
+    $('updText').textContent = `有新版 ${remote}（目前 ${APP_VERSION}）。更新只會重新載入頁面，持倉與報告不受影響。`;
+    $('updBar').style.display = 'flex';
+  } catch (_) {}   // 離線或抓不到就算了，下次再檢查
+}
+$('updLater').addEventListener('click', () => { updDismissed = updRemote; $('updBar').style.display = 'none'; });   // 同一版不再提示，直到重新開頁
+$('updBtn').addEventListener('click', async () => {
+  if ($('aiBtn').disabled) { $('updText').textContent = 'AI 正在作業中，重新載入會中斷；請待完成後再按「立即更新」。'; return; }
+  $('updBtn').disabled = true; $('updBtn').textContent = '更新中…';
+  try { sessionStorage.setItem('twpf_upd_target', updRemote || ''); } catch (_) {}
+  try { await fetch(location.pathname, { cache: 'reload' }); } catch (_) {}   // 先把瀏覽器快取換成新版，重新載入才拿得到
+  location.reload();
+});
+// 重新載入後仍是舊版（快取沒換掉）→ 改帶版本參數的網址再載一次，只試一次
+function updAfterReload() {
+  let target = null;
+  try { target = sessionStorage.getItem('twpf_upd_target'); sessionStorage.removeItem('twpf_upd_target'); } catch (_) {}
+  if (target && cmpVersion(target, APP_VERSION) > 0 && /^https?:$/.test(location.protocol)) {
+    location.replace(location.pathname + '?v=' + encodeURIComponent(target) + location.hash);
+    return true;
+  }
+  return false;
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkForUpdate(); });
+window.addEventListener('pageshow', e => { if (e.persisted) checkForUpdate(); });   // Safari 從往返快取還原頁面
 (function init() {
+  if (updAfterReload()) return;
+  setTimeout(checkForUpdate, 3000);
   loadDB();
   applyTheme();
   bindSettings();
