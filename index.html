@@ -258,6 +258,16 @@
   .badge.bond { color: var(--badge-bond); border-color: var(--badge-bond-bd); }
   /* 持倉明細面板：移到表格外，永遠以可視寬度呈現，編輯／刪除 icon 不再被橫向捲動藏到最右邊 */
   .expandPanel { background: var(--panel3); border: 1px solid var(--border); border-radius: 6px; padding: 20px; margin-top: 20px; }
+  /* 債券重估：現價旁的「估算」標籤、持倉表下方的估算提示列、明細裡的計算依據 */
+  .estTag { display: inline-block; margin-left: 6px; font-family: var(--font-sans); font-size: .7rem; padding: 0 6px; border: 1px solid var(--gold); border-radius: 4px; color: var(--gold); vertical-align: 1px; }
+  #bondEstBar { display: none; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 4px; background: var(--panel2); font-size: .85rem; }
+  .estBox { margin: 12px 0; border: 1px solid var(--border); border-radius: 4px; background: var(--panel); }
+  .estBox > div { display: flex; gap: 12px; align-items: baseline; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  .estBox > div:last-child { border-bottom: none; background: rgba(var(--gold-rgb),.12); }
+  .estBox .n { flex: none; width: 1.4em; color: var(--muted); font-family: var(--font-mono); font-size: .8rem; }
+  .estBox .t { flex: 1; min-width: 0; }
+  .estBox .t small { display: block; color: var(--muted); font-size: .8rem; }
+  .estBox b { font-family: var(--font-mono); white-space: nowrap; }
   .splitHint { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; padding: 10px 14px;
     border: 1px solid var(--gold); border-radius: 4px; background: rgba(var(--gold-rgb),.08); font-size: .9rem; }
   .splitHint > span:first-child { flex: 1 1 260px; }
@@ -389,9 +399,11 @@
     </div>
     <div class="row">
       <button id="quoteBtn" class="primary">更新所有報價</button>
+      <button id="bondRevalBtn" class="ghost" style="display:none" title="抓美國財政部最新公債殖利率曲線，以各債券上次手動報價的隱含利差重估現價">債券重估（依美債殖利率曲線）</button>
       <span class="hint">台股每檔間隔 0.5 秒；美股每 7 支一批、批間隔 60 秒（避開 Twelve Data 每分鐘限額）；同時更新匯率。金額一律以「換算新台幣」加總。</span>
     </div>
     <div id="qStatus" class="status"></div>
+    <div id="bondEstBar" role="status"><span id="bondEstText" style="flex:1; min-width:200px"></span><button id="bondEstUndo" class="ghost">復原為手動報價</button></div>
   </section>
   </div>
   <div class="col" id="homeSide">
@@ -458,7 +470,7 @@
       <div class="row">
         <button id="addBtn" class="primary">新增</button>
         <span class="hint f-stock">台股手續費會自動試算（可改）。賣出、股息請於新增後點開該持倉補登。</span>
-        <span class="hint f-bond" style="display:none">債券損益＝已收息（扣前手息）＋（市價 − 成本）。市價請定期從銀行對帳單手動更新。</span>
+        <span class="hint f-bond" style="display:none">債券損益＝已收息（扣前手息）＋（市價 − 成本）。市價請定期從銀行對帳單手動更新；兩次更新之間可用「債券重估」依美債殖利率曲線估算。</span>
       </div>
       <div id="addStatus" class="status"></div>
     </details>
@@ -956,7 +968,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v2.6.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v2.7.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1564,6 +1576,7 @@ function fmtCompact(v) {   // NT$2.69M／NT$325K／NT$980
 }
 // ── 股息行事曆與提醒 ──
 const BOND_STALE_DAYS = 30;   // 債券市價超過這麼多天沒更新就提醒
+const BOND_RECAL_DAYS = 90;   // 現價為殖利率曲線估算的債券：手動報價超過這麼多天才提醒校準
 const CAL_HORIZON_DAYS = 365, CAL_MAX_DATED = 10;
 function isoDayDiff(a, b) { return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400000); }
 function isoAddDays(d, n) { return new Date(Date.parse(d + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10); }
@@ -1578,7 +1591,7 @@ function checkAlerts(alerts, priceOf, today) {
   }
   return fresh;
 }
-// 行事曆列：stocks [{market,symbol,qty,lastPrice}]、bonds [{symbol,ccy,couponAmt,face,rate,freq,dates,lastMark,matured}]、
+// 行事曆列：stocks [{market,symbol,qty,lastPrice}]、bonds [{symbol,ccy,couponAmt,face,rate,freq,dates,lastMark,estimated,matured}]、
 // divCache { 代號: { events: [{exDate,payDate,cash}] } }（台股，FinMind）、alerts、today
 // → [{ kind:'div'|'pay'|'coupon'|'alert'|'sys', date, label, title, desc, amount, ccy, hit, id }]
 function calendarEvents({ stocks, bonds, divCache, alerts, today }) {
@@ -1601,7 +1614,10 @@ function calendarEvents({ stocks, bonds, divCache, alerts, today }) {
     (b.dates || []).filter(d => d > today && d <= end).slice(0, 2).forEach(d =>
       dated.push({ kind: 'coupon', date: d, title: `${b.symbol} 債券配息`, desc: `面額 ${num(b.face)} × ${b.rate}% ÷ ${b.freq}`, amount: b.couponAmt, ccy: b.ccy }));
     const since = b.lastMark ? isoDayDiff(b.lastMark, today) : null;
-    if (since == null || since > BOND_STALE_DAYS)
+    if (b.estimated) {   // 現價為殖利率曲線估算：放寬到 BOND_RECAL_DAYS 天才提醒拿對帳單報價校準
+      if (since == null || since > BOND_RECAL_DAYS)
+        sys.push({ kind: 'sys', date: '', label: '提醒', title: `${b.symbol} 估算價超過 ${BOND_RECAL_DAYS} 天未用對帳單報價校準`, desc: b.lastMark ? `上次手動報價 ${b.lastMark}` : '尚未輸入過手動報價（以買進價為基準估算）' });
+    } else if (since == null || since > BOND_STALE_DAYS)
       sys.push({ kind: 'sys', date: '', label: '提醒', title: `${b.symbol} 市價超過 ${BOND_STALE_DAYS} 天未更新`, desc: b.lastMark ? `上次更新 ${b.lastMark}` : '尚未更新過市價（以買進價計）' });
   }
   dated.sort((a, b) => a.date.localeCompare(b.date));
@@ -1826,6 +1842,145 @@ function computeStock(p, priceOverride = null) {
     priced: mv != null,
   };
 }
+/* ── 債券一鍵重估：個別債券沒有免費又能從瀏覽器抓的報價，改用美國財政部每日公債殖利率曲線估算。
+   作法：以「上次手動報價」（沒有就用買進價）當基準 → 反推當時的到期殖利率 → 減去當天同年期美債殖利率＝隱含利差；
+   重估時利差不變，最新同年期美債殖利率＋利差＝重估殖利率 → 折現剩餘票息與本金＝估算現價（不含應計利息）。
+   只反映利率變動、不含信用利差變動；僅支援美元債。手動存一次市價就重新校準 ── */
+const BOND_HIST_MAX = 12;   // 報價紀錄保留筆數
+function parseTreasuryCsv(text) {   // 財政部 CSV → [{ date:'YYYY-MM-DD', pts:[[年期, 殖利率%], …] }]，新的在前
+  const lines = String(text || '').trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
+  const cols = lines[0].split(',').map(h => {
+    const m = /([\d.]+)\s*(Mo|Month|Yr)/i.exec(h.replace(/"/g, ''));
+    return m ? (/yr/i.test(m[2]) ? +m[1] : +m[1] / 12) : null;
+  });
+  const out = [];
+  for (const ln of lines.slice(1)) {
+    const f = ln.split(','), dm = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec((f[0] || '').trim());
+    if (!dm) continue;
+    const pts = [];
+    cols.forEach((yrs, i) => { const v = parseFloat(f[i]); if (yrs != null && isFinite(v)) pts.push([yrs, v]); });
+    if (pts.length >= 2) out.push({ date: `${dm[3]}-${dm[1]}-${dm[2]}`, pts: pts.sort((a, b) => a[0] - b[0]) });
+  }
+  return out.sort((a, b) => b.date.localeCompare(a.date));
+}
+function curveYield(curve, years) {   // 線性內插；超出兩端取端點值
+  const p = curve.pts;
+  if (years <= p[0][0]) return p[0][1];
+  for (let i = 1; i < p.length; i++) {
+    if (years <= p[i][0]) return p[i - 1][1] + (p[i][1] - p[i - 1][1]) * (years - p[i - 1][0]) / (p[i][0] - p[i - 1][0]);
+  }
+  return p[p.length - 1][1];
+}
+function curveOnOrBefore(curves, date, maxGap) {   // 該日或之前最近一個交易日的曲線（相隔太久視為沒有）
+  const c = (curves || []).find(x => x.date <= date);
+  return c && daysBetween(c.date, date) <= (maxGap ?? 10) ? c : null;
+}
+function bondFlows(b, asOf) {   // asOf 之後的剩餘配息：n 期、w＝距下次配息占一期的比例、c＝每期票息（面額 100）
+  const step = 12 / b.freq;
+  let d = parseD(b.maturity), n = 0, next = null;
+  while (isoD(d) > asOf && n < 1500) { next = isoD(d); n++; d = addMonths(d, -step); }
+  if (!n) return null;
+  const span = daysBetween(isoD(d), next);
+  return { n, w: span > 0 ? Math.min(1, daysBetween(asOf, next) / span) : 1, c: b.rate / b.freq };
+}
+function bondCleanPrice(b, ytmPct, asOf) {   // 到期殖利率 → 除息價（% of 面額）
+  const fl = bondFlows(b, asOf), r = ytmPct / 100 / b.freq;
+  if (!fl || !(1 + r > 0)) return null;
+  let pv = 0;
+  for (let k = 0; k < fl.n; k++) pv += fl.c / Math.pow(1 + r, fl.w + k);
+  pv += 100 / Math.pow(1 + r, fl.w + fl.n - 1);
+  return pv - fl.c * (1 - fl.w);
+}
+function bondYtm(b, pricePct, asOf) {   // 除息價 → 到期殖利率（%），二分法
+  if (!bondFlows(b, asOf) || !(pricePct > 0)) return null;
+  let lo = -20, hi = 200;
+  for (let i = 0; i < 80; i++) {
+    const mid = (lo + hi) / 2;
+    if (bondCleanPrice(b, mid, asOf) > pricePct) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+function bondBasis(b) {   // 重估的基準報價：上次手動市價，沒有就用買進價
+  return b.mark > 0 && b.markDate ? { pct: b.mark, date: b.markDate, src: 'manual' } : { pct: b.buyPricePct, date: b.buyDate, src: 'buy' };
+}
+function bondEst(b) {   // 目前有效的估算（基準報價沒變才算數；手動改過市價即失效）
+  const e = b.est, base = bondBasis(b);
+  return e && e.pct > 0 && e.basePct === base.pct && e.baseDate === base.date ? e : null;
+}
+// curves：新的在前。→ { ok:true, est } 或 { ok:false, why:'nocurve'|'ccy'|'matured'|'fresh'|'nobase'|'calc' }
+function estimateBond(b, curves) {
+  const now = (curves || [])[0];
+  if (!now) return { ok: false, why: 'nocurve' };
+  if ((b.currency || 'USD') !== 'USD') return { ok: false, why: 'ccy' };
+  if (b.maturity <= now.date) return { ok: false, why: 'matured' };
+  const base = bondBasis(b);
+  if (base.date >= now.date) return { ok: false, why: 'fresh' };   // 報價比最新曲線還新，不必估
+  const cb = curveOnOrBefore(curves, base.date);
+  if (!cb) return { ok: false, why: 'nobase' };
+  const baseYtm = bondYtm(b, base.pct, base.date);
+  if (baseYtm == null) return { ok: false, why: 'calc' };
+  const yrs = (a, d) => daysBetween(a, d) / 365.25;
+  const baseTsy = curveYield(cb, yrs(base.date, b.maturity)), tsy = curveYield(now, yrs(now.date, b.maturity));
+  const spread = baseYtm - baseTsy, ytm = tsy + spread;
+  const pct = bondCleanPrice(b, ytm, now.date);
+  if (!(pct > 0) || !isFinite(pct)) return { ok: false, why: 'calc' };
+  return { ok: true, est: {
+    pct: Math.round(pct * 100) / 100, asOf: now.date, basePct: base.pct, baseDate: base.date, baseSrc: base.src,
+    baseYtm, baseTsy, spreadBp: Math.round(spread * 100), tsy, ytm, years: yrs(now.date, b.maturity), n: bondFlows(b, now.date).n,
+  } };
+}
+function pushMarkHist(b, entry) {   // 報價紀錄（新的在前）：同日同來源覆蓋
+  const h = (b.markHist || []).filter(x => !(x.date === entry.date && x.src === entry.src));
+  h.unshift(entry);
+  h.sort((a, c) => c.date.localeCompare(a.date));
+  b.markHist = h.slice(0, BOND_HIST_MAX);
+}
+const ustCache = {};   // 年度 → 該年曲線（本次開頁期間快取）
+async function fetchUstYear(year, force) {
+  if (ustCache[year] && !force) return ustCache[year];
+  const res = await fetch(`https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/${year}/all?type=daily_treasury_yield_curve&field_tdr_date_value=${year}&page&_format=csv`);
+  if (!res.ok) throw new Error(`美國財政部殖利率曲線抓取失敗（HTTP ${res.status}）`);
+  return (ustCache[year] = parseTreasuryCsv(await res.text()));
+}
+async function loadCurves(dates) {   // 今年（每次重抓拿最新）＋各基準報價日所在年度；一月上旬另補前一年（年初還沒有資料）
+  const y = new Date().getFullYear(), years = new Set([y]);
+  for (const d of dates.concat(todayISO())) { const yy = +d.slice(0, 4); years.add(yy); if (d.slice(5) < '01-15') years.add(yy - 1); }
+  let all = [];
+  for (const yy of [...years].filter(v => v >= 1990 && v <= y)) all = all.concat(await fetchUstYear(yy, yy === y));
+  return all.sort((a, b) => b.date.localeCompare(a.date));
+}
+function cachedCurves() { return Object.values(ustCache).flat().sort((a, b) => b.date.localeCompare(a.date)); }
+const EST_SKIP = { ccy: '非美元債', fresh: '手動報價比最新曲線還新', nobase: '查不到基準報價日的曲線', calc: '無法計算' };
+async function revalueBonds() {
+  const st = $('qStatus'), btn = $('bondRevalBtn');
+  const live = db.positions.filter(p => p.market === 'bond' && todayISO() < p.bond.maturity);
+  st.className = 'status';
+  if (!live.length) { st.textContent = '沒有未到期的債券可重估'; return; }
+  btn.disabled = true; st.textContent = '抓取美國財政部公債殖利率曲線…';
+  try {
+    const curves = await loadCurves(live.map(p => bondBasis(p.bond).date));
+    if (!curves.length) throw new Error('美國財政部殖利率曲線沒有資料');
+    const mvUsd = () => live.filter(p => posCcy(p) === 'USD').reduce((a, p) => a + computeBond(p).mv, 0);
+    const before = mvUsd(), skipped = [];
+    let n = 0;
+    for (const p of live) {
+      const b = p.bond, r = estimateBond(b, curves);
+      if (!r.ok) { if (EST_SKIP[r.why]) skipped.push(`${p.symbol}（${EST_SKIP[r.why]}）`); continue; }
+      b.est = r.est; n++;
+      if (r.est.baseSrc === 'manual') pushMarkHist(b, { date: r.est.baseDate, src: 'manual', pct: r.est.basePct, spreadBp: r.est.spreadBp });
+      pushMarkHist(b, { date: r.est.asOf, src: 'est', pct: r.est.pct, spreadBp: r.est.spreadBp });
+    }
+    saveDB(); renderAll();
+    const after = mvUsd(), d = after - before, c = curves[0];
+    const y = t => curveYield(c, t).toFixed(2) + '%';
+    st.textContent = (n ? `✅ 已重估 ${n} 檔債券（美債曲線 ${c.date}：2Y ${y(2)}、5Y ${y(5)}、10Y ${y(10)}、30Y ${y(30)}）。` +
+        `美元債市值 ${fmtMoney(before, 'USD')} → ${fmtMoney(after, 'USD')}（${d >= 0 ? '+' : ''}${fmtMoney(d, 'USD')}${before > 0 ? `，${fmtPct(d / before * 100)}` : ''}）。估算只反映利率變動，不含信用利差變動。`
+      : '沒有債券被重估。') + (skipped.length ? ` 未重估：${skipped.join('、')}。` : '');
+  } catch (e) {
+    st.className = 'status error'; st.textContent = '❌ ' + e.message;
+  } finally { btn.disabled = false; }
+}
 function couponDates(b) {   // 配息日：以到期日回推（買進日之後 ～ 到期日）
   const step = 12 / b.freq, out = [];
   let d = parseD(b.maturity);
@@ -1845,7 +2000,8 @@ function computeBond(p) {
   const received = recvN * cAmt - (b.accruedPaid || 0);
   const next = dates.find(d => d > today) || null;
   const matured = today >= b.maturity;
-  const markPct = matured ? 100 : (b.mark ?? b.buyPricePct);
+  const est = matured ? null : bondEst(b);   // 依殖利率曲線的估算價（有效時優先於手動市價）
+  const markPct = matured ? 100 : est ? est.pct : (b.mark ?? b.buyPricePct);
   const mv = b.face * markPct / 100;
   const cost = b.face * b.buyPricePct / 100 + (b.fee || 0);
   let accrued = 0;
@@ -1857,7 +2013,7 @@ function computeBond(p) {
   }
   const unreal = mv - cost;
   return {
-    qty: b.face, cost, avgCost: b.buyPricePct, mv, unreal, markPct,
+    qty: b.face, cost, avgCost: b.buyPricePct, mv, unreal, markPct, est,
     unrealPct: cost > 0 ? unreal / cost * 100 : null,
     received, accrued, next, matured, couponAmt: cAmt,
     realDiv: received, div: 0, realized: 0,
@@ -2066,7 +2222,7 @@ function calInputs() {
     if (p.market === 'bond') {
       const c = computeBond(p), b = p.bond;
       bonds.push({ symbol: p.symbol, ccy: posCcy(p), couponAmt: c.couponAmt, face: b.face, rate: b.rate, freq: b.freq,
-        dates: couponDates(b), lastMark: b.markDate || null, matured: c.matured });
+        dates: couponDates(b), lastMark: b.markDate || null, estimated: !!c.est, matured: c.matured });
     } else stocks.push({ market: p.market, symbol: p.symbol, qty: computeStock(p).qty, lastPrice: p.lastPrice ?? null });
   }
   return { stocks, bonds, divCache: db.divCache, alerts: db.alerts, today: todayISO() };
@@ -2122,6 +2278,14 @@ function addAlert(market, symbol, dir, price, note) {
   return true;
 }
 
+// 持倉表下方：有未到期美元債才顯示「債券重估」按鈕；有債券用估算價時列出提示與「復原為手動報價」
+function renderBondEstBar() {
+  const today = todayISO(), live = db.positions.filter(p => p.market === 'bond' && today < p.bond.maturity);
+  $('bondRevalBtn').style.display = live.some(p => posCcy(p) === 'USD') ? '' : 'none';
+  const ests = live.map(p => bondEst(p.bond)).filter(Boolean);
+  $('bondEstBar').style.display = ests.length ? 'flex' : 'none';
+  if (ests.length) $('bondEstText').textContent = `${ests.length} 檔債券的現價為估算（美債曲線 ${ests.map(e => e.asOf).sort().pop()}）；只反映利率變動，不含信用利差變動。`;
+}
 function renderTable() {
   const tb = $('posBody');
   if (!db.positions.length) {
@@ -2131,6 +2295,7 @@ function renderTable() {
     return;
   }
   let html = '', cards = '';
+  renderBondEstBar();
   for (const p of db.positions) {
     const c = computeRow(p);
     const ccy = posCcy(p);
@@ -2138,7 +2303,7 @@ function renderTable() {
     const hold = isBond ? fmtMoney(c.qty, ccy) + ' 面額' : nf.format(c.qty) + ' 股';
     const avg = isBond ? (c.avgCost != null ? c.avgCost.toFixed(2) + '%' : '—')
                        : (c.avgCost != null ? c.avgCost.toFixed(2) : '—');
-    const lastP = isBond ? (c.matured ? '已到期' : c.markPct.toFixed(2) + '%')
+    const lastP = isBond ? (c.matured ? '已到期' : c.markPct.toFixed(2) + '%' + (c.est ? '<span class="estTag">估算</span>' : ''))
                          : (p.lastPrice != null ? p.lastPrice.toFixed(2) + (p.lastDate ? `<span class="hint"> (${p.lastDate.slice(5)})</span>` : '') : '—');
     html += `<tr class="prow${flashId === p.id ? ' flash' : ''}" data-id="${p.id}">` +
       `<td class="l"><span class="badge ${p.market}">${MKT_NAME[p.market]}</span></td>` +
@@ -2150,7 +2315,7 @@ function renderTable() {
       `<td class="${clsOf(c.realDiv)}">${fmtMoney(c.realDiv, ccy)}</td>` +
       `<td class="${clsOf(c.total)}">${fmtMoney(c.total, ccy)}</td></tr>`;
     // 卡片（手機／平板／摺疊機）：第一列 徽章＋代號＋名稱｜市值；第二列 持有 · 均價 · 現價；第三列 未實現損益（報酬率）
-    const lastTxt = isBond ? (c.matured ? '已到期' : c.markPct.toFixed(2) + '%') : (p.lastPrice != null ? p.lastPrice.toFixed(2) : '—');
+    const lastTxt = isBond ? (c.matured ? '已到期' : c.markPct.toFixed(2) + '%' + (c.est ? '<span class="estTag">估算</span>' : '')) : (p.lastPrice != null ? p.lastPrice.toFixed(2) : '—');
     cards += `<div class="pcard${expandedId === p.id ? ' sel' : ''}${flashId === p.id ? ' flash' : ''}" data-id="${p.id}" role="button" tabindex="0">` +
       `<div class="pcTop"><span><span class="badge ${p.market}">${MKT_NAME[p.market]}</span> <b>${esc(p.symbol)}</b> ${esc(p.name || '')}</span>` +
       `<span class="pcMv">${fmtMoney(c.mv, ccy)}</span></div>` +
@@ -2188,6 +2353,23 @@ function renderExpandPanel() {
   updateTableShadows(box);
 }
 
+// 債券明細：估算價的計算依據（五步）＋報價紀錄
+function bondEstHTML(b, c) {
+  const e = c.est, hist = b.markHist || [];
+  const f2 = v => v.toFixed(2), bp = v => (v >= 0 ? '+' : '') + v + ' bp';
+  const steps = !e ? '' : `
+      <div class="estBox">
+        <div><span class="n">1</span><span class="t">${e.baseSrc === 'manual' ? '上次手動報價' : '買進價（尚無手動報價）'}<small>${e.baseDate}；換算到期殖利率 ${f2(e.baseYtm)}%</small></span><b>${f2(e.basePct)}</b></div>
+        <div><span class="n">2</span><span class="t">當時的隱含利差<small>${f2(e.baseYtm)}% 減去當天同年期美債殖利率 ${f2(e.baseTsy)}%（曲線內插）</small></span><b>${bp(e.spreadBp)}</b></div>
+        <div><span class="n">3</span><span class="t">最新同年期美債殖利率<small>${e.asOf} 曲線，剩餘 ${e.years.toFixed(1)} 年內插</small></span><b>${f2(e.tsy)}%</b></div>
+        <div><span class="n">4</span><span class="t">重估殖利率<small>${f2(e.tsy)}% 加上利差 ${e.spreadBp} bp（利差假設不變）</small></span><b>${f2(e.ytm)}%</b></div>
+        <div><span class="n">5</span><span class="t"><b style="font-family:inherit">估算現價</b><small>用 ${f2(e.ytm)}% 折現剩餘 ${e.n} 期票息與本金（不含應計利息）</small></span><b>${f2(e.pct)}</b></div>
+      </div>
+      <div class="hint" style="margin-bottom:10px">估算只跟著美債利率走；發行人信用變好或變差造成的價格變動不會反映，請在下方輸入對帳單報價重新校準。</div>`;
+  const rows = hist.map(h => `<tr><td class="l">${h.date}</td><td class="l">${h.src === 'est' ? '估算' : '手動'}</td><td>${f2(h.pct)}</td><td>${h.spreadBp != null ? bp(h.spreadBp) : '—'}</td></tr>`).join('');
+  return steps + (rows ? `<details class="hintFold" style="margin-bottom:10px"><summary>報價紀錄（最近 ${hist.length} 筆）</summary>
+      <div class="tableScroll"><table><thead><tr><th class="l">日期</th><th class="l">來源</th><th>現價 %</th><th>利差</th></tr></thead><tbody>${rows}</tbody></table></div></details>` : '');
+}
 function expandHTML(p, c) {
   const ccy = posCcy(p);
   if (p.market === 'bond') {
@@ -2201,12 +2383,13 @@ function expandHTML(p, c) {
         <div class="kv">應計利息（未配發）<b>${fmtMoney(c.accrued, ccy)}</b></div>
         <div class="kv">買進成本（含費用）<b>${fmtMoney(c.cost, ccy)}</b></div>
       </div>
+      ${bondEstHTML(b, c)}
       <div class="row">
-        <label class="field">更新市價（% of 面額）
+        <label class="field">更新市價（% of 面額，取自對帳單）
           <input id="ex_mark" type="number" step="any" min="0" value="${b.mark ?? b.buyPricePct}">
         </label>
-        <button id="ex_markBtn" class="ghost">儲存市價</button>
-        <span class="hint">上次更新：${b.markDate || '未曾更新（以買進價計）'}</span>
+        <button id="ex_markBtn" class="ghost">${c.est ? '儲存並重新校準利差' : '儲存市價'}</button>
+        <span class="hint">上次手動更新：${b.markDate || '未曾更新（以買進價計）'}<span id="ex_markPrev"></span></span>
         <label class="field">ISIN／識別碼（選填，改完自動存）
           <input id="ex_isin" value="${esc(b.isin || '')}" placeholder="XS2861550817" maxlength="20" style="width:170px">
         </label>
@@ -2289,8 +2472,18 @@ function bindExpand(p) {
       const v = parseFloat($('ex_mark').value);
       if (!(v > 0)) return;
       p.bond.mark = v; p.bond.markDate = todayISO();
+      delete p.bond.est;   // 手動報價成為新的基準；下次「債券重估」以它重新校準利差
+      pushMarkHist(p.bond, { date: p.bond.markDate, src: 'manual', pct: v });
       saveDB(); renderAll();
     };
+    // 輸入時預覽新利差（本次開頁抓過殖利率曲線才算得出來）
+    $('ex_mark').addEventListener('input', () => {
+      const v = parseFloat($('ex_mark').value), today = todayISO(), cv = curveOnOrBefore(cachedCurves(), today), old = bondEst(p.bond);
+      const y = cv && v > 0 && today < p.bond.maturity ? bondYtm(p.bond, v, today) : null;
+      if (y == null) { $('ex_markPrev').textContent = ''; return; }
+      const sp = Math.round((y - curveYield(cv, daysBetween(today, p.bond.maturity) / 365.25)) * 100);
+      $('ex_markPrev').textContent = `　·　儲存後利差${old ? `由 ${old.spreadBp >= 0 ? '+' : ''}${old.spreadBp} bp ` : ''}改為 ${sp >= 0 ? '+' : ''}${sp} bp`;
+    });
     // ISIN 補填/修改：離開欄位即存（既有持倉當初沒填也能事後補）
     $('ex_isin').addEventListener('change', e => { p.bond.isin = e.target.value.trim().toUpperCase() || null; saveDB(); });
     return;
@@ -4213,7 +4406,7 @@ function buildPortfolioPrompt() {
     if (p.market === 'bond') {
       const b = p.bond;
       const toMat = c.matured ? '已到期' : `距到期 ${(daysBetween(todayISO(), b.maturity) / 365).toFixed(1)} 年`;
-      lines.push(`${MKT_NAME[p.market]},${p.symbol},面額 ${fmtMoney(b.face, ccy)},買進價 ${b.buyPricePct}%,市價 ${c.matured ? '到期' : c.markPct + '%'},` +
+      lines.push(`${MKT_NAME[p.market]},${p.symbol},面額 ${fmtMoney(b.face, ccy)},買進價 ${b.buyPricePct}%,市價 ${c.matured ? '到期' : c.markPct + '%' + (c.est ? `（依 ${c.est.asOf} 美債殖利率曲線估算，非實際報價）` : '')},` +
         `市值 ${fmtMoney(c.mv, ccy)},未實現 ${fmtMoney(c.unreal, ccy)}(${fmtPct(c.unrealPct)}),已收息 ${fmtMoney(c.received, ccy)},` +
         `總損益 ${fmtMoney(c.total, ccy)},票息 ${b.rate}%/年,到期 ${b.maturity}（${toMat}）,買進日 ${b.buyDate}${b.isin ? `,ISIN ${b.isin}` : ''}`);
     } else {
@@ -5084,6 +5277,13 @@ function updAfterReload() {
   }
   return false;
 }
+$('bondRevalBtn').addEventListener('click', revalueBonds);
+$('bondEstUndo').addEventListener('click', () => {
+  let n = 0;
+  for (const p of db.positions) if (p.market === 'bond' && p.bond.est) { delete p.bond.est; n++; }
+  saveDB(); renderAll();
+  $('qStatus').className = 'status'; $('qStatus').textContent = `已復原 ${n} 檔債券為手動報價（沒有手動報價者回到買進價）`;
+});
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkForUpdate(); });
 window.addEventListener('pageshow', e => { if (e.persisted) checkForUpdate(); });   // Safari 從往返快取還原頁面
 (function init() {

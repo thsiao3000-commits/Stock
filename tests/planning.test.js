@@ -61,6 +61,9 @@ const near = (a, b, e = 1e-6) => Math.abs(a - b) < e;
   const sys = rows.find(r => r.kind === 'sys');
   check(`債券市價超過 ${BOND_STALE_DAYS} 天未更新 → 提醒`, /超過 30 天未更新/.test(sys.title) && /2026-06-01/.test(sys.desc));
   check('30 天內更新過 → 不提醒', !calendarEvents({ ...base, bonds: [{ ...base.bonds[0], lastMark: '2026-06-20' }] }).some(r => r.kind === 'sys'));
+  const estB = { ...base.bonds[0], estimated: true };   // 現價為殖利率曲線估算（v2.7.0）：放寬到 90 天才提醒校準
+  check('估算中的債券：手動報價 90 天內 → 不提醒', !calendarEvents({ ...base, bonds: [estB] }).some(r => r.kind === 'sys'));
+  check('估算中的債券：手動報價超過 90 天 → 提醒校準', calendarEvents({ ...base, bonds: [{ ...estB, lastMark: '2026-03-01' }] }).some(r => r.kind === 'sys' && /超過 90 天未用對帳單報價校準/.test(r.title)));
   check('從未更新市價 → 提醒', calendarEvents({ ...base, bonds: [{ ...base.bonds[0], lastMark: null }] }).some(r => r.kind === 'sys'));
   check('已到期債券不列配息與提醒', !calendarEvents({ ...base, bonds: [{ ...base.bonds[0], matured: true }] }).some(r => r.kind === 'coupon' || r.kind === 'sys'));
   check('已出清（股數 0）不列除息', !calendarEvents({ ...base, stocks: [{ market: 'tw', symbol: '2330', qty: 0, lastPrice: 1085 }] }).some(r => r.kind === 'div'));
