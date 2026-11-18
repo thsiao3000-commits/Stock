@@ -49,7 +49,7 @@ const TABLE = { schema_version: 1, updated_at: '2026-09-25', models: {
   check('查無模型回 null', M.estimateCostUSD(TABLE, 'no-such-model', 100, 100) === null);
   check('內嵌後備表 grok-4.7：100,000 / 10,000 → 0.26', near(M.estimateCostUSD(M.PRICING_FALLBACK, 'grok-4.7', 100000, 10000), 0.26));
   check('內嵌後備表已移除 grok-4.5', !M.PRICING_FALLBACK.models['grok-4.5']);
-  check('內嵌後備表 gpt-6.1-sol 10,000 / 5,000 → 0.07', near(M.estimateCostUSD(M.PRICING_FALLBACK, 'gpt-6.1-sol', 10000, 5000), 0.07));
+  check('內嵌後備表 gpt-6.2-sol 10,000 / 5,000 → 0.07', near(M.estimateCostUSD(M.PRICING_FALLBACK, 'gpt-6.2-sol', 10000, 5000), 0.07));
 
   check('內嵌後備表 claude-opus-5-5 12,000 / 3,000 → 0.108', near(M.estimateCostUSD(M.PRICING_FALLBACK, 'claude-opus-5-5', 12000, 3000), 0.108));
   check('內嵌後備表 claude-fable-5-2 10,000 / 5,000 → 0.28', near(M.estimateCostUSD(M.PRICING_FALLBACK, 'claude-fable-5-2', 10000, 5000), 0.28));
@@ -86,7 +86,7 @@ const TABLE = { schema_version: 1, updated_at: '2026-09-25', models: {
   global.fetch = async () => { throw new Error('offline'); };
   let t = await M1.loadPricing();
   check('fetch 失敗 → 退回內嵌後備表', t === M1.PRICING_FALLBACK);
-  for (const id of ['gpt-6-astra', 'gpt-6.1-sol', 'gpt-6.1-terra', 'claude-fable-5-2', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'grok-4.3', 'grok-4.7'])
+  for (const id of ['gpt-6.2-astra', 'gpt-6.2-sol', 'gpt-6.1-terra', 'claude-fable-5-2', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'grok-4.3', 'grok-4.7'])
     check(`後備表含下拉選單模型 ${id}`, !!t.models[id]);
   const M2 = fresh();
   global.fetch = async (url, opts) => ({ ok: true, json: async () => ({ schema_version: 1, updated_at: '2099-01-01', models: { 'x': { input: 1, output: 2 } } }) });

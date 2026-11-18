@@ -32,6 +32,18 @@
 
 ---
 
+## [v2.8.0] — 2026-11-18
+
+### 變更
+- **AI 思考模型 gpt-6-astra → gpt-6.2-astra、gpt-6.1-sol → gpt-6.2-sol**：設定卡「AI 思考模型」下拉的 OpenAI 選項改為 OpenAI 2026-11-17 推出的 gpt-6.2-astra 與 gpt-6.2-sol；gpt-6.2-sol 成為新預設，「自訂…」留空時的後備模型同步改為 gpt-6.2-sol。
+  - 價格（每百萬 tokens）：gpt-6.2-astra $8／$40（長上下文 272K 以上 $16／$60，比 gpt-6-astra 的 $10／$50 便宜 20%）；gpt-6.2-sol $2／$10（長上下文 $4／$15，與 gpt-6.1-sol 同價）。
+  - 內嵌價格後備表以兩個新模型取代舊模型；線上 pricing.json 原已收錄。
+  - 先前選過 gpt-6-astra 或 gpt-6.1-sol 的使用者，開頁時會自動回到預設 gpt-6.2-sol。
+  - gpt-6.1-terra（OpenAI 尚無 6.2 版）、Claude 四個模型、grok-4.3／grok-4.7 經核對仍為各家最新，維持不變。
+
+### 測試
+- `tests/pricing.test.js` 後備表覆蓋清單改為 gpt-6.2-astra／gpt-6.2-sol。
+
 ## [v2.7.0] — 2026-11-12
 
 ### 新增
