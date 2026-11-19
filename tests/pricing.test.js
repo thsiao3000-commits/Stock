@@ -163,6 +163,14 @@ const TABLE = { schema_version: 1, updated_at: '2026-09-25', models: {
   check('0 次／未知／壞值 → null', M.webSearchFee(0) === null && M.webSearchFee(undefined) === null && M.webSearchFee(null) === null && M.webSearchFee('3') === null && M.webSearchFee(-1) === null);
   check('標籤：含 web search 工具費', M.usageLabel({ input: 12000, output: 3000, reasoning: 0 }, 0.054, 'web search', M.webSearchFee(3)) === 'tokens 輸入 12,000／輸出 3,000　·　約 US$0.084（含 web search 工具費 US$0.030：3 次搜尋）');
 
+  console.log('I. 設定頁價目表連結（v2.9.0）');
+  const costBox = html.slice(html.indexOf('<section id="costBox">'), html.indexOf('</section>', html.indexOf('<section id="costBox">')));
+  const link = /<a id="pricingLink" href="([^"]+)"([^>]*)>/.exec(costBox);
+  const pricingUrl = /const PRICING_URL = '([^']+)'/.exec(html)[1];
+  check('花費統計卡內有價目表連結', !!link);
+  check('連結與 PRICING_URL 同站、指向 pricing.html', !!link && link[1] === pricingUrl.replace(/pricing\.json$/, 'pricing.html'));
+  check('另開分頁且 rel=noopener', !!link && /target="_blank"/.test(link[2]) && /rel="noopener"/.test(link[2]));
+
   console.log(fail === 0 ? `ALL ${pass} TESTS PASSED` : `${fail} TEST(S) FAILED`);
   process.exit(fail === 0 ? 0 : 1);
 })();

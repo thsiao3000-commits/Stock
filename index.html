@@ -854,12 +854,13 @@
         <select id="costMonthSel" style="font-size:.82rem; padding:5px 8px;"></select>
       </label>
       <span style="flex:1"></span>
+      <a id="pricingLink" href="https://thsiao3000-commits.github.io/BenchAI-Support/pricing.html" target="_blank" rel="noopener" style="font-size:.82rem; color:var(--accent); white-space:nowrap">模型價目表 ↗</a>
       <button id="costClearBtn" class="ghost">清除統計</button>
     </div>
     <div class="tableScroll" style="margin-top:8px">
       <table id="costTable"></table>
     </div>
-    <div class="hint" style="margin-top:6px; line-height:1.7">每次 AI 呼叫（OpenAI／Claude／xAI）成功完成後自動累計，保留最近 12 個月、只存在本機瀏覽器（隨「匯出 JSON」備份）。費用為依價格表估算的 <b>tokens 費用</b>，另加<b>工具費</b>（列於「工具費」欄）：OpenAI／Claude 的 web search 每 1,000 次搜尋 US$10、xAI x_search 每抓 1,000 則貼文 US$5，數量取自各家 API 的回報；中途失敗的呼叫與「複製 Prompt」到其他聊天機器人的用量不在統計內，實際帳單以 OpenAI／Anthropic／xAI 後台為準。</div>
+    <div class="hint" style="margin-top:6px; line-height:1.7">每次 AI 呼叫（OpenAI／Claude／xAI）成功完成後自動累計，保留最近 12 個月、只存在本機瀏覽器（隨「匯出 JSON」備份）。費用為依價格表估算的 <b>tokens 費用</b>（各模型費率見右上「模型價目表」），另加<b>工具費</b>（列於「工具費」欄）：OpenAI／Claude 的 web search 每 1,000 次搜尋 US$10、xAI x_search 每抓 1,000 則貼文 US$5，數量取自各家 API 的回報；中途失敗的呼叫與「複製 Prompt」到其他聊天機器人的用量不在統計內，實際帳單以 OpenAI／Anthropic／xAI 後台為準。</div>
   </section>
   <section id="helpBox">
     <h2>報告說明與名詞解釋</h2>
@@ -968,7 +969,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v2.8.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
+const APP_VERSION = 'v2.9.0';   // 版本（單一來源：注入畫面、亦寫進報告開頭）
 const $  = id => document.getElementById(id);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const sleep = ms => new Promise(r => setTimeout(r, ms));

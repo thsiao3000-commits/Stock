@@ -32,6 +32,14 @@
 
 ---
 
+## [v2.9.0] — 2026-11-19
+
+### 新增
+- **設定頁「模型價目表」連結**：「設定」分頁的「AI 花費統計」卡右上新增「模型價目表 ↗」連結，另開分頁顯示各模型每百萬 tokens 的輸入／輸出費率（[pricing.html](https://thsiao3000-commits.github.io/BenchAI-Support/pricing.html)，與本工具估算費用所用的線上 pricing.json 同一來源）。
+
+### 測試
+- `tests/pricing.test.js` 新增價目表連結檢查（位於花費統計卡、與 `PRICING_URL` 同站、另開分頁）。
+
 ## [v2.8.0] — 2026-11-18
 
 ### 變更
